@@ -9,12 +9,12 @@ const getClient = async (): Promise<KeycloakAdminClient> => {
     }
 
     const client = new KeycloakAdminClient({
-        baseUrl: `${process.env.KEYCLOAK_URL ?? '/'}auth`,
+        baseUrl: `${process.env.KEYCLOAK_URL}auth`,
         realmName: process.env.KEYCLOAK_REALM,
     });
 
     await client.auth({
-        clientId: process.env.KEYCLOAK_CLIENT_ID ?? '',
+        clientId: process.env.KEYCLOAK_CLIENT_ID,
         clientSecret: process.env.KEYCLOAK_CLIENT_SECRET,
         username: process.env.KEYCLOAK_API_USER,
         password: process.env.KEYCLOAK_API_PASS,

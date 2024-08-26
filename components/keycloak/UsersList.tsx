@@ -1,11 +1,14 @@
 import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import { getServerSession } from 'next-auth';
 import type { ReactElement } from 'react';
+import authOptions from '@/lib/auth/authOptions';
 import { getAllUsers } from '@/lib/keycloak/actions';
 
 const UsersList = async (): Promise<ReactElement> => {
-    const allUsers = await getAllUsers();
+    const session = await getServerSession(authOptions);
+    console.log('session', session);
 
-    console.log('allUsers', allUsers);
+    const allUsers = await getAllUsers();
 
     return (
         <div>

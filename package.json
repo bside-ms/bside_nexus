@@ -21,6 +21,7 @@
     "currency.js": "2.0.x",
     "lodash-es": "4.17.x",
     "next": "14.2.x",
+    "next-auth": "4.24.x",
     "next-server-action-hook": "2.0.x",
     "react": "18.3.x",
     "react-dom": "18.3.x",
