@@ -1,15 +1,15 @@
 'use client';
 
 import { useCallback, useState } from 'react';
+import type { ColumnFiltersState, SortingState } from '@tanstack/react-table';
+import { getFilteredRowModel } from '@tanstack/react-table';
+import { flexRender, getPaginationRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table';
 import type { ChangeEvent, ReactElement } from 'react';
 import { FaSort, FaSortDown, FaSortUp } from 'react-icons/fa';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { AugmentedUserRepresentation } from '@/lib/keycloak/userActions';
-import type { ColumnFiltersState, SortingState } from '@tanstack/react-table';
-import { getFilteredRowModel } from '@tanstack/react-table';
-import { flexRender, getPaginationRowModel, getSortedRowModel, useReactTable } from '@tanstack/react-table';
 import type { ColumnDef } from '@tanstack/table-core';
 import { getCoreRowModel } from '@tanstack/table-core';
 import type { SortingColumn } from '@tanstack/table-core/src/features/RowSorting';
