@@ -1,11 +1,8 @@
-import type { ReactElement } from 'react';
+import { redirect } from 'next/navigation';
 
-const Users = async (): Promise<ReactElement> => {
-    return (
-        <div>
-            <h1>Gruppenübersicht</h1>
-        </div>
-    );
+const Users = (): void => {
+    // For now...
+    redirect('/');
 };
 
 export default Users;

@@ -8,7 +8,7 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
     const group = await getGroupById(groupId);
 
     if (group === null) {
-        redirect('/groups');
+        redirect('/');
     }
 
     const [membersGroup, groupMembers] = await getGroupMembers(group);

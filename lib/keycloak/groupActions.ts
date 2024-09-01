@@ -52,9 +52,13 @@ export const getGroupName = (group: AugmentedGroupRepresentation): string =>
     group.attributes?.displayName ?? group.attributes?.shortName ?? upperFirst(group.name);
 
 export const getGroupById = async (groupId: string): Promise<AugmentedGroupRepresentation | null> => {
-    const group = await (await getClient()).groups.findOne({ id: groupId });
+    try {
+        const group = await (await getClient()).groups.findOne({ id: groupId });
 
-    return isNil(group) ? null : augmentGroup(group);
+        return isNil(group) ? null : augmentGroup(group);
+    } catch {
+        return null;
+    }
 };
 
 const getAllGroupsFlat = async (): Promise<Array<AugmentedGroupRepresentation>> => {
