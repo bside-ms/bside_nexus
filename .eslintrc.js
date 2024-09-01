@@ -18,58 +18,18 @@ module.exports = {
         },
     },
     ignorePatterns: ['**/*.json', '**/*.js', 'next-env.d.ts'],
-    plugins: [
-        // https://github.com/yannickcr/eslint-plugin-react
-        'react',
-
-        // https://github.com/typescript-eslint/typescript-eslint
-        '@typescript-eslint',
-
-        // https://github.com/benmosher/eslint-plugin-import
-        'import',
-
-        // https://github.com/lydell/eslint-plugin-simple-import-sort
-        'simple-import-sort',
-
-        // https://github.com/sweepline/eslint-plugin-unused-imports
-        'unused-imports',
-
-        // https://github.com/selaux/eslint-plugin-filenames
-        'filenames',
-
-        // https://github.com/sindresorhus/eslint-plugin-unicorn/
-        'unicorn',
-
-        // https://github.com/facebook/react/tree/main/packages/eslint-plugin-react-hooks
-        'react-hooks',
-
-        // https://github.com/jsx-eslint/eslint-plugin-jsx-a11y
-        'jsx-a11y',
-    ],
+    plugins: ['react', '@typescript-eslint', 'import', 'simple-import-sort', 'unused-imports', 'unicorn', 'react-hooks'],
     extends: [
         'next',
         'next/core-web-vitals',
         'prettier',
-
-        // node_modules/eslint/conf/eslint-recommended.js
         'eslint:recommended',
-
-        // node_modules/eslint-plugin-react/index.js
         'plugin:react/recommended',
         'plugin:react/jsx-runtime',
-
-        // node_modules/@typescript-eslint/eslint-plugin/dist/configs/eslint-recommended.js
         'plugin:@typescript-eslint/eslint-recommended',
-
-        // node_modules/@typescript-eslint/eslint-plugin/dist/configs/recommended.json
         'plugin:@typescript-eslint/recommended',
-
-        // node_modules/@typescript-eslint/eslint-plugin/dist/configs/recommended-requiring-type-checking.json
         'plugin:@typescript-eslint/recommended-requiring-type-checking',
-
-        // node_modules/eslint-plugin-react-hooks/src/index.js
         'plugin:react-hooks/recommended',
-
         'plugin:tailwindcss/recommended',
     ],
     settings: {
@@ -98,9 +58,7 @@ module.exports = {
         eqeqeq: [ERROR, 'always'],
         'guard-for-in': ERROR,
         'id-match': ERROR,
-        'jsx-a11y/alt-text': ERROR,
         'max-classes-per-file': [ERROR, 10],
-
         'no-bitwise': ERROR,
         'no-caller': ERROR,
         'no-console': ERROR,
