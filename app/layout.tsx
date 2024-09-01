@@ -1,20 +1,32 @@
 import './globals.css';
 
 import type { Metadata } from 'next';
-import { Roboto } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import type { ReactElement, ReactNode } from 'react';
+import Login from '@/components/Login';
+import Navigation from '@/components/navigation/Navigation';
+import isUserLoggedIn from '@/lib/auth/isUserLoggedIn';
 
-const roboto = Roboto({ weight: ['100', '300', '400', '500', '700', '900'], subsets: ['latin'] });
+const interFont = Inter({ weight: ['400'], subsets: ['latin'], variable: '--font-sans' });
 
 export const metadata: Metadata = {
     title: 'B-Side Nexus',
-    description: '',
 };
 
-const RootLayout = ({ children }: Readonly<{ children: ReactNode }>): ReactElement => (
-    <html>
-        <body className={roboto.className}>{children}</body>
-    </html>
-);
+const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Promise<ReactElement> => {
+    const isLoggedIn = await isUserLoggedIn();
+
+    return (
+        <html>
+            <body className={interFont.className}>
+                <div className="flex min-h-screen bg-gray-100">
+                    <Navigation />
+
+                    <main className="min-h-screen flex-1 bg-gray-100 px-9 py-6">{isLoggedIn ? children : <Login />}</main>
+                </div>
+            </body>
+        </html>
+    );
+};
 
 export default RootLayout;

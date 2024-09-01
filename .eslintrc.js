@@ -145,7 +145,6 @@ module.exports = {
         'react/jsx-no-bind': WARNING,
         'react/jsx-no-target-blank': OFF,
         'react/jsx-no-useless-fragment': [ERROR, { allowExpressions: true }],
-        'react/jsx-props-no-spreading': ERROR,
         'react/no-access-state-in-setstate': ERROR,
         'react/no-adjacent-inline-elements': OFF,
         'react/no-array-index-key': WARNING,

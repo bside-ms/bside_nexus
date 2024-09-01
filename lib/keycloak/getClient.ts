@@ -1,5 +1,4 @@
 import KeycloakAdminClient from '@keycloak/keycloak-admin-client';
-import type UserRepresentation from '@keycloak/keycloak-admin-client/lib/defs/userRepresentation';
 
 let adminClient: KeycloakAdminClient | null = null;
 
@@ -26,6 +25,4 @@ const getClient = async (): Promise<KeycloakAdminClient> => {
     return client;
 };
 
-export const getAllUsers = async (): Promise<Array<UserRepresentation>> => {
-    return (await getClient()).users.find({ first: 0, max: 9999 });
-};
+export default getClient;
