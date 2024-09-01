@@ -37,15 +37,25 @@ const augmentGroup = (group: GroupRepresentation): AugmentedGroupRepresentation 
 };
 
 const getSubGroups = async (parentGroupId: string): Promise<Array<AugmentedGroupRepresentation>> => {
-    return (await (await getClient()).groups.listSubGroups({ parentId: parentGroupId, briefRepresentation: false, first: 0, max: 9999 }))
-        .map(augmentGroup)
-        .filter((group): group is AugmentedGroupRepresentation => group !== null);
+    try {
+        return (
+            await (await getClient()).groups.listSubGroups({ parentId: parentGroupId, briefRepresentation: false, first: 0, max: 9999 })
+        )
+            .map(augmentGroup)
+            .filter((group): group is AugmentedGroupRepresentation => group !== null);
+    } catch {
+        return [];
+    }
 };
 
 const getParentGroups = async (): Promise<Array<AugmentedGroupRepresentation>> => {
-    return (await (await getClient()).groups.find({ briefRepresentation: false, first: 0, max: 9999 }))
-        .map(augmentGroup)
-        .filter((group): group is AugmentedGroupRepresentation => group !== null);
+    try {
+        return (await (await getClient()).groups.find({ briefRepresentation: false, first: 0, max: 9999 }))
+            .map(augmentGroup)
+            .filter((group): group is AugmentedGroupRepresentation => group !== null);
+    } catch {
+        return [];
+    }
 };
 
 export const getGroupName = (group: AugmentedGroupRepresentation): string =>
