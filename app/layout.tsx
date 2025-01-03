@@ -4,6 +4,9 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import type { ReactElement, ReactNode } from 'react';
 import Login from '@/components/Login';
+import AppSidebar from '@/components/sidebar/app-sidebar';
+import ThemeProvider from '@/components/theming/theme-provider';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import isUserLoggedIn from '@/lib/auth/isUserLoggedIn';
 
 const interFont = Inter({ weight: ['400'], subsets: ['latin'], variable: '--font-sans' });
@@ -17,10 +20,17 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
 
     return (
         <html>
+            <head />
             <body className={interFont.className}>
-                <div className="flex min-h-screen bg-gray-100">
-                    <main className="min-h-screen flex-1 bg-gray-100 px-9 py-6">{isLoggedIn ? children : <Login />}</main>
-                </div>
+                <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+                    <SidebarProvider>
+                        <AppSidebar />
+                        <main className="min-h-screen flex-1 bg-gray-100 px-9 py-6 dark:bg-zinc-900">
+                            <SidebarTrigger />
+                            {isLoggedIn ? children : <Login />}
+                        </main>
+                    </SidebarProvider>
+                </ThemeProvider>
             </body>
         </html>
     );
