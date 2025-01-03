@@ -1,5 +1,6 @@
 'use server';
 
+import { isEmpty } from 'lodash-es';
 import type { ReactElement } from 'react';
 import type * as React from 'react';
 import { AppSidebarContent } from '@/components/sidebar/sidebar-content';
@@ -20,7 +21,7 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
                     user={{
                         name: user.name,
                         email: user.email,
-                        avatar: 'https://avatars.githubusercontent.com/u/10064425?v=4',
+                        avatar: !isEmpty(user.username) ? `/api/mattermost/${user.username}` : '',
                     }}
                 />
             )}

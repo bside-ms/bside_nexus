@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     robots: 'noindex, nofollow',
 };
 
-export default function Page(): ReactElement {
+export default async function Page(): Promise<ReactElement> {
     return (
         <div className="">
             <TopNav items={breadCrumbs} />

@@ -8,6 +8,7 @@ declare module 'next-auth' {
             name: string;
             keycloakGroups: Array<string>;
             email: string;
+            username: string;
         };
     }
 }
@@ -15,6 +16,7 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
     interface JWT {
         keycloakGroups?: Array<string>;
+        username: string;
     }
 }
 
