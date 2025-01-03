@@ -1,7 +1,8 @@
 'use client';
 
+import { useCallback } from 'react';
 import { BadgeCheck, Bell, ChevronsUpDown, CreditCard, LogOut, Sparkles } from 'lucide-react';
-import Link from 'next/link';
+import { signOut } from 'next-auth/react';
 import type { ReactElement } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -25,6 +26,7 @@ export function AppSidebarFooter({
     };
 }): ReactElement {
     const { isMobile } = useSidebar();
+    const logout = useCallback(() => signOut(), []);
 
     return (
         <SidebarMenu>
@@ -87,12 +89,10 @@ export function AppSidebarFooter({
                             </DropdownMenuItem>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
-                        <Link href="/api/auth/signout">
-                            <DropdownMenuItem>
-                                <LogOut />
-                                Log out
-                            </DropdownMenuItem>
-                        </Link>
+                        <DropdownMenuItem onClick={logout}>
+                            <LogOut />
+                            Log out
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             </SidebarMenuItem>
