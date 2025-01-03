@@ -1,34 +1,44 @@
 import './globals.css';
 
+import { GeistSans } from 'geist/font/sans';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import type { ReactElement, ReactNode } from 'react';
 import Login from '@/components/Login';
-import AppSidebar from '@/components/sidebar/app-sidebar';
+import { AppSidebar } from '@/components/sidebar/sidebar';
 import ThemeProvider from '@/components/theming/theme-provider';
-import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import isUserLoggedIn from '@/lib/auth/isUserLoggedIn';
 
-const interFont = Inter({ weight: ['400'], subsets: ['latin'], variable: '--font-sans' });
-
 export const metadata: Metadata = {
-    title: 'B-Side Nexus',
+    title: 'B-Side Intern',
 };
 
 const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Promise<ReactElement> => {
     const isLoggedIn = await isUserLoggedIn();
 
+    if (!isLoggedIn) {
+        return (
+            <html>
+                <body className={GeistSans.className}>
+                    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+                        <main className="">
+                            <Login />
+                        </main>
+                    </ThemeProvider>
+                </body>
+            </html>
+        );
+    }
+
     return (
         <html>
-            <head />
-            <body className={interFont.className}>
+            <body className={GeistSans.className}>
                 <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
                     <SidebarProvider>
                         <AppSidebar />
-                        <main className="min-h-screen flex-1 bg-gray-100 px-9 py-6 dark:bg-zinc-900">
-                            <SidebarTrigger />
-                            {isLoggedIn ? children : <Login />}
-                        </main>
+                        <SidebarInset>
+                            <main className="">{isLoggedIn ? children : <Login />}</main>
+                        </SidebarInset>
                     </SidebarProvider>
                 </ThemeProvider>
             </body>
