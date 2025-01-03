@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
-import TopNav from '@/components/sidebar/nav-top';
+import NavbarTop from '@/components/sidebar/NavbarTop';
 
 const breadCrumbs = [
     {
@@ -15,10 +15,10 @@ export const metadata: Metadata = {
     robots: 'noindex, nofollow',
 };
 
-export default async function Page(): Promise<ReactElement> {
+export default function Page(): ReactElement {
     return (
         <div className="">
-            <TopNav items={breadCrumbs} />
+            <NavbarTop items={breadCrumbs} />
             <div className="flex flex-1 flex-col gap-4 p-4">
                 <div className="grid auto-rows-min gap-4 md:grid-cols-3">
                     <div className="aspect-video rounded-xl bg-zinc-100 dark:bg-zinc-800/50" />

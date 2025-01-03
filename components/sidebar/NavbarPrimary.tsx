@@ -19,7 +19,7 @@ import {
     useSidebar,
 } from '@/components/ui/sidebar';
 
-export function NavPrimary({
+export function NavbarPrimary({
     projects,
 }: {
     projects: Array<{

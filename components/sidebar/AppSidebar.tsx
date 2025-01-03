@@ -3,9 +3,9 @@
 import { isEmpty } from 'lodash-es';
 import type { ReactElement } from 'react';
 import type * as React from 'react';
-import { AppSidebarContent } from '@/components/sidebar/sidebar-content';
-import { AppSidebarFooter } from '@/components/sidebar/sidebar-footer';
-import { AppSidebarHeader } from '@/components/sidebar/sidebar-header';
+import { AppSidebarContent } from '@/components/sidebar/AppSidebarContent';
+import { AppSidebarFooter } from '@/components/sidebar/AppSidebarFooter';
+import { AppSidebarHeader } from '@/components/sidebar/AppSidebarHeader';
 import { Sidebar } from '@/components/ui/sidebar';
 import getUserSession from '@/lib/auth/getUserSession';
 

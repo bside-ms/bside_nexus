@@ -4,8 +4,8 @@ import { GeistSans } from 'geist/font/sans';
 import type { Metadata } from 'next';
 import type { ReactElement, ReactNode } from 'react';
 import Login from '@/components/Login';
-import { AppSidebar } from '@/components/sidebar/sidebar';
-import ThemeProvider from '@/components/theming/theme-provider';
+import { AppSidebar } from '@/components/sidebar/AppSidebar';
+import ThemeProvider from '@/components/theming/ThemeProvider';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import isUserLoggedIn from '@/lib/auth/isUserLoggedIn';
 

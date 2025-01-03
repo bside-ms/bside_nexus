@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { ThemeToggle } from '@/components/theming/theme-toggle';
+import { ThemeToggle } from '@/components/theming/ThemeToggle';
 import {
     Breadcrumb,
     BreadcrumbItem,
@@ -19,7 +19,7 @@ interface BreadcrumbItemProps {
     }>;
 }
 
-export default function TopNav(props: BreadcrumbItemProps): ReactElement {
+export default function NavbarTop(props: BreadcrumbItemProps): ReactElement {
     const breadcrumbLength = props.items?.length ?? 0;
 
     return (

@@ -2,8 +2,8 @@
 
 import { Frame, Map, PieChart } from 'lucide-react';
 import type { ReactElement } from 'react';
-import { NavPrimary } from '@/components/sidebar/nav-primary';
-import { NavSecondary } from '@/components/sidebar/nav-secondary';
+import { NavbarPrimary } from '@/components/sidebar/NavbarPrimary';
+import { NavbarSecondary } from '@/components/sidebar/NavbarSecondary';
 import { SidebarContent } from '@/components/ui/sidebar';
 
 const data = {
@@ -29,8 +29,8 @@ const data = {
 export function AppSidebarContent(): ReactElement {
     return (
         <SidebarContent>
-            <NavPrimary projects={data.projects} />
-            <NavSecondary className="mt-auto" />
+            <NavbarPrimary projects={data.projects} />
+            <NavbarSecondary className="mt-auto" />
         </SidebarContent>
     );
 }
