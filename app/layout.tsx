@@ -4,7 +4,6 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import type { ReactElement, ReactNode } from 'react';
 import Login from '@/components/Login';
-import Navigation from '@/components/navigation/Navigation';
 import isUserLoggedIn from '@/lib/auth/isUserLoggedIn';
 
 const interFont = Inter({ weight: ['400'], subsets: ['latin'], variable: '--font-sans' });
@@ -20,8 +19,6 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
         <html>
             <body className={interFont.className}>
                 <div className="flex min-h-screen bg-gray-100">
-                    <Navigation />
-
                     <main className="min-h-screen flex-1 bg-gray-100 px-9 py-6">{isLoggedIn ? children : <Login />}</main>
                 </div>
             </body>
