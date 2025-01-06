@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { ChevronsUpDown, LogOut, Settings } from 'lucide-react';
+import Link from 'next/link';
 import { signOut } from 'next-auth/react';
 import type { ReactElement } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -25,7 +26,7 @@ export function AppSidebarFooter({
         avatar: string;
     };
 }): ReactElement {
-    const { isMobile } = useSidebar();
+    const { isMobile, toggleSidebar, state } = useSidebar();
     const logout = useCallback(() => signOut(), []);
 
     return (
@@ -68,10 +69,12 @@ export function AppSidebarFooter({
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
-                            <DropdownMenuItem>
-                                <Settings />
-                                Account
-                            </DropdownMenuItem>
+                            <Link href="/settings" onClick={isMobile && state === 'expanded' ? toggleSidebar : void 0}>
+                                <DropdownMenuItem>
+                                    <Settings />
+                                    Account
+                                </DropdownMenuItem>
+                            </Link>
                         </DropdownMenuGroup>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={logout}>

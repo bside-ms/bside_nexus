@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { Fragment, type ReactElement } from 'react';
 import { ThemeToggle } from '@/components/theming/ThemeToggle';
 import {
     Breadcrumb,
@@ -31,7 +31,7 @@ export default function NavbarTop(props: BreadcrumbItemProps): ReactElement {
                     <Breadcrumb>
                         <BreadcrumbList>
                             {props.items.map((item, index) => (
-                                <>
+                                <Fragment key={item.title}>
                                     <BreadcrumbItem className="hidden md:block">
                                         {item.active === true ? (
                                             <BreadcrumbPage>{item.title}</BreadcrumbPage>
@@ -40,7 +40,7 @@ export default function NavbarTop(props: BreadcrumbItemProps): ReactElement {
                                         )}
                                     </BreadcrumbItem>
                                     {breadcrumbLength - 1 !== index && <BreadcrumbSeparator className="hidden md:block" />}
-                                </>
+                                </Fragment>
                             ))}
                         </BreadcrumbList>
                     </Breadcrumb>
