@@ -49,3 +49,25 @@ export const changeMail = async (userId: string, newMail: string): Promise<void>
         throw new Error('An unexpected error occurred while updating the username.');
     }
 };
+
+export const changeDisplayname = async (userId: string, newDisplayname: string): Promise<void> => {
+    const client = await getClient();
+
+    try {
+        await client.users.update(
+            { id: userId }, // ID of the user to update
+            { firstName: newDisplayname }, // Values to be updated
+        );
+
+        // eslint-disable-next-line no-console
+        console.log(`Displayname updated for user ID '${userId}' to '${newDisplayname}'.`);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+        // Handle specific Keycloak errors
+        if (error.response && error.response.data) {
+            throw new Error(error.response.data.errorMessage || 'Keycloak error occurred.');
+        }
+        throw new Error('An unexpected error occurred while updating the displayname.');
+    }
+};
