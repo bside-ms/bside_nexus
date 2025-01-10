@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
-import { changeUsername } from '@/lib/keycloak/accountActions';
+import { changeMail } from '@/lib/keycloak/accountActions';
 
 export async function POST(req: Request): Promise<NextResponse> {
     try {
@@ -15,14 +15,14 @@ export async function POST(req: Request): Promise<NextResponse> {
             return NextResponse.json({ error: 'Die eingeloggte Benutzer*in konnte nicht identifiziert werden.' }, { status: 400 });
         }
 
-        const { newUsername }: { newUsername: string } = await req.json();
+        const { newEmail }: { newEmail: string } = await req.json();
 
-        if (!newUsername || newUsername.trim().length < 3) {
-            return NextResponse.json({ error: 'Benutzer*innen-Name muss mindestens 3 Zeichen lang sein.' }, { status: 400 });
+        if (!newEmail || newEmail.trim().length < 3) {
+            return NextResponse.json({ error: 'Mail-Adresse ist ungültig.' }, { status: 400 });
         }
 
         // Change username in KeyCloak
-        await changeUsername(userId, newUsername);
+        await changeMail(userId, newEmail);
         // ToDo: Change username in Mattermost
 
         return NextResponse.json({ success: true });
@@ -30,7 +30,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         // eslint-disable-next-line no-console
-        console.error('Error changing username:', error);
-        return NextResponse.json({ error: error.message || 'Dein Username wurde nicht geändert.' }, { status: 500 });
+        console.error('Error changing mail-adress:', error.message);
+        return NextResponse.json({ error: error.message || 'Deine Mail-Adresse wurde nicht geändert.' }, { status: 500 });
     }
 }

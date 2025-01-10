@@ -1,6 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2 } from 'lucide-react';
+import { signIn } from 'next-auth/react';
 import type { ReactElement } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -23,22 +26,56 @@ export default function FormChangeMail({ mail }: { mail: string }): ReactElement
         },
     });
 
+    const [isLoading, setIsLoading] = useState(false);
+
     if (mail === undefined) {
         return <div>Loading...</div>;
     }
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
-        // Do something with the form values.
-        // ✅ This will be type-safe and validated.
+    const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        setIsLoading(true);
 
-        // eslint-disable-next-line no-console
-        console.log(values);
+        try {
+            const response = await fetch('/api/account/change-mail', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    newEmail: values.mail,
+                }),
+            });
 
-        toast.success('Deine E-Mail-Adresse wurde geändert!', {
-            description: `Bitte logge dich mit deiner neuen E-Mail-Adresse ein.`,
-            duration: 10000,
-        });
-    }
+            const result = await response.json();
+
+            if (!response.ok) {
+                toast.error('Fehler beim Ändern der Mail-Adresse!', {
+                    description: result.error || 'Unbekannter Fehler.',
+                });
+                return;
+            }
+
+            // Update the session.
+            const signInResult = await signIn('keycloak', { redirect: false });
+            if (signInResult?.error) {
+                toast.error('Fehler beim Aktualisieren der Sitzung.', {
+                    description: 'Bitte melde dich erneut an.',
+                });
+                return;
+            }
+
+            toast.success('Deine Mail-Adresse wurde geändert!', {
+                description: `Ab sofort kannst du dich mit der Mail-Adresse @${values.mail} in allen unseren Diensten anmelden.`,
+                duration: 10000,
+            });
+        } catch {
+            toast.error('Fehler beim Ändern der Mail-Adresse!', {
+                description: 'Bitte versuche es später erneut.',
+            });
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     return (
         <Form {...form}>
@@ -70,8 +107,15 @@ export default function FormChangeMail({ mail }: { mail: string }): ReactElement
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button variant="secondary" type="submit" className="w-full">
-                            Speichern
+                        <Button variant="secondary" type="submit" className="w-full" disabled={isLoading}>
+                            {isLoading ? (
+                                <div className="flex items-center justify-center space-x-2">
+                                    <Loader2 className="size-4 animate-spin" /> {/* Spinner */}
+                                    <span>Lädt...</span>
+                                </div>
+                            ) : (
+                                'Speichern'
+                            )}
                         </Button>
                     </CardFooter>
                 </Card>

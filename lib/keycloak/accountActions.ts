@@ -4,13 +4,41 @@ export const changeUsername = async (userId: string, newUsername: string): Promi
     const client = await getClient();
 
     try {
-        // Update the user's username in Keycloak
         await client.users.update(
-            { id: userId }, // User identifier
-            { username: newUsername }, // New username
+            { id: userId }, // ID of the user to update
+            { username: newUsername }, // Values to be updated
         );
+
         // eslint-disable-next-line no-console
         console.log(`Username successfully updated for user ID '${userId}' to '${newUsername}'.`);
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } catch (error: any) {
+        // Handle specific Keycloak errors
+        if (error.response && error.response.data) {
+            throw new Error(error.response.data.errorMessage || 'Keycloak error occurred.');
+        }
+        throw new Error('An unexpected error occurred while updating the username.');
+    }
+};
+
+export const changeMail = async (userId: string, newMail: string): Promise<void> => {
+    const client = await getClient();
+
+    const user = await client.users.find({ email: newMail });
+
+    if (user.length > 0) {
+        throw new Error('Mail-Adresse ist bereits vergeben.');
+    }
+
+    try {
+        await client.users.update(
+            { id: userId }, // ID of the user to update
+            { email: newMail }, // Values to be updated
+        );
+
+        // eslint-disable-next-line no-console
+        console.log(`Mail successfully updated for user ID '${userId}' to '${newMail}'.`);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
