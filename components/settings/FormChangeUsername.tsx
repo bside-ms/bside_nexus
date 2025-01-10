@@ -1,6 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Loader2 } from 'lucide-react';
+import { signIn } from 'next-auth/react';
 import type { ReactElement } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
@@ -23,21 +26,55 @@ export default function FormChangeUsername({ username }: { username: string }): 
         },
     });
 
+    const [isLoading, setIsLoading] = useState(false);
+
     if (username === undefined) {
         return <div>Loading...</div>;
     }
 
-    const onSubmit = (values: z.infer<typeof formSchema>) => {
-        // Do something with the form values.
-        // ✅ This will be type-safe and validated.
+    const onSubmit = async (values: z.infer<typeof formSchema>) => {
+        setIsLoading(true);
 
-        // eslint-disable-next-line no-console
-        console.log(values);
+        try {
+            const response = await fetch('/api/account/change-username', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    newUsername: values.username,
+                }),
+            });
 
-        toast.success('Dein Username wurde geändert!', {
-            description: `Bei Mattermost heißt du nun @${values.username}.`,
-            duration: 10000,
-        });
+            const result = await response.json();
+
+            if (!response.ok) {
+                toast.error('Fehler beim Ändern des Benutzer*innen-Namens.', {
+                    description: result.error || 'Unbekannter Fehler.',
+                });
+                return;
+            }
+
+            // Update the session.
+            const signInResult = await signIn('keycloak', { redirect: false });
+            if (signInResult?.error) {
+                toast.error('Fehler beim Aktualisieren der Sitzung.', {
+                    description: 'Bitte melde dich erneut an.',
+                });
+                return;
+            }
+
+            toast.success('Dein Username wurde geändert!', {
+                description: `Bei Mattermost heißt du nun @${values.username}.`,
+                duration: 10000,
+            });
+        } catch {
+            toast.error('Fehler beim Ändern des Benutzernamens.', {
+                description: 'Bitte versuche es später erneut.',
+            });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -71,8 +108,15 @@ export default function FormChangeUsername({ username }: { username: string }): 
                         </div>
                     </CardContent>
                     <CardFooter>
-                        <Button variant="secondary" type="submit" className="w-full">
-                            Speichern
+                        <Button variant="secondary" type="submit" className="w-full" disabled={isLoading}>
+                            {isLoading ? (
+                                <div className="flex items-center justify-center space-x-2">
+                                    <Loader2 className="size-4 animate-spin" /> {/* Spinner */}
+                                    <span>Lädt...</span>
+                                </div>
+                            ) : (
+                                'Speichern'
+                            )}
                         </Button>
                     </CardFooter>
                 </Card>

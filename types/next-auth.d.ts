@@ -9,6 +9,7 @@ declare module 'next-auth' {
             keycloakGroups: Array<string>;
             email: string;
             username: string;
+            id: string;
         };
     }
 }
