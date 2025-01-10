@@ -39,6 +39,8 @@ export async function GET(req: NextRequest, { params }: { params: { username: st
             },
             status: 200,
         });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         return new Response(
             JSON.stringify({

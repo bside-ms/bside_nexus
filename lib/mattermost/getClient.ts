@@ -2,7 +2,7 @@ import { Client4 } from '@mattermost/client';
 
 let mattermostClient: Client4 | null = null;
 
-const getMattermostClient = async (): Promise<Client4> => {
+const getMattermostClient = (): Client4 => {
     if (mattermostClient !== null) {
         return mattermostClient;
     }

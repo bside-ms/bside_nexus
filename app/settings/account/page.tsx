@@ -1,10 +1,9 @@
 import type { ReactElement } from 'react';
+import { Toaster } from 'sonner';
+import FormChangeMail from '@/components/settings/FormChangeMail';
+import FormChangeUsername from '@/components/settings/FormChangeUsername';
 import { SidebarNav } from '@/components/settings/SidebarNav';
 import NavbarTop from '@/components/sidebar/NavbarTop';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import getUserSession from '@/lib/auth/getUserSession';
 
@@ -43,51 +42,23 @@ export default async function Page(): Promise<ReactElement> {
                     <div className="flex-1 lg:max-w-4xl">
                         <div className="flex flex-1 flex-col gap-4 p-4">
                             <div className="grid auto-rows-min gap-4 md:grid-cols-1">
-                                <Card className="rounded-xl ">
-                                    <CardHeader>
-                                        <CardTitle>Mail-Adresse</CardTitle>
-                                        <CardDescription>Diese Mail-Adresse wird für den Login verwendet.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="grid gap-6">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="name">Mail-Adresse</Label>
-                                            <Input id="email" placeholder={user?.email ?? ''} value={user?.email ?? ''} />
-                                        </div>
-                                    </CardContent>
-                                    <CardFooter>
-                                        <Button variant="secondary" className="w-full">
-                                            Speichern
-                                        </Button>
-                                    </CardFooter>
-                                </Card>
+                                <FormChangeMail mail={user?.email ?? ''} />
 
                                 <Separator className="my-6" />
 
-                                <Card className="rounded-xl ">
-                                    <CardHeader>
-                                        <CardTitle>Benutzer*innenname</CardTitle>
-                                        <CardDescription>
-                                            Dieser Name wird als dein Benutzername verwendet.
-                                            <br />
-                                            Dieser Name muss eindeutig sein und darf keine Leerzeichen enthalten.
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="grid gap-6">
-                                        <div className="grid gap-2">
-                                            <Label htmlFor="name">Benutzer*innenname</Label>
-                                            <Input id="name" placeholder={user?.username ?? ''} value={user?.username ?? ''} />
-                                        </div>
-                                    </CardContent>
-                                    <CardFooter>
-                                        <Button variant="secondary" className="w-full">
-                                            Speichern
-                                        </Button>
-                                    </CardFooter>
-                                </Card>
+                                <FormChangeUsername username={user?.username ?? ''} />
                             </div>
                         </div>
                     </div>
                 </div>
+
+                <Toaster
+                    position="top-right"
+                    richColors
+                    // Voluntarily passing empty object as a workaround for `richColors`
+                    // to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
+                    toastOptions={{}}
+                />
             </div>
         </>
     );
