@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
 import { changeDisplayname } from '@/lib/keycloak/accountActions';
+import { changeMattermostDisplayname } from '@/lib/mattermost/accountActions';
 
 export async function POST(req: Request): Promise<NextResponse> {
     try {
@@ -21,9 +22,8 @@ export async function POST(req: Request): Promise<NextResponse> {
             return NextResponse.json({ error: 'Dein Anzeigename muss mindestens 3 Zeichen lang sein.' }, { status: 400 });
         }
 
-        // Change username in KeyCloak
         await changeDisplayname(userId, newDisplayname);
-        // ToDo: Change username in Mattermost
+        await changeMattermostDisplayname(user.username, newDisplayname);
 
         return NextResponse.json({ success: true });
 

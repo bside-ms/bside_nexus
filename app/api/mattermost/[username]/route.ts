@@ -1,6 +1,6 @@
 import axios from 'axios';
 import type { NextRequest } from 'next/server';
-import getMattermostClient from '@/lib/mattermost/getClient';
+import getMattermostClient from '@/lib/mattermost/getMattermostClient';
 
 export async function GET(req: NextRequest, { params }: { params: { username: string } }): Promise<Response> {
     const { username } = params;
