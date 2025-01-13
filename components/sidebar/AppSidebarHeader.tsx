@@ -9,7 +9,7 @@ export function AppSidebarHeader(): ReactElement {
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" asChild>
                         <a href="/">
-                            <div className="flex aspect-square size-8 items-center justify-center rounded-lg  text-sidebar-primary-foreground">
+                            <div className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground">
                                 <Image src="/logo.png" alt="Logo" width={40} height={40} />
                             </div>
                             <div className="grid flex-1 text-left text-sm leading-tight">

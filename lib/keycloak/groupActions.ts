@@ -14,6 +14,7 @@ export type AugmentedGroupRepresentation = GroupRepresentation &
             categoryName?: string;
             displayName?: string;
             shortName?: string;
+            description?: string;
         };
     };
 
@@ -30,8 +31,9 @@ const augmentGroup = (group: GroupRepresentation): AugmentedGroupRepresentation 
         attributes: {
             groupType: Array.isArray(group.attributes?.group_type) ? group.attributes.group_type[0] : undefined,
             categoryName: Array.isArray(group.attributes?.category_name) ? group.attributes.category_name[0] : undefined,
-            displayName: Array.isArray(group.attributes?.display_name) ? group.attributes.display_name[0] : undefined,
+            displayName: Array.isArray(group.attributes?.display_name) ? group.attributes.display_name[0] : group.name,
             shortName: Array.isArray(group.attributes?.short_name) ? group.attributes.short_name[0] : undefined,
+            description: Array.isArray(group.attributes?.description) ? group.attributes.description[0] : undefined,
         },
     };
 };
@@ -96,6 +98,7 @@ export const getGroupsByPaths = async (groupPaths: Array<string>): Promise<Array
 };
 
 const membersGroupIdentifier = 'mitglieder';
+const adminGroupIdentifier = 'admin';
 
 export const getUserGroups = async (): Promise<Array<AugmentedGroupRepresentation>> => {
     const keycloakGroupPaths = (await getUserSession())?.keycloakGroups ?? [];
@@ -104,6 +107,16 @@ export const getUserGroups = async (): Promise<Array<AugmentedGroupRepresentatio
         keycloakGroupPaths
             .filter((path) => path.endsWith(membersGroupIdentifier))
             .map((path) => path.replace(`/${membersGroupIdentifier}`, '')),
+    );
+};
+
+export const getUserAdminGroups = async (): Promise<Array<AugmentedGroupRepresentation>> => {
+    const keycloakGroupPaths = (await getUserSession())?.keycloakGroups ?? [];
+
+    return getGroupsByPaths(
+        keycloakGroupPaths
+            .filter((path) => path.endsWith(adminGroupIdentifier))
+            .map((path) => path.replace(`/${adminGroupIdentifier}`, '')),
     );
 };
 

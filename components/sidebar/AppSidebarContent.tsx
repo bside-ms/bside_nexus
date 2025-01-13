@@ -9,17 +9,17 @@ import { SidebarContent } from '@/components/ui/sidebar';
 const data = {
     projects: [
         {
-            name: 'Design Engineering',
-            url: '#',
+            name: 'Dashboard',
+            url: '/dashboard',
             icon: Frame,
         },
         {
-            name: 'Sales & Marketing',
-            url: '#',
+            name: 'Meine Gruppen',
+            url: '/groups',
             icon: PieChart,
         },
         {
-            name: 'Travel',
+            name: 'Placeholder',
             url: '#',
             icon: Map,
         },
