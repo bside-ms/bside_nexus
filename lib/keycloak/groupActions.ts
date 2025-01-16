@@ -14,6 +14,7 @@ export type AugmentedGroupRepresentation = GroupRepresentation &
             categoryName?: string;
             displayName?: string;
             shortName?: string;
+            description?: string;
         };
     };
 
@@ -30,8 +31,9 @@ const augmentGroup = (group: GroupRepresentation): AugmentedGroupRepresentation 
         attributes: {
             groupType: Array.isArray(group.attributes?.group_type) ? group.attributes.group_type[0] : undefined,
             categoryName: Array.isArray(group.attributes?.category_name) ? group.attributes.category_name[0] : undefined,
-            displayName: Array.isArray(group.attributes?.display_name) ? group.attributes.display_name[0] : undefined,
+            displayName: Array.isArray(group.attributes?.display_name) ? group.attributes.display_name[0] : group.name,
             shortName: Array.isArray(group.attributes?.short_name) ? group.attributes.short_name[0] : undefined,
+            description: Array.isArray(group.attributes?.description) ? group.attributes.description[0] : undefined,
         },
     };
 };
@@ -95,7 +97,10 @@ export const getGroupsByPaths = async (groupPaths: Array<string>): Promise<Array
         .filter((group): group is AugmentedGroupRepresentation => !isNil(group));
 };
 
-const membersGroupIdentifier = 'mitglieder';
+export const membersGroupIdentifier = 'mitglieder';
+export const adminGroupIdentifier = 'admin';
+const ignoredSubgroups = ['eingeschränkt', 'erweitert'];
+const relevantParentGroups = ['koerperschaften', 'kreise'];
 
 export const getUserGroups = async (): Promise<Array<AugmentedGroupRepresentation>> => {
     const keycloakGroupPaths = (await getUserSession())?.keycloakGroups ?? [];
@@ -104,6 +109,16 @@ export const getUserGroups = async (): Promise<Array<AugmentedGroupRepresentatio
         keycloakGroupPaths
             .filter((path) => path.endsWith(membersGroupIdentifier))
             .map((path) => path.replace(`/${membersGroupIdentifier}`, '')),
+    );
+};
+
+export const getUserAdminGroups = async (): Promise<Array<AugmentedGroupRepresentation>> => {
+    const keycloakGroupPaths = (await getUserSession())?.keycloakGroups ?? [];
+
+    return getGroupsByPaths(
+        keycloakGroupPaths
+            .filter((path) => path.endsWith(adminGroupIdentifier))
+            .map((path) => path.replace(`/${adminGroupIdentifier}`, '')),
     );
 };
 
@@ -127,4 +142,30 @@ export const getGroupMembers = async (
     const groupMembers = await (await getClient()).groups.listMembers({ id: membersGroup.id, first: 0, max: 9999 });
 
     return [membersGroup, groupMembers.map(augmentUser).filter((user): user is AugmentedUserRepresentation => user !== null)];
+};
+
+export const getAllGroups = async (): Promise<Map<AugmentedGroupRepresentation, Array<AugmentedGroupRepresentation>>> => {
+    const allGroups = await getAllGroupsFlat();
+
+    // ignore everything except for koerperschaft and kreis
+    const filteredGroups = allGroups
+        .filter((group) => !ignoredSubgroups.some((ignoredSubgroup) => group.path.includes(ignoredSubgroup)))
+        .filter((group) => relevantParentGroups.some((parentGroup) => group.path.includes(parentGroup)))
+        .filter((group) => group.path.split('/').length > 1);
+
+    const parentGroups = filteredGroups.filter((group) => group.path.split('/').length === 3);
+    const childrenGroups = filteredGroups.filter((group) => group.path.split('/').length > 3);
+
+    const groupMap = new Map<AugmentedGroupRepresentation, Array<AugmentedGroupRepresentation>>();
+    parentGroups.forEach((parent) => {
+        const children = childrenGroups.filter((child) => child.path.startsWith(`${parent.path}/`));
+        groupMap.set(parent, children);
+    });
+
+    return groupMap;
+};
+
+export const getDirectMembers = async (groupId: string): Promise<Array<AugmentedUserRepresentation>> => {
+    const groupMembers = await (await getClient()).groups.listMembers({ id: groupId, first: 0, max: 9999 });
+    return groupMembers.map(augmentUser).filter((user): user is AugmentedUserRepresentation => user !== null);
 };
