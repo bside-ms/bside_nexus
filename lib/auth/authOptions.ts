@@ -19,6 +19,8 @@ const authOptions: AuthOptions = {
                 return token;
             }
 
+            console.log(profile);
+
             token.name = profile.given_name;
             token.keycloakGroups = profile.members;
             token.email = profile.email;

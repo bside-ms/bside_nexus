@@ -4,11 +4,15 @@ import { Toaster } from 'sonner';
 import GroupOverviewCard from '@/components/group/overview/GroupOverviewCard';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Separator } from '@/components/ui/separator';
-import { getUserGroups } from '@/lib/db/groupActions';
+import { getAllGroups } from '@/lib/db/groupActions';
 
 const breadCrumbs = [
     {
-        title: 'Meine Gruppen',
+        title: 'Administration',
+        active: false,
+    },
+    {
+        title: 'Alle Gruppen',
         active: true,
     },
 ];
@@ -20,7 +24,7 @@ export const metadata: Metadata = {
 };
 
 export default async function Page(): Promise<ReactElement> {
-    const groups = await getUserGroups();
+    const groups = await getAllGroups();
 
     const circles = groups
         .filter((group) => group.groupType === 'kreis')
@@ -35,8 +39,8 @@ export default async function Page(): Promise<ReactElement> {
             <NavbarTop items={breadCrumbs} />
             <div className="space-y-6 p-10 pb-16">
                 <div className="space-y-0.5">
-                    <h2 className="text-2xl font-bold tracking-tight">Meine Vereine</h2>
-                    <p>Hier findest du eine Übersicht über deine Körperschaften der B-Side.</p>
+                    <h2 className="text-2xl font-bold tracking-tight">Alle Vereine</h2>
+                    <p>Hier findest du eine Übersicht über alle Körperschaften der B-Side.</p>
                 </div>
 
                 <Separator className="my-6" />
@@ -54,8 +58,8 @@ export default async function Page(): Promise<ReactElement> {
                 <Separator className="my-6" />
 
                 <div className="space-y-0.5">
-                    <h2 className="text-2xl font-bold tracking-tight">Meine Gruppen</h2>
-                    <p>Hier findest du eine Übersicht über alle deine Gruppen der B-Side.</p>
+                    <h2 className="text-2xl font-bold tracking-tight">Alle Gruppen</h2>
+                    <p>Hier findest du eine Übersicht über alle Gruppen der B-Side.</p>
                 </div>
 
                 <Separator className="my-6" />

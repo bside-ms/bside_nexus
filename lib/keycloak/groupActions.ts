@@ -149,7 +149,7 @@ export const getAllGroups = async (): Promise<Map<AugmentedGroupRepresentation, 
 
     // ignore everything except for koerperschaft and kreis
     const filteredGroups = allGroups
-        .filter((group) => !ignoredSubgroups.some((ignoredSubgroup) => group.path.includes(ignoredSubgroup)))
+        .filter((group) => !ignoredSubgroups.some((ignoredSubgroup) => group.path.endsWith(ignoredSubgroup)))
         .filter((group) => relevantParentGroups.some((parentGroup) => group.path.includes(parentGroup)))
         .filter((group) => group.path.split('/').length > 1);
 

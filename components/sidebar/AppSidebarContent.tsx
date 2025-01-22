@@ -10,7 +10,7 @@ const data = {
     projects: [
         {
             name: 'Dashboard',
-            url: '/dashboard',
+            url: '/',
             icon: Frame,
         },
         {
@@ -19,8 +19,8 @@ const data = {
             icon: PieChart,
         },
         {
-            name: 'Placeholder',
-            url: '#',
+            name: 'Administration',
+            url: '/admin',
             icon: Map,
         },
     ],
