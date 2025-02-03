@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import type { ReactElement } from 'react';
-import GroupMembers from '@/components/group/GroupMembers';
+import type { GroupMember } from '@/components/group/details/members/GroupMembersColumns';
+import { GroupMembersColumns } from '@/components/group/details/members/GroupMembersColumns';
 import NavbarTop from '@/components/sidebar/NavbarTop';
+import { DataTable } from '@/components/ui/datatable';
 import { Separator } from '@/components/ui/separator';
 import { getGroupById, getGroupMembers } from '@/lib/keycloak/groupActions';
 
@@ -37,6 +39,16 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
 
     const [membersGroup, groupMembers] = await getGroupMembers(group);
 
+    const members: Array<GroupMember> = [];
+    groupMembers.forEach((member) => {
+        members.push({
+            displayName: member.firstName ?? '-',
+            username: member.username ?? '-',
+            email: member.email ?? '-',
+            status: member.attributes.status ?? undefined,
+        });
+    });
+
     return (
         <div className="">
             <NavbarTop items={breadCrumbs} />
@@ -49,7 +61,7 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
                 <Separator className="my-6" />
 
                 <div className="space-y-8">
-                    {membersGroup !== null && groupMembers.length > 0 && <GroupMembers members={groupMembers} />}
+                    {membersGroup !== null && groupMembers.length > 0 && <DataTable columns={GroupMembersColumns} data={members} />}
                 </div>
             </div>
         </div>
