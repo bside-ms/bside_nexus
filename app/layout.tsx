@@ -1,9 +1,9 @@
-import './globals.css';
+import '@/app/globals.css';
 
 import { GeistSans } from 'geist/font/sans';
 import type { Metadata } from 'next';
 import type { ReactElement, ReactNode } from 'react';
-import Login from '@/components/Login';
+import { LoginForm } from '@/components/auth/LoginForm';
 import { AppSidebar } from '@/components/sidebar/AppSidebar';
 import ThemeProvider from '@/components/theming/ThemeProvider';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
@@ -22,7 +22,7 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
                 <body className={GeistSans.className}>
                     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
                         <main className="">
-                            <Login />
+                            <LoginForm />
                         </main>
                     </ThemeProvider>
                 </body>
@@ -37,7 +37,7 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
                     <SidebarProvider>
                         <AppSidebar />
                         <SidebarInset>
-                            <main className="">{isLoggedIn ? children : <Login />}</main>
+                            <main className="">{children}</main>
                         </SidebarInset>
                     </SidebarProvider>
                 </ThemeProvider>
