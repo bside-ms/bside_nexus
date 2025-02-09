@@ -19,10 +19,7 @@ const authOptions: AuthOptions = {
                 return token;
             }
 
-            console.log(profile);
-
             token.name = profile.given_name;
-            token.keycloakGroups = profile.members;
             token.email = profile.email;
             token.username = profile.preferred_username;
             token.sub = profile.sub;
@@ -32,7 +29,6 @@ const authOptions: AuthOptions = {
         session: ({ session, token }) => {
             session.user = {
                 name: token.name ?? '',
-                keycloakGroups: token.keycloakGroups ?? [],
                 email: token.email ?? '',
                 username: token.username ?? '',
                 id: token.sub ?? '',

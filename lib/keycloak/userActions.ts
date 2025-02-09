@@ -33,3 +33,7 @@ export const augmentUser = (user: UserRepresentation): AugmentedUserRepresentati
 export const getAllUsers = async (): Promise<Array<UserRepresentation>> => {
     return (await getClient()).users.find({ first: 0, max: 9999 });
 };
+
+export const removeUserFromGroup = async (userId: string, groupId: string): Promise<string> => {
+    return (await getClient()).users.delFromGroup({ id: userId, groupId });
+};

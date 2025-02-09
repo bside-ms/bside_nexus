@@ -21,7 +21,7 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
             <html>
                 <body className={GeistSans.className}>
                     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-                        <main className="">
+                        <main>
                             <LoginForm />
                         </main>
                     </ThemeProvider>
@@ -37,7 +37,7 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
                     <SidebarProvider>
                         <AppSidebar />
                         <SidebarInset>
-                            <main className="">{children}</main>
+                            <main>{children}</main>
                         </SidebarInset>
                     </SidebarProvider>
                 </ThemeProvider>

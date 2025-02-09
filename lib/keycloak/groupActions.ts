@@ -1,6 +1,5 @@
 import type GroupRepresentation from '@keycloak/keycloak-admin-client/lib/defs/groupRepresentation';
 import { isNil, upperFirst } from 'lodash-es';
-import getUserSession from '@/lib/auth/getUserSession';
 import getClient from '@/lib/keycloak/getClient';
 import type { AugmentedUserRepresentation } from '@/lib/keycloak/userActions';
 import { augmentUser } from '@/lib/keycloak/userActions';
@@ -101,29 +100,6 @@ export const membersGroupIdentifier = 'mitglieder';
 export const adminGroupIdentifier = 'admin';
 const ignoredSubgroups = ['eingeschränkt', 'erweitert'];
 const relevantParentGroups = ['koerperschaften', 'kreise'];
-
-export const getUserGroups = async (): Promise<Array<AugmentedGroupRepresentation>> => {
-    const keycloakGroupPaths = (await getUserSession())?.keycloakGroups ?? [];
-
-    return getGroupsByPaths(
-        keycloakGroupPaths
-            .filter((path) => path.endsWith(membersGroupIdentifier))
-            .map((path) => path.replace(`/${membersGroupIdentifier}`, '')),
-    );
-};
-
-export const getUserAdminGroups = async (): Promise<Array<AugmentedGroupRepresentation>> => {
-    const keycloakGroupPaths = (await getUserSession())?.keycloakGroups ?? [];
-
-    return getGroupsByPaths(
-        keycloakGroupPaths
-            .filter((path) => path.endsWith(adminGroupIdentifier))
-            .map((path) => path.replace(`/${adminGroupIdentifier}`, '')),
-    );
-};
-
-export const sortGroups = (groups: Array<AugmentedGroupRepresentation>): Array<AugmentedGroupRepresentation> =>
-    groups.toSorted((groupA, groupB) => getGroupName(groupA).localeCompare(getGroupName(groupB)));
 
 export const getSubGroupsByGroup = async (group: AugmentedGroupRepresentation): Promise<Array<AugmentedGroupRepresentation>> =>
     (await getAllGroupsFlat()).filter(({ path }) => path !== group.path && path.startsWith(group.path));

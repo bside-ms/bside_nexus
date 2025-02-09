@@ -6,7 +6,6 @@ declare module 'next-auth' {
     interface Session {
         user: {
             name: string;
-            keycloakGroups: Array<string>;
             email: string;
             username: string;
             id: string;
@@ -16,7 +15,6 @@ declare module 'next-auth' {
 
 declare module 'next-auth/jwt' {
     interface JWT {
-        keycloakGroups?: Array<string>;
         username: string;
     }
 }
