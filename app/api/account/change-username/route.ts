@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
-import { changeUsername } from '@/lib/keycloak/accountActions';
+import { keycloakChangeUsername } from '@/lib/keycloak/accountActions';
 import { invalidateMattermostSession } from '@/lib/mattermost/accountActions';
 
 export async function POST(req: Request): Promise<NextResponse> {
@@ -22,7 +22,7 @@ export async function POST(req: Request): Promise<NextResponse> {
             return NextResponse.json({ error: 'Benutzer*innen-Name muss mindestens 3 Zeichen lang sein.' }, { status: 400 });
         }
 
-        await changeUsername(userId, newUsername);
+        await keycloakChangeUsername(userId, newUsername);
         await invalidateMattermostSession(user.username);
 
         return NextResponse.json({ success: true });

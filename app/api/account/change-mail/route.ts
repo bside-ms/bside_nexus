@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
-import { changeMail } from '@/lib/keycloak/accountActions';
+import { keycloakChangeMail } from '@/lib/keycloak/accountActions';
 import { invalidateMattermostSession } from '@/lib/mattermost/accountActions';
 
 export async function POST(req: Request): Promise<NextResponse> {
@@ -22,7 +22,7 @@ export async function POST(req: Request): Promise<NextResponse> {
             return NextResponse.json({ error: 'Mail-Adresse ist ungültig.' }, { status: 400 });
         }
 
-        await changeMail(userId, newEmail);
+        await keycloakChangeMail(userId, newEmail);
         await invalidateMattermostSession(user.username);
 
         return NextResponse.json({ success: true });

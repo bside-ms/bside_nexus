@@ -1,5 +1,5 @@
 import type GroupRepresentation from '@keycloak/keycloak-admin-client/lib/defs/groupRepresentation';
-import { isNil, upperFirst } from 'lodash-es';
+import { isNil } from 'lodash-es';
 import getClient from '@/lib/keycloak/getClient';
 import type { AugmentedUserRepresentation } from '@/lib/keycloak/userActions';
 import { augmentUser } from '@/lib/keycloak/userActions';
@@ -59,10 +59,7 @@ const getParentGroups = async (): Promise<Array<AugmentedGroupRepresentation>> =
     }
 };
 
-export const getGroupName = (group: AugmentedGroupRepresentation): string =>
-    group.attributes?.displayName ?? group.attributes?.shortName ?? upperFirst(group.name);
-
-export const getGroupById = async (groupId: string): Promise<AugmentedGroupRepresentation | null> => {
+export const keycloakGetGroupById = async (groupId: string): Promise<AugmentedGroupRepresentation | null> => {
     try {
         const group = await (await getClient()).groups.findOne({ id: groupId });
 
@@ -88,14 +85,6 @@ const getAllGroupsFlat = async (): Promise<Array<AugmentedGroupRepresentation>> 
     return allGroupsFlat;
 };
 
-export const getGroupsByPaths = async (groupPaths: Array<string>): Promise<Array<AugmentedGroupRepresentation>> => {
-    const allGroups = await getAllGroupsFlat();
-
-    return groupPaths
-        .map((groupPath) => allGroups.find(({ path }) => path === groupPath))
-        .filter((group): group is AugmentedGroupRepresentation => !isNil(group));
-};
-
 export const membersGroupIdentifier = 'mitglieder';
 export const adminGroupIdentifier = 'admin';
 const ignoredSubgroups = ['eingeschränkt', 'erweitert'];
@@ -104,7 +93,7 @@ const relevantParentGroups = ['koerperschaften', 'kreise'];
 export const getSubGroupsByGroup = async (group: AugmentedGroupRepresentation): Promise<Array<AugmentedGroupRepresentation>> =>
     (await getAllGroupsFlat()).filter(({ path }) => path !== group.path && path.startsWith(group.path));
 
-export const getGroupMembers = async (
+export const keycloakGetGroupMembers = async (
     group: AugmentedGroupRepresentation,
 ): Promise<[group: AugmentedGroupRepresentation | null, Array<AugmentedUserRepresentation>]> => {
     const membersGroup = group.path.endsWith(membersGroupIdentifier)
@@ -120,7 +109,11 @@ export const getGroupMembers = async (
     return [membersGroup, groupMembers.map(augmentUser).filter((user): user is AugmentedUserRepresentation => user !== null)];
 };
 
-export const getAllGroups = async (): Promise<Map<AugmentedGroupRepresentation, Array<AugmentedGroupRepresentation>>> => {
+/*
+ * Population Methods.
+ */
+
+export const keycloakGetAllGroups = async (): Promise<Map<AugmentedGroupRepresentation, Array<AugmentedGroupRepresentation>>> => {
     const allGroups = await getAllGroupsFlat();
 
     // ignore everything except for koerperschaft and kreis
@@ -141,7 +134,7 @@ export const getAllGroups = async (): Promise<Map<AugmentedGroupRepresentation, 
     return groupMap;
 };
 
-export const getDirectMembers = async (groupId: string): Promise<Array<AugmentedUserRepresentation>> => {
+export const keycloakGetDirectMembers = async (groupId: string): Promise<Array<AugmentedUserRepresentation>> => {
     const groupMembers = await (await getClient()).groups.listMembers({ id: groupId, first: 0, max: 9999 });
     return groupMembers.map(augmentUser).filter((user): user is AugmentedUserRepresentation => user !== null);
 };

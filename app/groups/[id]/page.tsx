@@ -6,11 +6,11 @@ import { GroupMembersColumns } from '@/components/group/details/members/GroupMem
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { DataTable } from '@/components/ui/datatable';
 import { Separator } from '@/components/ui/separator';
-import { getGroupById as getGroupByIdFromDb } from '@/lib/db/groupActions';
-import { getGroupById, getGroupMembers } from '@/lib/keycloak/groupActions';
+import { getGroupById } from '@/lib/db/groupActions';
+import { keycloakGetGroupById, keycloakGetGroupMembers } from '@/lib/keycloak/groupActions';
 
 const Group = async ({ params: { id: groupId } }: { params: { id: string } }): Promise<ReactElement> => {
-    const group = await getGroupByIdFromDb(groupId);
+    const group = await getGroupById(groupId);
 
     // Handle when the group is not found
     if (group === null) {
@@ -33,8 +33,8 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
 
     // ToDo: Reload table when group members change (deletion, promotion, demotion).
 
-    const groupKc = await getGroupById(groupId);
-    const [membersGroup, groupMembers] = await getGroupMembers(groupKc!);
+    const groupKc = await keycloakGetGroupById(groupId);
+    const [membersGroup, groupMembers] = await keycloakGetGroupMembers(groupKc!);
 
     const members: Array<GroupMember> = [];
     groupMembers.forEach((member) => {

@@ -5,7 +5,7 @@ import { db } from '@/db';
 import type { Group } from '@/db/schema';
 import { groupsTable, membersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
-import { removeUserFromGroup as removeUserFromGroupKeycloak } from '@/lib/keycloak/userActions';
+import { keycloakRemoveUserFromGroup } from '@/lib/keycloak/userActions';
 
 export const getUserGroups = async (): Promise<Array<Group>> => {
     const userId = (await getUserSession())?.id ?? null;
@@ -112,12 +112,12 @@ export const removeUserFromGroup = async (userIdToBeRemoved: string, groupId: st
     }
 
     if (userIsMemberOfGroup === 'Admin' && dbGroup.adminGroup !== null) {
-        await removeUserFromGroupKeycloak(userIdToBeRemoved, dbGroup.adminGroup);
+        await keycloakRemoveUserFromGroup(userIdToBeRemoved, dbGroup.adminGroup);
         await removeUserFromDbGroup(userIdToBeRemoved, dbGroup.id);
     }
 
     if (userIsMemberOfGroup === 'Member' && dbGroup.memberGroup !== null) {
-        await removeUserFromGroupKeycloak(userIdToBeRemoved, dbGroup.memberGroup);
+        await keycloakRemoveUserFromGroup(userIdToBeRemoved, dbGroup.memberGroup);
         await removeUserFromDbGroup(userIdToBeRemoved, dbGroup.id);
     }
 

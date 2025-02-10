@@ -2,11 +2,11 @@ import { isNull } from 'drizzle-orm';
 import 'dotenv/config';
 import { db } from '@/db/index';
 import { groupsTable, membersTable } from '@/db/schema';
-import { adminGroupIdentifier, getAllGroups, getDirectMembers, membersGroupIdentifier } from '@/lib/keycloak/groupActions';
+import { adminGroupIdentifier, keycloakGetAllGroups, keycloakGetDirectMembers, membersGroupIdentifier } from '@/lib/keycloak/groupActions';
 import type { AugmentedUserRepresentation } from '@/lib/keycloak/userActions';
 
 async function populateGroups(): Promise<void> {
-    const groups = await getAllGroups();
+    const groups = await keycloakGetAllGroups();
 
     const entries = Array.from(groups.entries());
     for (const [parentGroup, subGroups] of entries) {
@@ -71,11 +71,11 @@ async function populateMembers(): Promise<void> {
         let admins: Array<AugmentedUserRepresentation> = [];
 
         if (memberGroupId !== null) {
-            members = await getDirectMembers(memberGroupId);
+            members = await keycloakGetDirectMembers(memberGroupId);
         }
 
         if (adminGroupId !== null) {
-            admins = await getDirectMembers(adminGroupId);
+            admins = await keycloakGetDirectMembers(adminGroupId);
         }
 
         const uniqueEntries = new Set<string>();
