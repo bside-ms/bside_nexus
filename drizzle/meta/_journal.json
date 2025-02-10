@@ -15,6 +15,20 @@
       "when": 1737481779270,
       "tag": "0001_add_parent_group",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1739176722820,
+      "tag": "0002_add_users",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1739177485185,
+      "tag": "0003_busy_old_lace",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import { boolean, pgTable, primaryKey, text, varchar } from 'drizzle-orm/pg-core';
 
 export type Group = typeof groupsTable.$inferSelect;
+export type User = typeof usersTable.$inferSelect;
 export type Members = typeof membersTable.$inferSelect;
 
 export const groupsTable = pgTable('groups', {
@@ -16,10 +17,20 @@ export const groupsTable = pgTable('groups', {
     parentGroup: varchar({ length: 255 }),
 });
 
+export const usersTable = pgTable('users', {
+    id: varchar({ length: 255 }).primaryKey(),
+    username: varchar({ length: 255 }).notNull(),
+    displayName: varchar({ length: 255 }),
+    email: varchar({ length: 255 }).notNull(),
+    enabled: boolean().default(false).notNull(),
+});
+
 export const membersTable = pgTable(
     'members',
     {
-        userId: varchar({ length: 255 }).notNull(),
+        userId: varchar({ length: 255 })
+            .notNull()
+            .references(() => usersTable.id),
         groupId: varchar({ length: 255 })
             .notNull()
             .references(() => groupsTable.id),

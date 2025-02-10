@@ -6,8 +6,7 @@ import { GroupMembersColumns } from '@/components/group/details/members/GroupMem
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { DataTable } from '@/components/ui/datatable';
 import { Separator } from '@/components/ui/separator';
-import { getGroupById } from '@/lib/db/groupActions';
-import { keycloakGetGroupById, keycloakGetGroupMembers } from '@/lib/keycloak/groupActions';
+import { getGroupById, getGroupMembers } from '@/lib/db/groupActions';
 
 const Group = async ({ params: { id: groupId } }: { params: { id: string } }): Promise<ReactElement> => {
     const group = await getGroupById(groupId);
@@ -32,19 +31,18 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
     ];
 
     // ToDo: Reload table when group members change (deletion, promotion, demotion).
-
-    const groupKc = await keycloakGetGroupById(groupId);
-    const [membersGroup, groupMembers] = await keycloakGetGroupMembers(groupKc!);
+    // ToDo: UseEffect to load the group members.
+    const groupMembers = await getGroupMembers(groupId);
 
     const members: Array<GroupMember> = [];
     groupMembers.forEach((member) => {
         members.push({
             userId: member.id,
             groupId: group.id,
-            displayName: member.firstName ?? '-',
+            displayName: member.displayName ?? '-',
             username: member.username ?? '-',
             email: member.email ?? '-',
-            status: member.attributes.status ?? undefined,
+            status: !member.enabled ? 'disabled' : member.isAdmin ? 'admin' : 'member',
         });
     });
 
@@ -59,9 +57,7 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
 
                 <Separator className="my-6" />
 
-                <div className="space-y-8">
-                    {membersGroup !== null && groupMembers.length > 0 && <DataTable columns={GroupMembersColumns} data={members} />}
-                </div>
+                <div className="space-y-8">{groupMembers.length > 0 && <DataTable columns={GroupMembersColumns} data={members} />}</div>
             </div>
 
             <Toaster

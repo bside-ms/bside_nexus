@@ -1,9 +1,10 @@
 import { isNull } from 'drizzle-orm';
+import { isEmpty } from 'lodash-es';
 import 'dotenv/config';
 import { db } from '@/db/index';
-import { groupsTable, membersTable } from '@/db/schema';
+import { groupsTable, membersTable, usersTable } from '@/db/schema';
 import { adminGroupIdentifier, keycloakGetAllGroups, keycloakGetDirectMembers, membersGroupIdentifier } from '@/lib/keycloak/groupActions';
-import type { AugmentedUserRepresentation } from '@/lib/keycloak/userActions';
+import { type AugmentedUserRepresentation, keycloakGetAllUsers } from '@/lib/keycloak/userActions';
 
 async function populateGroups(): Promise<void> {
     const groups = await keycloakGetAllGroups();
@@ -57,6 +58,26 @@ async function populateGroups(): Promise<void> {
 
     // eslint-disable-next-line no-console
     console.log('Groups successfully populated.');
+}
+
+async function populateUsers(): Promise<void> {
+    const users = await keycloakGetAllUsers();
+
+    const entries = Array.from(users.entries());
+    for (const [_, user] of entries) {
+        const userEntry: typeof usersTable.$inferInsert = {
+            id: user.id!,
+            username: user.username!,
+            displayName: !isEmpty(user.firstName) ? user.firstName : null,
+            email: user.email!,
+            enabled: user.enabled,
+        };
+
+        await db.insert(usersTable).values([userEntry]).onConflictDoNothing({ target: usersTable.id });
+    }
+
+    // eslint-disable-next-line no-console
+    console.log('Users successfully populated.');
 }
 
 async function populateMembers(): Promise<void> {
@@ -119,6 +140,7 @@ async function populateMembers(): Promise<void> {
 
 async function cleanTables(): Promise<void> {
     await db.delete(membersTable);
+    await db.delete(usersTable);
     await db.delete(groupsTable);
 
     // eslint-disable-next-line no-console
@@ -128,6 +150,7 @@ async function cleanTables(): Promise<void> {
 async function main(): Promise<void> {
     await cleanTables();
     await populateGroups();
+    await populateUsers();
     await populateMembers();
 }
 

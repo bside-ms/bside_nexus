@@ -80,6 +80,19 @@ async function demoteMember(userId: string, groupId: string): Promise<void> {
     }
 }
 
+const formatMemberStatus = (status: string): string => {
+    switch (status) {
+        case 'admin':
+            return 'Administrator*in';
+        case 'member':
+            return 'Mitglied';
+        case 'disabled':
+            return 'Deaktiviert';
+        default:
+            return 'Unbekannt';
+    }
+};
+
 export const GroupMembersColumns: Array<ColumnDef<GroupMember>> = [
     {
         accessorKey: 'displayName',
@@ -105,6 +118,10 @@ export const GroupMembersColumns: Array<ColumnDef<GroupMember>> = [
         id: 'Status',
         enableGlobalFilter: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+        cell: ({ row }): ReactElement => {
+            return <Fragment>{formatMemberStatus(row.getValue('Status'))}</Fragment>;
+        },
     },
     {
         id: 'actions',
@@ -125,7 +142,7 @@ export const GroupMembersColumns: Array<ColumnDef<GroupMember>> = [
                     <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Aktionen: {member.displayName}</DropdownMenuLabel>
                         <DropdownMenuItem onClick={() => navigator.clipboard.writeText(member.username)}>
-                            Kopiere den Mattermost-Handle
+                            Kopiere den Mattermost-Namen
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => navigator.clipboard.writeText(member.email)}>
                             Kopiere die Mail-Adresse

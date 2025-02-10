@@ -12,7 +12,14 @@ export type AugmentedUserRepresentation = UserRepresentation &
     };
 
 export const augmentUser = (user: UserRepresentation): AugmentedUserRepresentation | null => {
-    if (isNil(user.id) || isNil(user.username) || isNil(user.firstName) || isNil(user.email) || isNil(user.emailVerified)) {
+    if (
+        isNil(user.id) ||
+        isNil(user.username) ||
+        isNil(user.firstName) ||
+        isNil(user.email) ||
+        isNil(user.emailVerified) ||
+        isNil(user.enabled)
+    ) {
         return null;
     }
 
@@ -23,6 +30,7 @@ export const augmentUser = (user: UserRepresentation): AugmentedUserRepresentati
         firstName: user.firstName,
         email: user.email,
         emailVerified: user.emailVerified,
+        enabled: user.enabled,
         attributes: {
             redmineId: Array.isArray(user.attributes?.redmineId) ? user.attributes.redmineId[0] : undefined,
             mattermostId: Array.isArray(user.attributes?.mattermostId) ? user.attributes.mattermostId[0] : undefined,

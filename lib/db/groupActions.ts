@@ -2,7 +2,8 @@ import { and, count, eq, isNull } from 'drizzle-orm';
 import { inArray } from 'drizzle-orm/sql/expressions/conditions';
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import type { Group } from '@/db/schema';
+import type { Group, User } from '@/db/schema';
+import { usersTable } from '@/db/schema';
 import { groupsTable, membersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { keycloakRemoveUserFromGroup } from '@/lib/keycloak/userActions';
@@ -28,6 +29,43 @@ export const getAllGroups = async (): Promise<Array<Group>> => {
 /*
  *
  */
+
+export type GroupMember = User & {
+    isAdmin: boolean;
+};
+
+export const getGroup = async (groupId: string): Promise<Group | null> => {
+    const group = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
+    return group[0] ?? null;
+};
+
+export const getGroupMembers = async (groupId: string): Promise<Array<GroupMember>> => {
+    const groupMembers = await db
+        .select()
+        .from(membersTable)
+        .leftJoin(usersTable, eq(membersTable.userId, usersTable.id))
+        .where(eq(membersTable.groupId, groupId));
+
+    if (groupMembers.length === 0) {
+        return [];
+    }
+
+    const users: Array<GroupMember> = [];
+    groupMembers.forEach((member) => {
+        if (member.users === null) {
+            return;
+        }
+
+        const groupMember: GroupMember = {
+            ...member.users,
+            isAdmin: member.members.isAdmin,
+        };
+
+        users.push(groupMember);
+    });
+
+    return users;
+};
 
 export const getGroupMemberCount = async (groupId: string): Promise<number> => {
     const groupMembers = await db.select({ count: count() }).from(membersTable).where(eq(membersTable.groupId, groupId));
