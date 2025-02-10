@@ -103,7 +103,7 @@ export const removeUserFromGroup = async (userIdToBeRemoved: string, groupId: st
 
     const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
     if (!adminStatus) {
-        return NextResponse.json({ error: 'Du bist nicht der Admin dieser Gruppe.' }, { status: 400 });
+        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte um diese Aktion durchzuführen.' }, { status: 403 });
     }
 
     const userIsMemberOfGroup = await getGroupAdminStatus(userIdToBeRemoved, groupId);

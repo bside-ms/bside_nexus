@@ -31,7 +31,7 @@ async function removeMember(userId: string, groupId: string): Promise<void> {
         // Send POST request to remove the member
         const response = await axios.post('/api/group/remove', {
             userIdToBeRemoved: userId,
-            groupIdToBeRemoved: groupId,
+            groupId,
         });
 
         if (response.data.success) {
@@ -39,32 +39,70 @@ async function removeMember(userId: string, groupId: string): Promise<void> {
         } else {
             toast.error(response.data.error || 'Fehler beim Entfernen der Benutzer*in.');
         }
-    } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error('Error removing user:', error);
+    } catch {
         toast.error('Ein Fehler ist aufgetreten. Die Benutzer*in konnte nicht entfernt werden.');
+    }
+}
+
+async function promoteMember(userId: string, groupId: string): Promise<void> {
+    try {
+        // Send POST request to remove the member
+        const response = await axios.post('/api/group/promote', {
+            userIdToBeRemoved: userId,
+            groupId,
+        });
+
+        if (response.data.success) {
+            toast.success('Benutzer*in wurde erfolgreich zur Administrator*innen ernannt.');
+        } else {
+            toast.error(response.data.error || 'Fehler beim Ernennen der Administrator*in.');
+        }
+    } catch {
+        toast.error('Ein Fehler ist aufgetreten. Die Benutzer*in konnte nicht zur Administrator*innen ernannt werden.');
+    }
+}
+
+async function demoteMember(userId: string, groupId: string): Promise<void> {
+    try {
+        // Send POST request to remove the member
+        const response = await axios.post('/api/group/demote', {
+            userIdToBeRemoved: userId,
+            groupId,
+        });
+
+        if (response.data.success) {
+            toast.success('Administrator*in wurde erfolgreich entfernt.');
+        } else {
+            toast.error(response.data.error || 'Fehler beim Entfernen der Administrator*in.');
+        }
+    } catch {
+        toast.error('Ein Fehler ist aufgetreten. Die Administrator*in konnte nicht entfernt werden.');
     }
 }
 
 export const GroupMembersColumns: Array<ColumnDef<GroupMember>> = [
     {
         accessorKey: 'displayName',
+        id: 'Anzeigename',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Anzeigename" />,
     },
     {
         accessorKey: 'username',
+        id: 'Username',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Username" />,
         // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
         cell: ({ row }): ReactElement => {
-            return <Fragment>@{row.getValue('username')}</Fragment>;
+            return <Fragment>@{row.getValue('Username')}</Fragment>;
         },
     },
     {
         accessorKey: 'email',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,
+        id: 'E-Mail',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="E-Mail" />,
     },
     {
         accessorKey: 'status',
+        id: 'Status',
         enableGlobalFilter: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
     },
@@ -86,14 +124,26 @@ export const GroupMembersColumns: Array<ColumnDef<GroupMember>> = [
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Aktionen: {member.displayName}</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(member.username)}>
+                            Kopiere den Mattermost-Handle
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => navigator.clipboard.writeText(member.email)}>
                             Kopiere die Mail-Adresse
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => removeMember(member.userId, member.groupId)}>
-                            Benutzer*in aus der Gruppe entfernen
+                            Aus der Gruppe entfernen
                         </DropdownMenuItem>
-                        <DropdownMenuItem>Benutzer*in zum Admin machen</DropdownMenuItem>
+                        {member.status === 'admin' && (
+                            <DropdownMenuItem onClick={() => demoteMember(member.userId, member.groupId)}>
+                                Administrator*in entfernen
+                            </DropdownMenuItem>
+                        )}
+                        {member.status === 'member' && (
+                            <DropdownMenuItem onClick={() => promoteMember(member.userId, member.groupId)}>
+                                Administrator*innen ernennen
+                            </DropdownMenuItem>
+                        )}
                     </DropdownMenuContent>
                 </DropdownMenu>
             );
