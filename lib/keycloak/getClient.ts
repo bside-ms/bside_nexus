@@ -2,7 +2,7 @@ import KeycloakAdminClient from '@keycloak/keycloak-admin-client';
 
 let adminClient: KeycloakAdminClient | null = null;
 
-const getClient = async (): Promise<KeycloakAdminClient> => {
+const getKeycloakClient = async (): Promise<KeycloakAdminClient> => {
     if (adminClient !== null) {
         return adminClient;
     }
@@ -25,4 +25,4 @@ const getClient = async (): Promise<KeycloakAdminClient> => {
     return client;
 };
 
-export default getClient;
+export default getKeycloakClient;

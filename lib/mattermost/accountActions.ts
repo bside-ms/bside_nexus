@@ -7,14 +7,8 @@ const getUserByUsername = async (username: string): Promise<UserProfile | null> 
 
     try {
         return await client.getUserByUsername(username);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+    } catch {
         // no mattermost user for this id has been found.
-        if (error.response && error.response.status === 404) {
-            return null;
-        }
-
         return null;
     }
 };

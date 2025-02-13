@@ -1,7 +1,7 @@
-import getClient from '@/lib/keycloak/getClient';
+import getKeycloakClient from '@/lib/keycloak/getClient';
 
-export const changeUsername = async (userId: string, newUsername: string): Promise<void> => {
-    const client = await getClient();
+export const keycloakChangeUsername = async (userId: string, newUsername: string): Promise<void> => {
+    const client = await getKeycloakClient();
 
     try {
         await client.users.update(
@@ -9,21 +9,22 @@ export const changeUsername = async (userId: string, newUsername: string): Promi
             { username: newUsername }, // Values to be updated
         );
 
+        // ToDo: Log the username change in the database and remove the console.log.
         // eslint-disable-next-line no-console
         console.log(`Username successfully updated for user ID '${userId}' to '${newUsername}'.`);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-        // Handle specific Keycloak errors
         if (error.response && error.response.data) {
             throw new Error(error.response.data.errorMessage || 'Keycloak error occurred.');
         }
+
         throw new Error('An unexpected error occurred while updating the username.');
     }
 };
 
-export const changeMail = async (userId: string, newMail: string): Promise<void> => {
-    const client = await getClient();
+export const keycloakChangeMail = async (userId: string, newMail: string): Promise<void> => {
+    const client = await getKeycloakClient();
 
     const user = await client.users.find({ email: newMail });
 
@@ -37,21 +38,22 @@ export const changeMail = async (userId: string, newMail: string): Promise<void>
             { email: newMail }, // Values to be updated
         );
 
+        // ToDo: Log the mail change in the database and remove the console.log.
         // eslint-disable-next-line no-console
         console.log(`Mail successfully updated for user ID '${userId}' to '${newMail}'.`);
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
-        // Handle specific Keycloak errors
         if (error.response && error.response.data) {
             throw new Error(error.response.data.errorMessage || 'Keycloak error occurred.');
         }
+
         throw new Error('An unexpected error occurred while updating the username.');
     }
 };
 
-export const changeDisplayname = async (userId: string, newDisplayname: string): Promise<void> => {
-    const client = await getClient();
+export const keycloakChangeDisplayname = async (userId: string, newDisplayname: string): Promise<void> => {
+    const client = await getKeycloakClient();
 
     try {
         await client.users.update(
@@ -68,6 +70,7 @@ export const changeDisplayname = async (userId: string, newDisplayname: string):
         if (error.response && error.response.data) {
             throw new Error(error.response.data.errorMessage || 'Keycloak error occurred.');
         }
+
         throw new Error('An unexpected error occurred while updating the displayname.');
     }
 };
