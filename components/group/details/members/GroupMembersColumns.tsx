@@ -48,7 +48,7 @@ async function promoteMember(userId: string, groupId: string): Promise<void> {
     try {
         // Send POST request to remove the member
         const response = await axios.post('/api/group/promote', {
-            userIdToBeRemoved: userId,
+            userIdToBePromoted: userId,
             groupId,
         });
 
@@ -66,7 +66,7 @@ async function demoteMember(userId: string, groupId: string): Promise<void> {
     try {
         // Send POST request to remove the member
         const response = await axios.post('/api/group/demote', {
-            userIdToBeRemoved: userId,
+            userIdToBeDemoted: userId,
             groupId,
         });
 

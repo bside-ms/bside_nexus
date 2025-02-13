@@ -45,3 +45,7 @@ export const keycloakGetAllUsers = async (): Promise<Array<UserRepresentation>> 
 export const keycloakRemoveUserFromGroup = async (userId: string, groupId: string): Promise<string> => {
     return (await getClient()).users.delFromGroup({ id: userId, groupId });
 };
+
+export const keycloakAddUserToGroup = async (userId: string, groupId: string): Promise<string> => {
+    return (await getClient()).users.addToGroup({ id: userId, groupId });
+};
