@@ -8,8 +8,8 @@ import { getAllGroups } from '@/lib/db/groupActions';
 
 const breadCrumbs = [
     {
-        title: 'Administration',
-        active: false,
+        title: 'Meine Gruppen',
+        url: '/groups',
     },
     {
         title: 'Alle Gruppen',

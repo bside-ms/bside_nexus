@@ -1,3 +1,4 @@
+import { isEmpty } from 'lodash-es';
 import { ArrowRight, FolderTree, LinkIcon, Star, Users } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -23,7 +24,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
             return (
                 <HoverCard>
                     <HoverCardTrigger asChild>
-                        <div className="flex aspect-square size-16 items-center justify-center rounded-lg">
+                        <div className="flex aspect-square size-10 items-center justify-center rounded-lg">
                             <Image src="/logo_kv.png" alt="KV" width={120} height={120} />
                         </div>
                     </HoverCardTrigger>
@@ -56,7 +57,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
             return (
                 <HoverCard>
                     <HoverCardTrigger asChild>
-                        <div className="flex aspect-square size-16 items-center justify-center rounded-lg">
+                        <div className="flex aspect-square size-10 items-center justify-center rounded-lg">
                             <Image src="/logo_gmbh.png" alt="GmbH" width={120} height={120} />
                         </div>
                     </HoverCardTrigger>
@@ -90,7 +91,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
             return (
                 <HoverCard>
                     <HoverCardTrigger asChild>
-                        <div className="flex aspect-square size-16 items-center justify-center rounded-lg">
+                        <div className="flex aspect-square size-10 items-center justify-center rounded-lg">
                             <Image src="/logo_ev.png" alt="Hausverein" width={120} height={120} />
                         </div>
                     </HoverCardTrigger>
@@ -123,7 +124,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
             return (
                 <HoverCard>
                     <HoverCardTrigger asChild>
-                        <div className="flex aspect-square size-16 items-center justify-center rounded-lg">
+                        <div className="flex aspect-square size-10 items-center justify-center rounded-lg">
                             <Image src="/logo.png" alt="Kollektiv" width={120} height={120} />
                         </div>
                     </HoverCardTrigger>
@@ -150,7 +151,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
     }
 };
 
-const GroupMembers = async ({ group }: { group: Group }): Promise<ReactElement> => {
+const GroupOverviewCard = async ({ group }: { group: Group }): Promise<ReactElement> => {
     const user = await getUserSession();
 
     const isAdmin = await getGroupAdminStatus(user?.id ?? '', group.id);
@@ -165,8 +166,7 @@ const GroupMembers = async ({ group }: { group: Group }): Promise<ReactElement> 
                     <GroupLogo group={group} />
                 </div>
                 <CardDescription className="text-base">
-                    {group.description ?? 'Lorem Ipsum'}
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className=" flex items-center gap-2">
                         <Badge variant="outline" className="flex items-center gap-1">
                             <Users className="size-3" />
                             <span>{memberCount}</span>
@@ -188,14 +188,16 @@ const GroupMembers = async ({ group }: { group: Group }): Promise<ReactElement> 
                 </CardDescription>
             </CardHeader>
 
+            {!isEmpty(group.description) && <CardContent>{group.description}</CardContent>}
+
             {subGroups && subGroups.length > 0 && (
                 <CardContent className="grid flex-1 gap-6">
-                    <div className="mt-2">
+                    <div>
                         <div className="mb-1 flex items-center">
                             <FolderTree className="mr-1 size-4" />
-                            <span className="font-medium">Untergruppen:</span>
+                            <span className="font-semibold">Untergruppen:</span>
                         </div>
-                        <ul className="text-muted-foreground list-inside list-disc">
+                        <ul className="list-inside list-disc">
                             {subGroups.map((subGroup) => (
                                 <li key={subGroup.id}>{subGroup.displayName}</li>
                             ))}
@@ -207,7 +209,7 @@ const GroupMembers = async ({ group }: { group: Group }): Promise<ReactElement> 
             <CardFooter className="pt-2">
                 <Link className="w-full" href={`/groups/${group.id}`}>
                     <Button size="default" variant="outline" className="w-full text-base">
-                        Zur Gruppenverwaltung
+                        Zu den Gruppendetails
                         <ArrowRight className="ml-2 size-4" />
                     </Button>
                 </Link>
@@ -216,4 +218,4 @@ const GroupMembers = async ({ group }: { group: Group }): Promise<ReactElement> 
     );
 };
 
-export default GroupMembers;
+export default GroupOverviewCard;

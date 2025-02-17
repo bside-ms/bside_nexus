@@ -1,8 +1,12 @@
+import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { Toaster } from 'sonner';
 import GroupOverviewCard from '@/components/group/overview/GroupOverviewCard';
 import NavbarTop from '@/components/sidebar/NavbarTop';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { getUserGroups } from '@/lib/db/groupActions';
 
@@ -39,8 +43,6 @@ export default async function Page(): Promise<ReactElement> {
                     <p>Hier findest du eine Übersicht über deine Körperschaften der B-Side.</p>
                 </div>
 
-                <Separator className="my-6" />
-
                 <div className="flex flex-col space-y-8 lg:flex-row">
                     <div className="flex flex-1 flex-col gap-4 p-4">
                         <div className="grid auto-rows-min gap-4 md:grid-cols-2">
@@ -58,23 +60,38 @@ export default async function Page(): Promise<ReactElement> {
                     <p>Hier findest du eine Übersicht über alle deine Gruppen der B-Side.</p>
                 </div>
 
-                <Separator className="my-6" />
-
                 <div className="flex flex-col space-y-8 lg:flex-row">
                     <div className="flex flex-1 flex-col gap-4 p-4">
                         <div className="grid auto-rows-min gap-4 md:grid-cols-2">
                             {circles.map((circle) => (
                                 <GroupOverviewCard key={circle.id} group={circle} />
                             ))}
+
+                            <Card className="flex h-full flex-col justify-between rounded-xl  ">
+                                <CardHeader>
+                                    <CardTitle>Alle weiteren Gruppen</CardTitle>
+                                </CardHeader>
+                                <CardContent className="grid flex-1 gap-6">
+                                    Hier findest du eine Übersicht über alle Gruppen, in denen du (noch) nicht Mitglied bist.
+                                </CardContent>
+                                <CardFooter className="pt-2">
+                                    <Link className="w-full" href="/groups/all">
+                                        <Button size="default" variant="destructive" className="w-full text-base">
+                                            Zur gesamten Gruppenübersicht
+                                            <ArrowRight className="ml-2 size-4" />
+                                        </Button>
+                                    </Link>
+                                </CardFooter>
+                            </Card>
                         </div>
                     </div>
-
-                    <Toaster
-                        position="top-right"
-                        richColors
-                        toastOptions={{}} // Voluntarily passing empty object as a workaround for `richColors` to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
-                    />
                 </div>
+
+                <Toaster
+                    position="top-right"
+                    richColors
+                    toastOptions={{}} // Voluntarily passing empty object as a workaround for `richColors` to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
+                />
             </div>
         </div>
     );

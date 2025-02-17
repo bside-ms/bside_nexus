@@ -26,7 +26,7 @@ export default function FormChangeAvatar({ username }: { username: string }): Re
                 </Avatar>
                 <div className="mx-2 grid w-full max-w-sm items-center gap-1.5">
                     <Label htmlFor="picture">Picture</Label>
-                    <Input id="picture" type="file" />
+                    <Input id="picture" type="file" disabled={true} />
                 </div>
             </CardContent>
             <CardFooter>
