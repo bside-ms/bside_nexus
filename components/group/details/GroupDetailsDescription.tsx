@@ -61,12 +61,14 @@ const GroupDetailsDescriptionMobile = ({ groupId, wikiLink, websiteLink, descrip
             <Card className="w-full max-w-full lg:max-w-[50%]">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle>Gruppenbeschreibung</CardTitle>
-                    <DrawerTrigger asChild>
-                        <Button size="sm" variant="outline">
-                            <Edit className="mr-2 size-4" />
-                            Gruppe bearbeiten
-                        </Button>
-                    </DrawerTrigger>
+                    {isAdmin === 'Admin' && (
+                        <DrawerTrigger asChild>
+                            <Button size="sm" variant="outline">
+                                <Edit className="mr-2 size-4" />
+                                Gruppe bearbeiten
+                            </Button>
+                        </DrawerTrigger>
+                    )}
                 </CardHeader>
                 <CardContent>
                     <p>{isEmpty(description) ? 'Diese Gruppe hat aktuell noch keine Beschreibung.' : description}</p>
@@ -82,24 +84,26 @@ const GroupDetailsDescriptionMobile = ({ groupId, wikiLink, websiteLink, descrip
                 </CardContent>
             </Card>
 
-            <DrawerContent>
-                <DrawerHeader className="text-left">
-                    <DrawerTitle>Gruppendetails bearbeiten</DrawerTitle>
-                    <DrawerDescription>Bearbeite die Gruppendetails hier. Klicke speichern, wenn du fertig bist.</DrawerDescription>
-                </DrawerHeader>
-                <GroupDescriptionForm
-                    className="px-4"
-                    description={description}
-                    groupId={groupId}
-                    wikiLink={wikiLink}
-                    websiteLink={websiteLink}
-                />
-                <DrawerFooter className="pt-2">
-                    <DrawerClose asChild>
-                        <Button variant="outline">Abbrechen</Button>
-                    </DrawerClose>
-                </DrawerFooter>
-            </DrawerContent>
+            {isAdmin === 'Admin' && (
+                <DrawerContent>
+                    <DrawerHeader className="text-left">
+                        <DrawerTitle>Gruppendetails bearbeiten</DrawerTitle>
+                        <DrawerDescription>Bearbeite die Gruppendetails hier. Klicke speichern, wenn du fertig bist.</DrawerDescription>
+                    </DrawerHeader>
+                    <GroupDescriptionForm
+                        className="px-4"
+                        description={description}
+                        groupId={groupId}
+                        wikiLink={wikiLink}
+                        websiteLink={websiteLink}
+                    />
+                    <DrawerFooter className="pt-2">
+                        <DrawerClose asChild>
+                            <Button variant="outline">Abbrechen</Button>
+                        </DrawerClose>
+                    </DrawerFooter>
+                </DrawerContent>
+            )}
         </Drawer>
     );
 };
@@ -112,12 +116,14 @@ const GroupDetailsDescriptionDesktop = ({ groupId, wikiLink, websiteLink, descri
             <Card className="col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle>Gruppenbeschreibung</CardTitle>
-                    <DialogTrigger asChild>
-                        <Button size="sm" variant="outline">
-                            <Edit className="mr-2 size-4" />
-                            Gruppe bearbeiten
-                        </Button>
-                    </DialogTrigger>
+                    {isAdmin === 'Admin' && (
+                        <DialogTrigger asChild>
+                            <Button size="sm" variant="outline">
+                                <Edit className="mr-2 size-4" />
+                                Gruppe bearbeiten
+                            </Button>
+                        </DialogTrigger>
+                    )}
                 </CardHeader>
                 <CardContent>
                     <p>{isEmpty(description) ? 'Diese Gruppe hat aktuell noch keine Beschreibung.' : description}</p>
@@ -137,13 +143,15 @@ const GroupDetailsDescriptionDesktop = ({ groupId, wikiLink, websiteLink, descri
                 </CardContent>
             </Card>
 
-            <DialogContent className="sm:max-w-[425px] md:max-w-[645px] lg:max-w-[890px]">
-                <DialogHeader>
-                    <DialogTitle>Gruppendetails bearbeiten</DialogTitle>
-                    <DialogDescription>Bearbeite die Gruppendetails hier. Klicke speichern, wenn du fertig bist.</DialogDescription>
-                </DialogHeader>
-                <GroupDescriptionForm description={description} groupId={groupId} wikiLink={wikiLink} websiteLink={websiteLink} />
-            </DialogContent>
+            {isAdmin === 'Admin' && (
+                <DialogContent className="sm:max-w-[425px] md:max-w-[645px] lg:max-w-[890px]">
+                    <DialogHeader>
+                        <DialogTitle>Gruppendetails bearbeiten</DialogTitle>
+                        <DialogDescription>Bearbeite die Gruppendetails hier. Klicke speichern, wenn du fertig bist.</DialogDescription>
+                    </DialogHeader>
+                    <GroupDescriptionForm description={description} groupId={groupId} wikiLink={wikiLink} websiteLink={websiteLink} />
+                </DialogContent>
+            )}
         </Dialog>
     );
 };
