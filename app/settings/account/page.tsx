@@ -55,9 +55,7 @@ export default async function Page(): Promise<ReactElement> {
                 <Toaster
                     position="top-right"
                     richColors
-                    // Voluntarily passing empty object as a workaround for `richColors`
-                    // to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
-                    toastOptions={{}}
+                    toastOptions={{}} // Voluntarily passing empty object as a workaround for `richColors` to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
                 />
             </div>
         </>

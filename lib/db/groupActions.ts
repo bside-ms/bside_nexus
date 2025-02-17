@@ -1,5 +1,6 @@
 import { and, count, eq, isNull } from 'drizzle-orm';
 import { inArray } from 'drizzle-orm/sql/expressions/conditions';
+import { isEmpty } from 'lodash-es';
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import type { Group, User } from '@/db/schema';
@@ -75,6 +76,10 @@ export const getGroupMemberCount = async (groupId: string): Promise<number> => {
 // Returns the number of admins in the group.
 export type GroupAdminStatus = 'Admin' | 'Member' | 'None';
 export const getGroupAdminStatus = async (userId: string, groupId: string): Promise<GroupAdminStatus> => {
+    if (isEmpty(userId) || isEmpty(groupId)) {
+        return 'None';
+    }
+
     const groupMembers = await db
         .select()
         .from(membersTable)

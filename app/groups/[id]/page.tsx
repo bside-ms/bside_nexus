@@ -1,15 +1,20 @@
 import { redirect } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { Toaster } from 'sonner';
+import { GroupDetailsDescription } from '@/components/group/details/GroupDetailsDescription';
+import { GroupDetailsHeader } from '@/components/group/details/GroupDetailsHeader';
+import { GroupDetailsServices } from '@/components/group/details/GroupDetailsServices';
+import { GroupDetailsSubgroups } from '@/components/group/details/GroupDetailsSubgroups';
+import { GroupDetailsMembers } from '@/components/group/details/members/GroupDetailsMembers';
 import type { GroupMember } from '@/components/group/details/members/GroupMembersColumns';
-import { GroupMembersColumns } from '@/components/group/details/members/GroupMembersColumns';
 import NavbarTop from '@/components/sidebar/NavbarTop';
-import { DataTable } from '@/components/ui/datatable';
 import { Separator } from '@/components/ui/separator';
-import { getGroupById, getGroupMembers } from '@/lib/db/groupActions';
+import getUserSession from '@/lib/auth/getUserSession';
+import { getGroupAdminStatus, getGroupById, getGroupMembers, getSubgroups } from '@/lib/db/groupActions';
 
 const Group = async ({ params: { id: groupId } }: { params: { id: string } }): Promise<ReactElement> => {
     const group = await getGroupById(groupId);
+    const user = await getUserSession();
 
     // Handle when the group is not found
     if (group === null) {
@@ -23,6 +28,7 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
         },
         {
             title: group.categoryName ?? '',
+            url: `/groups`,
         },
         {
             title: group.displayName ?? '',
@@ -33,6 +39,11 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
     // ToDo: Reload table when group members change (deletion, promotion, demotion).
     // ToDo: UseEffect to load the group members.
     const groupMembers = await getGroupMembers(groupId);
+    const subgroups = await getSubgroups(groupId);
+    const isAdmin = await getGroupAdminStatus(user?.id ?? '', group.id);
+
+    // ToDo: Fetch those values from the database.
+    const [wikiUrl, websiteUrl, services] = ['', '', []];
 
     const members: Array<GroupMember> = [];
     groupMembers.forEach((member) => {
@@ -50,22 +61,29 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
         <div className="">
             <NavbarTop items={breadCrumbs} />
             <div className="space-y-6 p-10 pb-16">
-                <div className="space-y-0.5">
-                    <h2 className="text-2xl font-bold tracking-tight">Gruppenverwaltung: {group.displayName ?? group.name}</h2>
-                    <p>Hier findest du eine Übersicht über alle Gruppen auf die du innerhalb der B-Side zugreifen kannst.</p>
+                <GroupDetailsHeader displayName={group.displayName ?? group.name} />
+                <Separator className="my-6" />
+
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                    <GroupDetailsDescription
+                        wikiLink={wikiUrl ?? ''}
+                        websiteLink={websiteUrl ?? ''}
+                        description={group.description ?? ''}
+                        isAdmin={isAdmin}
+                    />
+                    <GroupDetailsSubgroups subgroups={subgroups} />
+                    <GroupDetailsServices services={services ?? []} />
                 </div>
 
                 <Separator className="my-6" />
 
-                <div className="space-y-8">{groupMembers.length > 0 && <DataTable columns={GroupMembersColumns} data={members} />}</div>
+                <GroupDetailsMembers groupMembers={members} />
             </div>
 
             <Toaster
                 position="top-right"
                 richColors
-                // Voluntarily passing empty object as a workaround for `richColors`
-                // to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
-                toastOptions={{}}
+                toastOptions={{}} // Voluntarily passing empty object as a workaround for `richColors` to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
             />
         </div>
     );

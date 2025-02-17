@@ -2,15 +2,18 @@ import axios from 'axios';
 import type { NextRequest } from 'next/server';
 import getMattermostClient from '@/lib/mattermost/getMattermostClient';
 
-export async function GET(req: NextRequest, { params }: { params: { username: string } }): Promise<Response> {
-    const { username } = params;
+export async function GET(req: NextRequest, { params }: { params: { username: Array<string> } }): Promise<Response> {
+    const username = params.username.join('/');
 
     if (!username) {
         return new Response(JSON.stringify({ error: 'Username is required' }), { status: 400 });
     }
 
+    // replace spaces and german special characters with dashes
+    const fixedUsername = username.replace(/\s/g, '-').replace(/[äöüß()/]/g, '-');
+
     try {
-        const userid = (await getMattermostClient().getUserByUsername(username)).id;
+        const userid = (await getMattermostClient().getUserByUsername(fixedUsername)).id;
 
         if (!userid) {
             return new Response(JSON.stringify({ error: 'User ID is required' }), { status: 400 });

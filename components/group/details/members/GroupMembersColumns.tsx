@@ -6,6 +6,7 @@ import axios from 'axios';
 import { MoreHorizontal } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { toast } from 'sonner';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { DataTableColumnHeader } from '@/components/ui/datatable-columnheader';
 import {
@@ -94,6 +95,24 @@ const formatMemberStatus = (status: string): string => {
 };
 
 export const GroupMembersColumns: Array<ColumnDef<GroupMember>> = [
+    {
+        accessorKey: 'avatar',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="" />,
+        enableGlobalFilter: false,
+        enableSorting: false,
+        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+        cell: ({ row }): ReactElement => {
+            const username: string = row.getValue('Username') ?? '';
+            return (
+                <div className="flex justify-end">
+                    <Avatar className="size-8 rounded-lg">
+                        <AvatarImage src={`/api/mattermost/${username}`} alt={`Avatar von ${username}`} />
+                        <AvatarFallback className="rounded-lg">{username.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                </div>
+            );
+        },
+    },
     {
         accessorKey: 'displayName',
         id: 'Anzeigename',
