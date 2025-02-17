@@ -12,6 +12,8 @@ export const groupsTable = pgTable('groups', {
     categoryName: varchar({ length: 255 }).notNull(),
     displayName: varchar({ length: 255 }).notNull(),
     description: text(),
+    wikiLink: varchar({ length: 255 }),
+    websiteLink: varchar({ length: 255 }),
     memberGroup: varchar({ length: 255 }),
     adminGroup: varchar({ length: 255 }),
     parentGroup: varchar({ length: 255 }),

@@ -173,6 +173,24 @@ const removeAdminFromDbGroup = async (userId: string, groupId: string): Promise<
     return result.length;
 };
 
+const updateDescription = async (groupId: string, description?: string): Promise<number> => {
+    const newDescription = isEmpty(description) ? null : description;
+    const result = await db.update(groupsTable).set({ description: newDescription }).where(eq(groupsTable.id, groupId)).returning();
+    return result.length;
+};
+
+const updateWebsiteLink = async (groupId: string, websiteLink?: string): Promise<number> => {
+    const newWebsiteLink = isEmpty(websiteLink) ? null : websiteLink;
+    const result = await db.update(groupsTable).set({ websiteLink: newWebsiteLink }).where(eq(groupsTable.id, groupId)).returning();
+    return result.length;
+};
+
+const updateWikiLink = async (groupId: string, wikiLink?: string): Promise<number> => {
+    const newWikiLink = isEmpty(wikiLink) ? null : wikiLink;
+    const result = await db.update(groupsTable).set({ wikiLink: newWikiLink }).where(eq(groupsTable.id, groupId)).returning();
+    return result.length;
+};
+
 /**
  * Demotes a user from an admin in a group.
  * This function is triggered by the /apu/group/demote endpoint.
@@ -286,6 +304,56 @@ export const removeUserFromGroup = async (userIdToBeRemoved: string, groupId: st
     }
 
     // ToDo: Force a refresh in our other tools.
+    // ToDo: Log the event.
+
+    return NextResponse.json({ success: true });
+};
+
+export const updateGroupDescription = async (
+    groupId: string,
+    executingUserId: string,
+    description?: string,
+    wikiLink?: string,
+    websiteLink?: string,
+): Promise<NextResponse> => {
+    const user = await getUserSession();
+    if (user === null) {
+        return NextResponse.json({ error: 'Du bist nicht eingeloggt.' }, { status: 401 });
+    }
+
+    const userId = user.id;
+    if (isEmpty(userId)) {
+        return NextResponse.json({ error: 'Die eingeloggte Benutzer*in konnte nicht identifiziert werden.' }, { status: 400 });
+    }
+
+    const dbGroup = await getGroupById(groupId);
+    if (dbGroup === null) {
+        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
+    }
+
+    const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
+    if (!adminStatus) {
+        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte um diese Aktion durchzuführen.' }, { status: 403 });
+    }
+
+    const currentDescription = isEmpty(dbGroup.description) ? undefined : dbGroup.description;
+    if (currentDescription !== description) {
+        await updateDescription(groupId, description);
+        // ToDo: Update keycloak attribute.
+    }
+
+    const currentWebsiteLink = isEmpty(dbGroup.websiteLink) ? undefined : dbGroup.websiteLink;
+    if (currentWebsiteLink !== websiteLink) {
+        await updateWebsiteLink(groupId, websiteLink);
+        // ToDo: Update keycloak attribute.
+    }
+
+    const currentWikiLink = isEmpty(dbGroup.wikiLink) ? undefined : dbGroup.wikiLink;
+    if (currentWikiLink !== wikiLink) {
+        await updateWikiLink(groupId, wikiLink);
+        // ToDo: Update keycloak attribute.
+    }
+
     // ToDo: Log the event.
 
     return NextResponse.json({ success: true });

@@ -38,12 +38,13 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
 
     // ToDo: Reload table when group members change (deletion, promotion, demotion).
     // ToDo: UseEffect to load the group members.
-    const groupMembers = await getGroupMembers(groupId);
-    const subgroups = await getSubgroups(groupId);
-    const isAdmin = await getGroupAdminStatus(user?.id ?? '', group.id);
+    const groupMemberPromise = getGroupMembers(groupId);
+    const subgroupsPromise = getSubgroups(groupId);
+    const isAdminPromise = getGroupAdminStatus(user?.id ?? '', group.id);
+    const [groupMembers, subgroups, isAdmin] = await Promise.all([groupMemberPromise, subgroupsPromise, isAdminPromise]);
 
     // ToDo: Fetch those values from the database.
-    const [wikiUrl, websiteUrl, services] = ['', '', []];
+    const [services] = [[]];
 
     const members: Array<GroupMember> = [];
     groupMembers.forEach((member) => {
@@ -64,10 +65,11 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
                 <GroupDetailsHeader displayName={group.displayName ?? group.name} />
                 <Separator className="my-6" />
 
-                <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     <GroupDetailsDescription
-                        wikiLink={wikiUrl ?? ''}
-                        websiteLink={websiteUrl ?? ''}
+                        groupId={group.id}
+                        wikiLink={group.wikiLink ?? ''}
+                        websiteLink={group.websiteLink ?? ''}
                         description={group.description ?? ''}
                         isAdmin={isAdmin}
                     />

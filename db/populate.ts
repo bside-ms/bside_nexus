@@ -49,6 +49,8 @@ async function populateGroups(): Promise<void> {
             categoryName: parentGroup.attributes.categoryName ?? '',
             displayName: parentGroup.attributes.displayName ?? parentGroup.name,
             description: parentGroup.attributes.description,
+            wikiLink: parentGroup.attributes.wikiLink,
+            websiteLink: parentGroup.attributes.websiteLink,
             memberGroup,
             adminGroup,
         };

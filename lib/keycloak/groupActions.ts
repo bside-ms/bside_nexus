@@ -14,6 +14,8 @@ export type AugmentedGroupRepresentation = GroupRepresentation &
             displayName?: string;
             shortName?: string;
             description?: string;
+            wikiLink?: string;
+            websiteLink?: string;
         };
     };
 
@@ -33,6 +35,8 @@ const augmentGroup = (group: GroupRepresentation): AugmentedGroupRepresentation 
             displayName: Array.isArray(group.attributes?.display_name) ? group.attributes.display_name[0] : group.name,
             shortName: Array.isArray(group.attributes?.short_name) ? group.attributes.short_name[0] : undefined,
             description: Array.isArray(group.attributes?.description) ? group.attributes.description[0] : undefined,
+            wikiLink: Array.isArray(group.attributes?.wikiLink) ? group.attributes.wikiLink[0] : undefined,
+            websiteLink: Array.isArray(group.attributes?.websiteLink) ? group.attributes.websiteLink[0] : undefined,
         },
     };
 };

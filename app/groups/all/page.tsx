@@ -47,7 +47,7 @@ export default async function Page(): Promise<ReactElement> {
 
                 <div className="flex flex-col space-y-8 lg:flex-row">
                     <div className="flex flex-1 flex-col gap-4 p-4">
-                        <div className="grid auto-rows-min gap-4 md:grid-cols-2">
+                        <div className="grid auto-rows-min gap-4 lg:grid-cols-2">
                             {bodies.map((body) => (
                                 <GroupOverviewCard key={body.id} group={body} />
                             ))}
@@ -66,7 +66,7 @@ export default async function Page(): Promise<ReactElement> {
 
                 <div className="flex flex-col space-y-8 lg:flex-row">
                     <div className="flex flex-1 flex-col gap-4 p-4">
-                        <div className="grid auto-rows-min gap-4 md:grid-cols-2">
+                        <div className="grid auto-rows-min gap-4 lg:grid-cols-2">
                             {circles.map((circle) => (
                                 <GroupOverviewCard key={circle.id} group={circle} />
                             ))}
