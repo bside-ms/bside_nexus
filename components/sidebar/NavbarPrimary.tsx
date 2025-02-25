@@ -1,39 +1,41 @@
 'use client';
 
-import { type LucideIcon, MoreHorizontal } from 'lucide-react';
-import type { ReactElement } from 'react';
+import { Fragment, type ReactElement } from 'react';
+import { type LucideIcon } from 'lucide-react';
 import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 
-export function NavbarPrimary({
-    projects,
-}: {
-    projects: Array<{
-        name: string;
+export interface NavbarItems {
+    title: string;
+    url: string;
+    icon?: LucideIcon;
+    isActive?: boolean;
+    items?: Array<{
+        title: string;
         url: string;
-        icon: LucideIcon;
+        icon?: LucideIcon;
     }>;
-}): ReactElement {
+}
+
+export function NavbarPrimary({ navbar }: { navbar: Array<NavbarItems> }): ReactElement {
     return (
         <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-            <SidebarGroupLabel>Title</SidebarGroupLabel>
-            <SidebarMenu>
-                {projects.map((item) => (
-                    <SidebarMenuItem key={item.name}>
-                        <SidebarMenuButton asChild>
-                            <a href={item.url}>
-                                <item.icon />
-                                <span>{item.name}</span>
-                            </a>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                ))}
-                <SidebarMenuItem>
-                    <SidebarMenuButton>
-                        <MoreHorizontal />
-                        <span>More</span>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
-            </SidebarMenu>
+            {navbar.map((item) => (
+                <Fragment key={item.title}>
+                    <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
+                    <SidebarMenu>
+                        {item.items?.map((subItem) => (
+                            <SidebarMenuItem key={item.title}>
+                                <SidebarMenuButton asChild>
+                                    <a href={subItem.url}>
+                                        {subItem.icon && <subItem.icon />}
+                                        <span>{subItem.title}</span>
+                                    </a>
+                                </SidebarMenuButton>
+                            </SidebarMenuItem>
+                        ))}
+                    </SidebarMenu>
+                </Fragment>
+            ))}
         </SidebarGroup>
     );
 }

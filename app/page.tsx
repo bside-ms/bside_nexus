@@ -16,6 +16,10 @@ export const metadata: Metadata = {
 };
 
 export default function Page(): ReactElement {
+    // ToDo: Display latest news from Mattermost.
+    // ToDo: Display upcoming events from Website.
+    // ToDo: Display upcoming internal events from ???.
+
     return (
         <div className="">
             <NavbarTop items={breadCrumbs} />

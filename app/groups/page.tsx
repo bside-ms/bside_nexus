@@ -1,4 +1,3 @@
-import { ArrowRight } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
@@ -6,7 +5,6 @@ import { Toaster } from 'sonner';
 import GroupOverviewCard from '@/components/group/overview/GroupOverviewCard';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { getUserGroups } from '@/lib/db/groupActions';
 
@@ -35,12 +33,24 @@ export default async function Page(): Promise<ReactElement> {
         .sort((a, b) => a?.displayName?.localeCompare(b?.displayName ?? '') ?? 0);
 
     return (
-        <div className="">
+        <>
             <NavbarTop items={breadCrumbs} />
             <div className="space-y-6 p-10 pb-16">
                 <div className="space-y-0.5">
-                    <h2 className="text-2xl font-bold tracking-tight">Meine Vereine</h2>
-                    <p>Hier findest du eine Übersicht über deine Körperschaften der B-Side.</p>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold tracking-tight">Meine Vereine</h2>
+                            <p>
+                                Hier findest du eine Übersicht über alle Vereine und Körperschaften innerhalb der B-Side auf deren interne
+                                Dokumente du aktuell zugreifen kannst.
+                            </p>
+                        </div>
+                        <Link href="/groups/all">
+                            <Button size="lg" variant="destructive">
+                                Zur Gesamtübersicht
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
                 <div className="flex flex-col space-y-8 lg:flex-row">
@@ -56,8 +66,17 @@ export default async function Page(): Promise<ReactElement> {
                 <Separator className="my-6" />
 
                 <div className="space-y-0.5">
-                    <h2 className="text-2xl font-bold tracking-tight">Meine Gruppen</h2>
-                    <p>Hier findest du eine Übersicht über alle deine Gruppen der B-Side.</p>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold tracking-tight">Meine Gruppen</h2>
+                            <p>Hier findest du eine Übersicht über alle deine Gruppen der B-Side.</p>
+                        </div>
+                        <Link href="/groups/all">
+                            <Button size="lg" variant="destructive" className="">
+                                Zur Gesamtübersicht
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
                 <div className="flex flex-col space-y-8 lg:flex-row">
@@ -66,23 +85,6 @@ export default async function Page(): Promise<ReactElement> {
                             {circles.map((circle) => (
                                 <GroupOverviewCard key={circle.id} group={circle} />
                             ))}
-
-                            <Card className="flex h-full flex-col justify-between rounded-xl">
-                                <CardHeader>
-                                    <CardTitle>Alle weiteren Gruppen</CardTitle>
-                                </CardHeader>
-                                <CardContent className="grid flex-1 gap-6">
-                                    Hier findest du eine Übersicht über alle Gruppen, in denen du (noch) nicht Mitglied bist.
-                                </CardContent>
-                                <CardFooter className="pt-2">
-                                    <Link className="w-full" href="/groups/all">
-                                        <Button size="default" variant="destructive" className="w-full text-base">
-                                            Zur gesamten Gruppenübersicht
-                                            <ArrowRight className="ml-2 size-4" />
-                                        </Button>
-                                    </Link>
-                                </CardFooter>
-                            </Card>
                         </div>
                     </div>
                 </div>
@@ -93,6 +95,6 @@ export default async function Page(): Promise<ReactElement> {
                     toastOptions={{}} // Voluntarily passing empty object as a workaround for `richColors` to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
                 />
             </div>
-        </div>
+        </>
     );
 }
