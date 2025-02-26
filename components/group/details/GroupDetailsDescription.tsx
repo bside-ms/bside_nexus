@@ -5,6 +5,7 @@ import { isEmpty } from 'lodash-es';
 import { Edit, ExternalLink, ShieldX, Star, Users } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
+import { useMediaQuery } from 'react-responsive';
 import { GroupDescriptionForm } from '@/components/group/details/GroupDetailsDescriptionForm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,6 @@ import {
     DrawerTitle,
     DrawerTrigger,
 } from '@/components/ui/drawer';
-import { useMediaQuery } from '@/hooks/use-media-query';
 import type { GroupAdminStatus } from '@/lib/db/groupActions';
 
 export interface GroupDetailsProps {
@@ -157,7 +157,7 @@ const GroupDetailsDescriptionDesktop = ({ groupId, wikiLink, websiteLink, descri
 };
 
 export function GroupDetailsDescription({ groupId, wikiLink, websiteLink, description, isAdmin }: GroupDetailsProps): ReactElement {
-    const isDesktop = useMediaQuery('(min-width: 768px)');
+    const isDesktop = useMediaQuery({ query: '(min-width: 768px)' });
 
     if (!isDesktop) {
         return <GroupDetailsDescriptionMobile {...{ groupId, wikiLink, websiteLink, description, isAdmin }} />;

@@ -66,20 +66,23 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
                 <Separator className="my-6" />
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <GroupDetailsDescription
-                        groupId={group.id}
-                        wikiLink={group.wikiLink ?? ''}
-                        websiteLink={group.websiteLink ?? ''}
-                        description={group.description ?? ''}
-                        isAdmin={isAdmin}
-                    />
+                    <div className="lg:col-span-2">
+                        <GroupDetailsDescription
+                            groupId={group.id}
+                            wikiLink={group.wikiLink ?? ''}
+                            websiteLink={group.websiteLink ?? ''}
+                            description={group.description ?? ''}
+                            isAdmin={isAdmin}
+                        />
+                    </div>
+
                     <GroupDetailsSubgroups subgroups={subgroups} />
                     <GroupDetailsServices services={services ?? []} />
                 </div>
 
                 <Separator className="my-6" />
 
-                <GroupDetailsMembers groupMembers={members} />
+                <GroupDetailsMembers groupMembers={members} isAdmin={isAdmin} groupId={group.id} />
             </div>
 
             <Toaster

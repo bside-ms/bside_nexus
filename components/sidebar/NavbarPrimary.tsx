@@ -6,9 +6,6 @@ import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, Sideba
 
 export interface NavbarItems {
     title: string;
-    url: string;
-    icon?: LucideIcon;
-    isActive?: boolean;
     items?: Array<{
         title: string;
         url: string;
@@ -18,11 +15,11 @@ export interface NavbarItems {
 
 export function NavbarPrimary({ navbar }: { navbar: Array<NavbarItems> }): ReactElement {
     return (
-        <SidebarGroup className="group-data-[collapsible=icon]:hidden">
+        <SidebarGroup className="mt-4 group-data-[collapsible=icon]:hidden">
             {navbar.map((item) => (
                 <Fragment key={item.title}>
                     <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
-                    <SidebarMenu>
+                    <SidebarMenu className="mb-4">
                         {item.items?.map((subItem) => (
                             <SidebarMenuItem key={item.title}>
                                 <SidebarMenuButton asChild>
