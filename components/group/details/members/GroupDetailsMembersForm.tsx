@@ -81,6 +81,9 @@ export function GroupDetailsMembersForm({ groupId }: ComponentProps<'form'> & Pa
                         'Cache-Control': 'no-store',
                         'Content-Type': 'application/json',
                     },
+                    body: JSON.stringify({
+                        groupId,
+                    }),
                 });
                 const data = await response.json();
                 setUsers(data);

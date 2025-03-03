@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getAllUsers } from '@/lib/db/userActions';
+import { getPossibleGroupMembers } from '@/lib/db/userActions';
 
-export async function POST(_: Request): Promise<NextResponse> {
-    const users = await getAllUsers();
+export async function POST(req: Request): Promise<NextResponse> {
+    const { groupId }: { groupId: string } = await req.json();
+    if (groupId === undefined) {
+        return NextResponse.json({ error: 'Die Gruppe konnte nicht identifiziert werden.' }, { status: 400 });
+    }
+
+    const users = await getPossibleGroupMembers(groupId);
 
     const userList = users.map((user) => ({
         id: user.id,

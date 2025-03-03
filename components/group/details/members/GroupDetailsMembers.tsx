@@ -14,17 +14,20 @@ import type { GroupAdminStatus } from '@/lib/db/groupActions';
 interface GroupMembersProps {
     groupMembers: Array<GroupMember>;
     isAdmin: GroupAdminStatus;
+    isGlobalAdmin: boolean;
     groupId: string;
 }
 
-export function GroupDetailsMembers({ groupId, groupMembers, isAdmin }: GroupMembersProps): ReactElement {
+export function GroupDetailsMembers({ groupId, groupMembers, isAdmin, isGlobalAdmin }: GroupMembersProps): ReactElement {
     const { isLg } = useBreakpointContext();
+
+    const isAdminOrGlobalAdmin = isAdmin === 'Admin' || isGlobalAdmin;
 
     return (
         <Card className="col-span-2">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle>Mitglieder</CardTitle>
-                {isAdmin === 'Admin' && (
+                {isAdminOrGlobalAdmin && (
                     <Link href={`/groups/${groupId}/add`}>
                         <Button size="sm" variant="outline">
                             <PlusCircle className="mr-2 size-4" />

@@ -7,7 +7,7 @@ import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import getUserSession from '@/lib/auth/getUserSession';
-import { getGroupAdminStatus, getGroupById } from '@/lib/db/groupActions';
+import { getGroupById, isGroupAdmin } from '@/lib/db/groupActions';
 
 const Group = async ({ params: { id: groupId } }: { params: { id: string } }): Promise<ReactElement> => {
     const group = await getGroupById(groupId);
@@ -37,7 +37,7 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
         },
     ];
 
-    const isAdmin = await getGroupAdminStatus(user?.id ?? '', group.id);
+    const isAdmin = await isGroupAdmin(user?.id ?? '', group.id, true);
     if (!isAdmin) {
         redirect(`/groups/${groupId}`);
     }

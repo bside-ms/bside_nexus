@@ -10,7 +10,7 @@ import type { GroupMember } from '@/components/group/details/members/GroupMember
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Separator } from '@/components/ui/separator';
 import getUserSession from '@/lib/auth/getUserSession';
-import { getGroupAdminStatus, getGroupById, getGroupMembers, getSubgroups } from '@/lib/db/groupActions';
+import { getGroupAdminStatus, getGroupById, getGroupMembers, getSubgroups, isGroupAdmin } from '@/lib/db/groupActions';
 
 const Group = async ({ params: { id: groupId } }: { params: { id: string } }): Promise<ReactElement> => {
     const group = await getGroupById(groupId);
@@ -41,7 +41,13 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
     const groupMemberPromise = getGroupMembers(groupId);
     const subgroupsPromise = getSubgroups(groupId);
     const isAdminPromise = getGroupAdminStatus(user?.id ?? '', group.id);
-    const [groupMembers, subgroups, isAdmin] = await Promise.all([groupMemberPromise, subgroupsPromise, isAdminPromise]);
+    const isGlobalAdminPromise = isGroupAdmin(user?.id ?? '', group.id, true);
+    const [groupMembers, subgroups, isAdmin, isGlobalAdmin] = await Promise.all([
+        groupMemberPromise,
+        subgroupsPromise,
+        isAdminPromise,
+        isGlobalAdminPromise,
+    ]);
 
     // ToDo: Fetch those values from the database.
     const [services] = [[]];
@@ -73,6 +79,7 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
                             websiteLink={group.websiteLink ?? ''}
                             description={group.description ?? ''}
                             isAdmin={isAdmin}
+                            isGlobalAdmin={isGlobalAdmin}
                         />
                     </div>
 
@@ -82,7 +89,7 @@ const Group = async ({ params: { id: groupId } }: { params: { id: string } }): P
 
                 <Separator className="my-6" />
 
-                <GroupDetailsMembers groupMembers={members} isAdmin={isAdmin} groupId={group.id} />
+                <GroupDetailsMembers groupMembers={members} isAdmin={isAdmin} groupId={group.id} isGlobalAdmin={isGlobalAdmin} />
             </div>
 
             <Toaster

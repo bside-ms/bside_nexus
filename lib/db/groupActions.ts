@@ -45,7 +45,7 @@ export const getGroupMembers = async (groupId: string): Promise<Array<GroupMembe
         .select()
         .from(membersTable)
         .leftJoin(usersTable, eq(membersTable.userId, usersTable.id))
-        .where(eq(membersTable.groupId, groupId));
+        .where(and(eq(membersTable.groupId, groupId), eq(usersTable.enabled, true)));
 
     if (groupMembers.length === 0) {
         return [];

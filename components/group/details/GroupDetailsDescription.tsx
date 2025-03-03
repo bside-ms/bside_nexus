@@ -29,6 +29,7 @@ export interface GroupDetailsProps {
     websiteLink: string;
     description: string;
     isAdmin: GroupAdminStatus;
+    isGlobalAdmin: boolean;
 }
 
 const MemberStatusBadge = ({ isAdmin }: { isAdmin: GroupAdminStatus }) => {
@@ -53,15 +54,24 @@ const MemberStatusBadge = ({ isAdmin }: { isAdmin: GroupAdminStatus }) => {
     );
 };
 
-const GroupDetailsDescriptionMobile = ({ groupId, wikiLink, websiteLink, description, isAdmin }: GroupDetailsProps): ReactElement => {
+const GroupDetailsDescriptionMobile = ({
+    groupId,
+    wikiLink,
+    websiteLink,
+    description,
+    isAdmin,
+    isGlobalAdmin,
+}: GroupDetailsProps): ReactElement => {
     const [open, setOpen] = useState(false);
+
+    const isAdminOrGlobalAdmin = isAdmin === 'Admin' || isGlobalAdmin;
 
     return (
         <Drawer open={open} onOpenChange={setOpen}>
             <Card className="w-full max-w-full lg:max-w-[50%]">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle>Gruppenbeschreibung</CardTitle>
-                    {isAdmin === 'Admin' && (
+                    {isAdminOrGlobalAdmin && (
                         <DrawerTrigger asChild>
                             <Button size="sm" variant="outline">
                                 <Edit className="mr-2 size-4" />
@@ -88,7 +98,7 @@ const GroupDetailsDescriptionMobile = ({ groupId, wikiLink, websiteLink, descrip
                 </CardContent>
             </Card>
 
-            {isAdmin === 'Admin' && (
+            {isAdminOrGlobalAdmin && (
                 <DrawerContent>
                     <DrawerHeader className="text-left">
                         <DrawerTitle>Gruppendetails bearbeiten</DrawerTitle>
@@ -112,15 +122,24 @@ const GroupDetailsDescriptionMobile = ({ groupId, wikiLink, websiteLink, descrip
     );
 };
 
-const GroupDetailsDescriptionDesktop = ({ groupId, wikiLink, websiteLink, description, isAdmin }: GroupDetailsProps): ReactElement => {
+const GroupDetailsDescriptionDesktop = ({
+    groupId,
+    wikiLink,
+    websiteLink,
+    description,
+    isAdmin,
+    isGlobalAdmin,
+}: GroupDetailsProps): ReactElement => {
     const [open, setOpen] = useState(false);
+
+    const isAdminOrGlobalAdmin = isAdmin === 'Admin' || isGlobalAdmin;
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <Card className="col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle>Gruppenbeschreibung</CardTitle>
-                    {isAdmin === 'Admin' && (
+                    {isAdminOrGlobalAdmin && (
                         <DialogTrigger asChild>
                             <Button size="sm" variant="outline">
                                 <Edit className="mr-2 size-4" />
@@ -147,7 +166,7 @@ const GroupDetailsDescriptionDesktop = ({ groupId, wikiLink, websiteLink, descri
                 </CardContent>
             </Card>
 
-            {isAdmin === 'Admin' && (
+            {isAdminOrGlobalAdmin && (
                 <DialogContent className="sm:max-w-[425px] md:max-w-[645px] lg:max-w-[890px]">
                     <DialogHeader>
                         <DialogTitle>Gruppendetails bearbeiten</DialogTitle>
@@ -160,12 +179,19 @@ const GroupDetailsDescriptionDesktop = ({ groupId, wikiLink, websiteLink, descri
     );
 };
 
-export function GroupDetailsDescription({ groupId, wikiLink, websiteLink, description, isAdmin }: GroupDetailsProps): ReactElement {
+export function GroupDetailsDescription({
+    groupId,
+    wikiLink,
+    websiteLink,
+    description,
+    isAdmin,
+    isGlobalAdmin,
+}: GroupDetailsProps): ReactElement {
     const { isLg } = useBreakpointContext();
 
     if (!isLg) {
-        return <GroupDetailsDescriptionMobile {...{ groupId, wikiLink, websiteLink, description, isAdmin }} />;
+        return <GroupDetailsDescriptionMobile {...{ groupId, wikiLink, websiteLink, description, isAdmin, isGlobalAdmin }} />;
     }
 
-    return <GroupDetailsDescriptionDesktop {...{ groupId, wikiLink, websiteLink, description, isAdmin }} />;
+    return <GroupDetailsDescriptionDesktop {...{ groupId, wikiLink, websiteLink, description, isAdmin, isGlobalAdmin }} />;
 }
