@@ -73,6 +73,11 @@ export const getGroupMemberCount = async (groupId: string): Promise<number> => {
     return groupMembers[0]?.count ?? 0;
 };
 
+const isGlobalAdmin = (userId: string): boolean => {
+    // ToDo: Implement this function.
+    return userId === '58722002-5ebc-4039-802f-01bb499978ae';
+};
+
 // Returns the number of admins in the group.
 export type GroupAdminStatus = 'Admin' | 'Member' | 'None';
 export const getGroupAdminStatus = async (userId: string, groupId: string): Promise<GroupAdminStatus> => {
@@ -106,11 +111,6 @@ export const getSubgroups = async (groupId: string): Promise<Array<Group>> => {
     return (subgroups as Array<Group>) ?? [];
 };
 
-const isGlobalAdmin = (userId: string): boolean => {
-    // ToDo: Implement this function.
-    return userId === '58722002-5ebc-4039-802f-01bb499978ae';
-};
-
 export const isGroupAdmin = async (userId: string, groupId: string, global: boolean = false): Promise<boolean> => {
     const groupAdminStatus = await getGroupAdminStatus(userId, groupId);
     if (groupAdminStatus === 'Admin') {
@@ -123,6 +123,18 @@ export const isGroupAdmin = async (userId: string, groupId: string, global: bool
 export const getGroupById = async (groupId: string): Promise<Group | null> => {
     const group = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
     return group[0] ?? null;
+};
+
+const addUserToDbGroup = async (userId: string, groupId: string): Promise<number> => {
+    const result = await db
+        .insert(membersTable)
+        .values({
+            userId,
+            groupId,
+            isAdmin: false,
+        })
+        .returning();
+    return result.length;
 };
 
 const removeUserFromDbGroup = async (userId: string, groupId: string): Promise<number> => {
@@ -258,6 +270,36 @@ export const addAdminToGroup = async (userIdToBePromoted: string, groupId: strin
 
     await keycloakAddUserToGroup(userIdToBePromoted, dbGroup.adminGroup);
     await addAdminToDbGroup(userIdToBePromoted, dbGroup.id);
+
+    // ToDo: Force a refresh in our other tools.
+    // ToDo: Log the event.
+
+    return NextResponse.json({ success: true });
+};
+
+export const addUserToGroup = async (userIdToBeAdded: string, groupId: string, executingUserId: string): Promise<NextResponse> => {
+    const idpGroup = await getGroupById(groupId);
+    if (idpGroup === null) {
+        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
+    }
+
+    const dbGroup = await getGroupById(groupId);
+    if (dbGroup === null || dbGroup.memberGroup === null) {
+        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
+    }
+
+    const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
+    if (!adminStatus) {
+        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte um diese Aktion durchzuführen.' }, { status: 403 });
+    }
+
+    const userIsMemberOfGroup = await getGroupAdminStatus(userIdToBeAdded, groupId);
+    if (userIsMemberOfGroup !== 'None') {
+        return NextResponse.json({ error: 'Die Benutzer*in ist bereits Mitglied dieser Gruppe.' }, { status: 400 });
+    }
+
+    await keycloakAddUserToGroup(userIdToBeAdded, dbGroup.memberGroup);
+    await addUserToDbGroup(userIdToBeAdded, dbGroup.id);
 
     // ToDo: Force a refresh in our other tools.
     // ToDo: Log the event.

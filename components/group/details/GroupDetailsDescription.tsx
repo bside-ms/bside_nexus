@@ -5,7 +5,7 @@ import { isEmpty } from 'lodash-es';
 import { Edit, ExternalLink, ShieldX, Star, Users } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
-import { useMediaQuery } from 'react-responsive';
+import { useBreakpointContext } from '@/components/common/BreakpointContext';
 import { GroupDescriptionForm } from '@/components/group/details/GroupDetailsDescriptionForm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,12 +74,16 @@ const GroupDetailsDescriptionMobile = ({ groupId, wikiLink, websiteLink, descrip
                     <p>{isEmpty(description) ? 'Diese Gruppe hat aktuell noch keine Beschreibung.' : description}</p>
                     <div className="mt-4 flex space-x-4">
                         <MemberStatusBadge isAdmin={isAdmin} />
-                        <Link href={wikiLink} className="flex items-center text-sm text-blue-600 hover:underline">
-                            Wiki <ExternalLink className="ml-1 size-4" />
-                        </Link>
-                        <Link href={websiteLink} className="flex items-center text-sm text-blue-600 hover:underline">
-                            Website <ExternalLink className="ml-1 size-4" />
-                        </Link>
+                        {!isEmpty(websiteLink) && (
+                            <Link href={websiteLink} target="_blank" className="flex items-center text-sm text-blue-600 hover:underline">
+                                Website <ExternalLink className="ml-1 size-4" />
+                            </Link>
+                        )}
+                        {!isEmpty(wikiLink) && (
+                            <Link href={wikiLink} target="_blank" className="flex items-center text-sm text-blue-600 hover:underline">
+                                Wiki <ExternalLink className="ml-1 size-4" />
+                            </Link>
+                        )}
                     </div>
                 </CardContent>
             </Card>
@@ -157,9 +161,9 @@ const GroupDetailsDescriptionDesktop = ({ groupId, wikiLink, websiteLink, descri
 };
 
 export function GroupDetailsDescription({ groupId, wikiLink, websiteLink, description, isAdmin }: GroupDetailsProps): ReactElement {
-    const isDesktop = useMediaQuery({ query: '(min-width: 768px)' });
+    const { isLg } = useBreakpointContext();
 
-    if (!isDesktop) {
+    if (!isLg) {
         return <GroupDetailsDescriptionMobile {...{ groupId, wikiLink, websiteLink, description, isAdmin }} />;
     }
 

@@ -4,6 +4,7 @@ import { GeistSans } from 'geist/font/sans';
 import type { Metadata } from 'next';
 import type { ReactElement, ReactNode } from 'react';
 import { LoginForm } from '@/components/auth/LoginForm';
+import { BreakpointContextProvider } from '@/components/common/BreakpointContext';
 import { AppSidebar } from '@/components/sidebar/AppSidebar';
 import ThemeProvider from '@/components/theming/ThemeProvider';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
@@ -34,12 +35,14 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
         <html>
             <body className={GeistSans.className}>
                 <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-                    <SidebarProvider>
-                        <AppSidebar />
-                        <SidebarInset>
-                            <main>{children}</main>
-                        </SidebarInset>
-                    </SidebarProvider>
+                    <BreakpointContextProvider>
+                        <SidebarProvider>
+                            <AppSidebar />
+                            <SidebarInset>
+                                <main>{children}</main>
+                            </SidebarInset>
+                        </SidebarProvider>
+                    </BreakpointContextProvider>
                 </ThemeProvider>
             </body>
         </html>

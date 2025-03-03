@@ -21,7 +21,7 @@ export function NavbarPrimary({ navbar }: { navbar: Array<NavbarItems> }): React
                     <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
                     <SidebarMenu className="mb-4">
                         {item.items?.map((subItem) => (
-                            <SidebarMenuItem key={item.title}>
+                            <SidebarMenuItem key={subItem.title}>
                                 <SidebarMenuButton asChild>
                                     <a href={subItem.url}>
                                         {subItem.icon && <subItem.icon />}

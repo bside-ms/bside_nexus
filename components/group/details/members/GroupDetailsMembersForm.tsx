@@ -63,12 +63,11 @@ export function GroupDetailsMembersForm({ groupId }: ComponentProps<'form'> & Pa
                 duration: 10000,
             });
 
-            window.location.reload();
+            setTimeout(() => (window.location.href = `/groups/${groupId!}`), 1000);
         } catch {
             toast.error('Fehler beim Hinzufügen der Mitglieder zur Gruppe.', {
                 description: 'Bitte versuche es später erneut.',
             });
-        } finally {
             setIsLoading(false);
         }
     };

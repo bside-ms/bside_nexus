@@ -3,6 +3,7 @@
 import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
+import { useBreakpointContext } from '@/components/common/BreakpointContext';
 import type { GroupMember } from '@/components/group/details/members/GroupMembersColumns';
 import { GroupMembersColumns } from '@/components/group/details/members/GroupMembersColumns';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,8 @@ interface GroupMembersProps {
 }
 
 export function GroupDetailsMembers({ groupId, groupMembers, isAdmin }: GroupMembersProps): ReactElement {
+    const { isLg } = useBreakpointContext();
+
     return (
         <Card className="col-span-2">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -30,7 +33,7 @@ export function GroupDetailsMembers({ groupId, groupMembers, isAdmin }: GroupMem
                     </Link>
                 )}
             </CardHeader>
-            <CardContent>{groupMembers.length > 0 && <DataTable columns={GroupMembersColumns} data={groupMembers} />}</CardContent>
+            <CardContent>{groupMembers.length > 0 && isLg && <DataTable columns={GroupMembersColumns} data={groupMembers} />}</CardContent>
         </Card>
     );
 }
