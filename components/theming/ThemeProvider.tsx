@@ -1,10 +1,21 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { ThemeProvider as NextThemesProvider } from 'next-themes';
-import type { ReactElement } from 'react';
 import type * as React from 'react';
+import type { ReactElement } from 'react';
 
-const ThemeProvider = ({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>): ReactElement => {
+const ThemeProvider = ({ children, ...props }: React.ComponentProps<typeof NextThemesProvider>): ReactElement | null => {
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    useEffect(() => {
+        setIsLoaded(true);
+    }, []);
+
+    if (!isLoaded) {
+        return null;
+    }
+
     return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
 };
 

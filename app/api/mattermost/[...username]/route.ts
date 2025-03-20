@@ -2,7 +2,8 @@ import axios from 'axios';
 import type { NextRequest } from 'next/server';
 import getMattermostClient from '@/lib/mattermost/getMattermostClient';
 
-export async function GET(req: NextRequest, { params }: { params: { username: Array<string> } }): Promise<Response> {
+export async function GET(req: NextRequest, props: { params: Promise<{ username: Array<string> }> }): Promise<Response> {
+    const params = await props.params;
     const username = params.username.join('/');
 
     if (!username) {
