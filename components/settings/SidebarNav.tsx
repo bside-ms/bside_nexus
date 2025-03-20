@@ -29,8 +29,8 @@ export function SidebarNav({ className, ...props }: React.ComponentPropsWithoutR
                     className={cn(
                         buttonVariants({ variant: 'ghost' }),
                         pathname === item.href
-                            ? 'bg-zinc-100 dark:bg-zinc-800/50 hover:bg-zinc-100 hover:dark:bg-zinc-800/50'
-                            : 'hover:bg-zinc-100 hover:dark:bg-zinc-800/50 hover:underline',
+                            ? 'bg-zinc-100 dark:bg-zinc-800/50 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'
+                            : 'hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:underline',
                         'justify-start',
                     )}
                 >

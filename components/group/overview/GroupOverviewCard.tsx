@@ -30,7 +30,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
                     </HoverCardTrigger>
                     <HoverCardContent className="w-80">
                         <div className="flex justify-between space-x-4">
-                            <Avatar className="!rounded-none">
+                            <Avatar className="rounded-none!">
                                 <AvatarImage src="/logo_kv.png" alt="Avatar" />
                                 <AvatarFallback>KV</AvatarFallback>
                             </Avatar>
@@ -63,7 +63,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
                     </HoverCardTrigger>
                     <HoverCardContent className="w-80">
                         <div className="flex justify-between space-x-4">
-                            <Avatar className="!rounded-none">
+                            <Avatar className="rounded-none!">
                                 <AvatarImage src="/logo_gmbh.png" alt="Avatar" />
                                 <AvatarFallback>GmbH</AvatarFallback>
                             </Avatar>
@@ -97,7 +97,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
                     </HoverCardTrigger>
                     <HoverCardContent className="w-80">
                         <div className="flex justify-between space-x-4">
-                            <Avatar className="!rounded-none">
+                            <Avatar className="rounded-none!">
                                 <AvatarImage src="/logo_gmbh.png" alt="Avatar" />
                                 <AvatarFallback>GmbH</AvatarFallback>
                             </Avatar>
@@ -130,7 +130,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
                     </HoverCardTrigger>
                     <HoverCardContent className="w-80">
                         <div className="flex justify-between space-x-4">
-                            <Avatar className="!rounded-none">
+                            <Avatar className="rounded-none!">
                                 <AvatarImage src="/logo.png" alt="Avatar" />
                                 <AvatarFallback>Kollektiv</AvatarFallback>
                             </Avatar>

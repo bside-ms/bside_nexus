@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 
@@ -8,7 +9,7 @@ export function AppSidebarHeader(): ReactElement {
             <SidebarMenu>
                 <SidebarMenuItem>
                     <SidebarMenuButton size="lg" asChild>
-                        <a href="/">
+                        <Link href="/">
                             <div className="flex aspect-square size-8 items-center justify-center rounded-lg text-sidebar-primary-foreground">
                                 <Image src="/logo.png" alt="Logo" width={40} height={40} />
                             </div>
@@ -16,7 +17,7 @@ export function AppSidebarHeader(): ReactElement {
                                 <span className="truncate font-semibold">B-Side</span>
                                 <span className="truncate text-xs">Interner Bereich</span>
                             </div>
-                        </a>
+                        </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>

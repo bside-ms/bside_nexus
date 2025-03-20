@@ -12,7 +12,14 @@ import { Separator } from '@/components/ui/separator';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getGroupAdminStatus, getGroupById, getGroupMembers, getSubgroups, isGroupAdmin } from '@/lib/db/groupActions';
 
-const Group = async ({ params: { id: groupId } }: { params: { id: string } }): Promise<ReactElement> => {
+interface GroupPageProps {
+    params: Promise<{
+        id: string;
+    }>;
+}
+
+const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
+    const { id: groupId } = await params;
     const group = await getGroupById(groupId);
     const user = await getUserSession();
 
