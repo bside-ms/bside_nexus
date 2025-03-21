@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Loader2 } from 'lucide-react';
 import type { ComponentProps, ReactElement } from 'react';
-import { useForm } from 'react-hook-form';
+import { type ControllerRenderProps, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import type { GroupDetailsProps } from '@/components/group/details/GroupDetailsDescription';
@@ -18,6 +18,19 @@ const formSchema = z.object({
     websiteLink: z.string().max(255).optional(),
     wikiLink: z.string().max(255).optional(),
 });
+
+const renderField =
+    (fieldName: keyof z.infer<typeof formSchema>, label: string, placeholder: string) =>
+    ({ field }: { field: ControllerRenderProps<z.infer<typeof formSchema>, typeof fieldName> }): ReactElement => (
+        <FormItem>
+            <FormLabel>{label}</FormLabel>
+            <FormControl>
+                <Input placeholder={placeholder} {...field} />
+            </FormControl>
+            <FormDescription />
+            <FormMessage />
+        </FormItem>
+    );
 
 export function GroupDescriptionForm({
     className,
@@ -63,7 +76,7 @@ export function GroupDescriptionForm({
 
             if (!response.ok) {
                 toast.error('Fehler beim Ändern der Gruppendetails.', {
-                    description: result.error || 'Unbekannter Fehler.',
+                    description: result.error ?? 'Unbekannter Fehler.',
                 });
                 return;
             }
@@ -86,51 +99,20 @@ export function GroupDescriptionForm({
         <Form {...form}>
             <form className={cn('grid items-start gap-4', className)} onSubmit={form.handleSubmit(onSubmit)}>
                 <div className="grid gap-2">
-                    <FormField
-                        control={form.control}
-                        name="description"
-                        render={({ field }): ReactElement => (
-                            <FormItem>
-                                <FormLabel>Beschreibung</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Diese Gruppe hat aktuell noch keine Beschreibung." {...field} />
-                                </FormControl>
-                                <FormDescription />
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                    <FormField control={form.control} name="description" render={renderField('description', 'Beschreibung', description)} />
                 </div>
                 <div className="grid gap-2">
                     <FormField
                         control={form.control}
                         name="websiteLink"
-                        render={({ field }): ReactElement => (
-                            <FormItem>
-                                <FormLabel>Link zur Webseite</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Kein Link hinterlegt." {...field} />
-                                </FormControl>
-                                <FormDescription />
-                                <FormMessage />
-                            </FormItem>
-                        )}
+                        render={renderField('websiteLink', 'Link zur Webseite', 'Kein Link hinterlegt.')}
                     />
                 </div>
                 <div className="grid gap-2">
                     <FormField
                         control={form.control}
                         name="wikiLink"
-                        render={({ field }): ReactElement => (
-                            <FormItem>
-                                <FormLabel>Link zum Wiki</FormLabel>
-                                <FormControl>
-                                    <Input placeholder="Kein Link hinterlegt." {...field} />
-                                </FormControl>
-                                <FormDescription />
-                                <FormMessage />
-                            </FormItem>
-                        )}
+                        render={renderField('wikiLink', 'Link zur Wiki', 'Kein Link hinterlegt.')}
                     />
                 </div>
                 <Button variant="secondary" type="submit" className="w-full" disabled={isLoading}>

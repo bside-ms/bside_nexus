@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { isEmpty } from 'lodash-es';
 import { Loader2 } from 'lucide-react';
 import { signIn } from 'next-auth/react';
 import type { ReactElement } from 'react';
-import { useForm } from 'react-hook-form';
+import { type ControllerRenderProps, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,19 @@ import { Input } from '@/components/ui/input';
 const formSchema = z.object({
     username: z.string().min(3).max(255),
 });
+
+const renderField =
+    (fieldName: keyof z.infer<typeof formSchema>, label: string, placeholder: string, description: string) =>
+    ({ field }: { field: ControllerRenderProps<z.infer<typeof formSchema>, typeof fieldName> }): ReactElement => (
+        <FormItem>
+            <FormLabel>{label}</FormLabel>
+            <FormControl>
+                <Input placeholder={placeholder} {...field} />
+            </FormControl>
+            <FormDescription>{description}</FormDescription>
+            <FormMessage />
+        </FormItem>
+    );
 
 export default function FormChangeUsername({ username }: { username: string }): ReactElement {
     const form = useForm<z.infer<typeof formSchema>>({
@@ -32,7 +46,7 @@ export default function FormChangeUsername({ username }: { username: string }): 
         return <div>Loading...</div>;
     }
 
-    const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    const onSubmit = async (values: z.infer<typeof formSchema>): Promise<void> => {
         setIsLoading(true);
 
         try {
@@ -50,14 +64,14 @@ export default function FormChangeUsername({ username }: { username: string }): 
 
             if (!response.ok) {
                 toast.error('Fehler beim Ändern des Benutzer*innen-Namens.', {
-                    description: result.error || 'Unbekannter Fehler.',
+                    description: result.error ?? 'Unbekannter Fehler.',
                 });
                 return;
             }
 
             // Update the session.
             const signInResult = await signIn('keycloak', { redirect: false });
-            if (signInResult?.error) {
+            if (signInResult === undefined || isEmpty(signInResult.error)) {
                 toast.error('Fehler beim Aktualisieren der Sitzung.', {
                     description: 'Bitte melde dich erneut an.',
                 });
@@ -94,16 +108,7 @@ export default function FormChangeUsername({ username }: { username: string }): 
                             <FormField
                                 control={form.control}
                                 name="username"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Dein Benutzer*innen-Name</FormLabel>
-                                        <FormControl>
-                                            <Input placeholder={username} {...field} />
-                                        </FormControl>
-                                        <FormDescription>Mindestens 3 Zeichen.</FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
+                                render={renderField('username', 'Dein Benutzer*innen-Name', username, 'Mindestens 3 Zeichen.')}
                             />
                         </div>
                     </CardContent>

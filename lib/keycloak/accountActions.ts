@@ -16,7 +16,7 @@ export const keycloakChangeUsername = async (userId: string, newUsername: string
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         if (error.response && error.response.data) {
-            throw new Error(error.response.data.errorMessage || 'Keycloak error occurred.');
+            throw new Error(error.response.data.errorMessage ?? 'Keycloak error occurred.');
         }
 
         throw new Error('An unexpected error occurred while updating the username.');
@@ -45,7 +45,7 @@ export const keycloakChangeMail = async (userId: string, newMail: string): Promi
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
         if (error.response && error.response.data) {
-            throw new Error(error.response.data.errorMessage || 'Keycloak error occurred.');
+            throw new Error(error.response.data.errorMessage ?? 'Keycloak error occurred.');
         }
 
         throw new Error('An unexpected error occurred while updating the username.');
@@ -68,7 +68,7 @@ export const keycloakChangeDisplayname = async (userId: string, newDisplayname: 
     } catch (error: any) {
         // Handle specific Keycloak errors
         if (error.response && error.response.data) {
-            throw new Error(error.response.data.errorMessage || 'Keycloak error occurred.');
+            throw new Error(error.response.data.errorMessage ?? 'Keycloak error occurred.');
         }
 
         throw new Error('An unexpected error occurred while updating the displayname.');

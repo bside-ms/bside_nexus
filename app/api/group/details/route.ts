@@ -27,9 +27,12 @@ export async function POST(req: Request): Promise<NextResponse> {
         const newWikiLink = isEmpty(wikiLink) ? undefined : wikiLink;
         const newWebsiteLink = isEmpty(websiteLink) ? undefined : websiteLink;
         return updateGroupDescription(groupId, userId, newDescription, newWikiLink, newWebsiteLink);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message || 'Die Gruppendetails konnten nicht aktualisiert werden.' }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json(
+            {
+                error: error instanceof Error ? error.message : 'Die Gruppendetails konnten nicht aktualisiert werden.',
+            },
+            { status: 500 },
+        );
     }
 }

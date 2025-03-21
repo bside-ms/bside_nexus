@@ -26,11 +26,10 @@ export async function POST(req: Request): Promise<NextResponse> {
         await changeMattermostDisplayname(user.username, newDisplayname);
 
         return NextResponse.json({ success: true });
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-        // eslint-disable-next-line no-console
-        console.error('Error changing displayname:', error);
-        return NextResponse.json({ error: error.message || 'Dein Anzeigename wurde nicht geändert.' }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json(
+            { error: error instanceof Error ? error.message : 'Dein Anzeigename wurde nicht geändert.' },
+            { status: 500 },
+        );
     }
 }

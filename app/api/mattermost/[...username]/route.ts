@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import type { NextRequest } from 'next/server';
 import getMattermostClient from '@/lib/mattermost/getMattermostClient';
 
@@ -44,15 +44,13 @@ export async function GET(req: NextRequest, props: { params: Promise<{ username:
                 },
                 status: 200,
             });
-
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (error: any) {
+        } catch (error: unknown) {
             return new Response(
                 JSON.stringify({
                     error: 'Failed to fetch avatar from Mattermost',
                 }),
                 {
-                    status: error.response?.status || 500,
+                    status: error instanceof AxiosError ? error.response?.status : 500,
                 },
             );
         }

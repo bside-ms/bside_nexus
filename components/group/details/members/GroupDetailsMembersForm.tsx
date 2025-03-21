@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import type { ComponentProps, ReactElement } from 'react';
+import type { ControllerRenderProps, UseFormReturn } from 'react-hook-form';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -26,6 +27,54 @@ interface UserData {
     name: string;
     displayName: string;
 }
+
+const renderUserField = (users: Array<UserData>, form: UseFormReturn<z.infer<typeof formSchema>>) => {
+    return ({ field }: { field: ControllerRenderProps<z.infer<typeof formSchema>, 'user'> }): ReactElement => (
+        <FormItem className="mt-4 flex flex-col">
+            <Popover>
+                <PopoverTrigger asChild>
+                    <FormControl>
+                        <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn('justify-between', !field.value && 'text-muted-foreground')}
+                        >
+                            {field.value
+                                ? `${users.find((user) => user.id === field.value)?.displayName} (@${users.find((user) => user.id === field.value)?.name})`
+                                : 'Mitglied auswählen...'}
+                            <ChevronsUpDown className="opacity-50" />
+                        </Button>
+                    </FormControl>
+                </PopoverTrigger>
+                <PopoverContent className="p-0">
+                    <Command>
+                        <CommandInput placeholder="Mitglieder suchen..." className="h-9" />
+                        <CommandList>
+                            <CommandEmpty>Keine Mitglieder gefunden.</CommandEmpty>
+                            <CommandGroup>
+                                {users.map((user) => (
+                                    <CommandItem
+                                        value={`${user.displayName} (@${user.name})`}
+                                        key={user.id}
+                                        // eslint-disable-next-line react/jsx-no-bind
+                                        onSelect={() => {
+                                            form.setValue('user', user.id);
+                                        }}
+                                    >
+                                        {user.displayName} (@{user.name})
+                                        <Check className={cn('ml-auto', user.id === field.value ? 'opacity-100' : 'opacity-0')} />
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </PopoverContent>
+            </Popover>
+            <FormDescription>Aktuell kann leider nur ein Mitglied zur Zeit hinzugefügt werden.</FormDescription>
+            <FormMessage />
+        </FormItem>
+    );
+};
 
 export function GroupDetailsMembersForm({ groupId }: ComponentProps<'form'> & Partial<GroupDetailsProps>): ReactElement {
     const form = useForm<z.infer<typeof formSchema>>({
@@ -54,7 +103,7 @@ export function GroupDetailsMembersForm({ groupId }: ComponentProps<'form'> & Pa
 
             if (!response.ok) {
                 toast.error('Fehler beim Hinzufügen der Mitglieder zur Gruppe.', {
-                    description: result.error || 'Unbekannter Fehler.',
+                    description: result.error ?? 'Unbekannter Fehler.',
                 });
                 return;
             }
@@ -73,7 +122,7 @@ export function GroupDetailsMembersForm({ groupId }: ComponentProps<'form'> & Pa
     };
 
     useEffect(() => {
-        const fetchUsers = async () => {
+        const fetchUsers = async (): Promise<void> => {
             try {
                 const response = await fetch('/api/group/userlist', {
                     method: 'POST',
@@ -85,7 +134,7 @@ export function GroupDetailsMembersForm({ groupId }: ComponentProps<'form'> & Pa
                         groupId,
                     }),
                 });
-                const data = await response.json();
+                const data: Array<UserData> = await response.json();
                 setUsers(data);
             } catch {
                 // Do nothing.
@@ -93,7 +142,7 @@ export function GroupDetailsMembersForm({ groupId }: ComponentProps<'form'> & Pa
         };
 
         fetchUsers();
-    }, []);
+    }, [groupId]);
 
     return (
         <Form {...form}>
@@ -104,60 +153,7 @@ export function GroupDetailsMembersForm({ groupId }: ComponentProps<'form'> & Pa
                         Loading...
                     </div>
                 ) : (
-                    <FormField
-                        control={form.control}
-                        name="user"
-                        render={({ field }) => (
-                            <FormItem className="mt-4 flex flex-col">
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <FormControl>
-                                            <Button
-                                                variant="outline"
-                                                role="combobox"
-                                                className={cn('justify-between', !field.value && 'text-muted-foreground')}
-                                            >
-                                                {field.value
-                                                    ? // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-                                                      `${users.find((user) => user.id === field.value)?.displayName} (@${users.find((user) => user.id === field.value)?.name})`
-                                                    : 'Mitglied auswählen...'}
-                                                <ChevronsUpDown className="opacity-50" />
-                                            </Button>
-                                        </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="p-0">
-                                        <Command>
-                                            <CommandInput placeholder="Mitglieder suchen..." className="h-9" />
-                                            <CommandList>
-                                                <CommandEmpty>Keine Mitglieder gefunden.</CommandEmpty>
-                                                <CommandGroup>
-                                                    {users.map((user) => (
-                                                        <CommandItem
-                                                            value={`${user.displayName} (@${user.name})`}
-                                                            key={user.id}
-                                                            onSelect={() => {
-                                                                form.setValue('user', user.id);
-                                                            }}
-                                                        >
-                                                            {user.displayName} (@{user.name})
-                                                            <Check
-                                                                className={cn(
-                                                                    'ml-auto',
-                                                                    user.id === field.value ? 'opacity-100' : 'opacity-0',
-                                                                )}
-                                                            />
-                                                        </CommandItem>
-                                                    ))}
-                                                </CommandGroup>
-                                            </CommandList>
-                                        </Command>
-                                    </PopoverContent>
-                                </Popover>
-                                <FormDescription>Aktuell kann leider nur ein Mitglied zur Zeit hinzugefügt werden.</FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                        )}
-                    />
+                    <FormField control={form.control} name="user" render={renderUserField(users, form)} />
                 )}
 
                 <div className="grid grid-cols-1 space-y-4">

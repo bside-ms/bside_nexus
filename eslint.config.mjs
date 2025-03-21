@@ -13,6 +13,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import js from '@eslint/js';
 import { FlatCompat } from '@eslint/eslintrc';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +26,17 @@ const compat = new FlatCompat({
 export default defineConfig([
     globalIgnores(['**/*.json', '**/*.js', '**/next-env.d.ts']),
     {
+        plugins: {
+            react: fixupPluginRules(react),
+            '@typescript-eslint': fixupPluginRules(typescriptEslint),
+            import: fixupPluginRules(_import),
+            'simple-import-sort': simpleImportSort,
+            'unused-imports': unusedImports,
+            unicorn,
+            'react-hooks': fixupPluginRules(reactHooks),
+            jsxA11y,
+        },
+
         extends: fixupConfigRules(
             compat.extends(
                 'next',
@@ -37,18 +49,9 @@ export default defineConfig([
                 'plugin:@typescript-eslint/recommended',
                 'plugin:@typescript-eslint/recommended-requiring-type-checking',
                 'plugin:react-hooks/recommended',
+                'plugin:jsx-a11y/recommended',
             ),
         ),
-
-        plugins: {
-            react: fixupPluginRules(react),
-            '@typescript-eslint': fixupPluginRules(typescriptEslint),
-            import: fixupPluginRules(_import),
-            'simple-import-sort': simpleImportSort,
-            'unused-imports': unusedImports,
-            unicorn,
-            'react-hooks': fixupPluginRules(reactHooks),
-        },
 
         linterOptions: {
             reportUnusedDisableDirectives: true,

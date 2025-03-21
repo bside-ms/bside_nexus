@@ -1,10 +1,9 @@
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-
 'use client';
 
 import * as React from 'react';
 import * as DropdownMenuPrimitive from '@radix-ui/react-dropdown-menu';
 import { Check, ChevronRight, Circle } from 'lucide-react';
+import type { ReactElement } from 'react';
 import { cn } from '@/lib/utils';
 
 const DropdownMenu = DropdownMenuPrimitive.Root;
@@ -29,7 +28,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
         ref={ref}
         className={cn(
             'flex cursor-default gap-2 select-none items-center rounded-xs px-2 py-1.5 text-sm outline-hidden focus:bg-zinc-100 data-[state=open]:bg-zinc-100 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 dark:focus:bg-zinc-800 dark:data-[state=open]:bg-zinc-800',
-            inset && 'pl-8',
+            inset === true && 'pl-8',
             className,
         )}
         {...props}
@@ -83,7 +82,7 @@ const DropdownMenuItem = React.forwardRef<
         ref={ref}
         className={cn(
             'relative flex cursor-default select-none items-center gap-2 rounded-xs px-2 py-1.5 text-sm outline-hidden transition-colors focus:bg-zinc-100 focus:text-zinc-900 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 dark:focus:bg-zinc-800 dark:focus:text-zinc-50',
-            inset && 'pl-8',
+            inset === true && 'pl-8',
             className,
         )}
         {...props}
@@ -142,7 +141,11 @@ const DropdownMenuLabel = React.forwardRef<
         inset?: boolean;
     }
 >(({ className, inset, ...props }, ref) => (
-    <DropdownMenuPrimitive.Label ref={ref} className={cn('px-2 py-1.5 text-sm font-semibold', inset && 'pl-8', className)} {...props} />
+    <DropdownMenuPrimitive.Label
+        ref={ref}
+        className={cn('px-2 py-1.5 text-sm font-semibold', inset === true && 'pl-8', className)}
+        {...props}
+    />
 ));
 DropdownMenuLabel.displayName = DropdownMenuPrimitive.Label.displayName;
 
@@ -154,7 +157,7 @@ const DropdownMenuSeparator = React.forwardRef<
 ));
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
 
-const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
+const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>): ReactElement => {
     return <span className={cn('ml-auto text-xs tracking-widest opacity-60', className)} {...props} />;
 };
 DropdownMenuShortcut.displayName = 'DropdownMenuShortcut';

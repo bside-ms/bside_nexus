@@ -38,7 +38,7 @@ async function removeMember(userId: string, groupId: string): Promise<void> {
         if (response.data.success) {
             toast.success('Benutzer*in wurde erfolgreich entfernt.');
         } else {
-            toast.error(response.data.error || 'Fehler beim Entfernen der Benutzer*in.');
+            toast.error(response.data.error ?? 'Fehler beim Entfernen der Benutzer*in.');
         }
     } catch {
         toast.error('Ein Fehler ist aufgetreten. Die Benutzer*in konnte nicht entfernt werden.');
@@ -56,7 +56,7 @@ async function promoteMember(userId: string, groupId: string): Promise<void> {
         if (response.data.success) {
             toast.success('Benutzer*in wurde erfolgreich zur Administrator*innen ernannt.');
         } else {
-            toast.error(response.data.error || 'Fehler beim Ernennen der Administrator*in.');
+            toast.error(response.data.error ?? 'Fehler beim Ernennen der Administrator*in.');
         }
     } catch {
         toast.error('Ein Fehler ist aufgetreten. Die Benutzer*in konnte nicht zur Administrator*innen ernannt werden.');
@@ -74,7 +74,7 @@ async function demoteMember(userId: string, groupId: string): Promise<void> {
         if (response.data.success) {
             toast.success('Administrator*in wurde erfolgreich entfernt.');
         } else {
-            toast.error(response.data.error || 'Fehler beim Entfernen der Administrator*in.');
+            toast.error(response.data.error ?? 'Fehler beim Entfernen der Administrator*in.');
         }
     } catch {
         toast.error('Ein Fehler ist aufgetreten. Die Administrator*in konnte nicht entfernt werden.');

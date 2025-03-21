@@ -1,11 +1,10 @@
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-
 'use client';
 
 import * as React from 'react';
 import type * as LabelPrimitive from '@radix-ui/react-label';
 import { Slot } from '@radix-ui/react-slot';
-import type { ControllerProps, FieldPath, FieldValues } from 'react-hook-form';
+import type { ReactElement } from 'react';
+import type { ControllerProps, FieldError, FieldPath, FieldValues } from 'react-hook-form';
 import { Controller, FormProvider, useFormContext } from 'react-hook-form';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
@@ -23,7 +22,7 @@ const FormFieldContext = React.createContext<FormFieldContextValue>({} as FormFi
 
 const FormField = <TFieldValues extends FieldValues = FieldValues, TName extends FieldPath<TFieldValues> = FieldPath<TFieldValues>>({
     ...props
-}: ControllerProps<TFieldValues, TName>) => {
+}: ControllerProps<TFieldValues, TName>): ReactElement => {
     return (
         <FormFieldContext.Provider value={{ name: props.name }}>
             <Controller {...props} />
@@ -33,7 +32,18 @@ const FormField = <TFieldValues extends FieldValues = FieldValues, TName extends
 
 const FormItemContext = React.createContext<FormItemContextValue>({} as FormItemContextValue);
 
-const useFormField = () => {
+const useFormField = (): {
+    invalid: boolean;
+    isDirty: boolean;
+    isTouched: boolean;
+    isValidating: boolean;
+    error?: FieldError;
+    id: string;
+    name: string;
+    formItemId: string;
+    formDescriptionId: string;
+    formMessageId: string;
+} => {
     const fieldContext = React.useContext(FormFieldContext);
     const itemContext = React.useContext(FormItemContext);
     const { getFieldState, formState } = useFormContext();
@@ -110,7 +120,7 @@ const FormMessage = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<
         const { error, formMessageId } = useFormField();
         const body = error ? String(error?.message) : children;
 
-        if (!body) {
+        if (body === undefined) {
             return null;
         }
 

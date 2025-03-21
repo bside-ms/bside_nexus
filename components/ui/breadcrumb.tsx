@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-
 import * as React from 'react';
 import { Slot } from '@radix-ui/react-slot';
 import { ChevronRight, MoreHorizontal } from 'lucide-react';
+import type { ReactElement } from 'react';
 import { cn } from '@/lib/utils';
 
 const Breadcrumb = React.forwardRef<
@@ -33,7 +32,7 @@ const BreadcrumbLink = React.forwardRef<
         asChild?: boolean;
     }
 >(({ asChild, className, ...props }, ref) => {
-    const Comp = asChild ? Slot : 'a';
+    const Comp = asChild === true ? Slot : 'a';
 
     return <Comp ref={ref} className={cn('transition-colors hover:text-zinc-950 dark:hover:text-zinc-50', className)} {...props} />;
 });
@@ -51,14 +50,14 @@ const BreadcrumbPage = React.forwardRef<HTMLSpanElement, React.ComponentPropsWit
 ));
 BreadcrumbPage.displayName = 'BreadcrumbPage';
 
-const BreadcrumbSeparator = ({ children, className, ...props }: React.ComponentProps<'li'>) => (
+const BreadcrumbSeparator = ({ children, className, ...props }: React.ComponentProps<'li'>): ReactElement => (
     <li role="presentation" aria-hidden="true" className={cn('[&>svg]:w-3.5 [&>svg]:h-3.5', className)} {...props}>
         {children ?? <ChevronRight />}
     </li>
 );
 BreadcrumbSeparator.displayName = 'BreadcrumbSeparator';
 
-const BreadcrumbEllipsis = ({ className, ...props }: React.ComponentProps<'span'>) => (
+const BreadcrumbEllipsis = ({ className, ...props }: React.ComponentProps<'span'>): ReactElement => (
     <span role="presentation" aria-hidden="true" className={cn('flex h-9 w-9 items-center justify-center', className)} {...props}>
         <MoreHorizontal className="size-4" />
         <span className="sr-only">More</span>

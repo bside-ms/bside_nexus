@@ -26,11 +26,10 @@ export async function POST(req: Request): Promise<NextResponse> {
         await invalidateMattermostSession(user.username);
 
         return NextResponse.json({ success: true });
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-        // eslint-disable-next-line no-console
-        console.error('Error changing mail-adress:', error.message);
-        return NextResponse.json({ error: error.message || 'Deine Mail-Adresse wurde nicht geändert.' }, { status: 500 });
+    } catch (error: unknown) {
+        return NextResponse.json(
+            { error: error instanceof Error ? error.message : 'eine Mail-Adresse wurde nicht geändert.' },
+            { status: 500 },
+        );
     }
 }

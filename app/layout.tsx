@@ -19,7 +19,7 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
 
     if (!isLoggedIn) {
         return (
-            <html>
+            <html lang="de">
                 <body className={GeistSans.className}>
                     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
                         <main>
@@ -32,7 +32,7 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
     }
 
     return (
-        <html>
+        <html lang="de">
             <body className={GeistSans.className}>
                 <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
                     <BreakpointContextProvider>

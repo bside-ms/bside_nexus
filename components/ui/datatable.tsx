@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react/jsx-no-bind */
+
 import { useState } from 'react';
 import type { ColumnDef, GlobalFilterTableState, SortingState, VisibilityState } from '@tanstack/react-table';
 import { getFilteredRowModel } from '@tanstack/react-table';

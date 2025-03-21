@@ -32,7 +32,7 @@ export interface GroupDetailsProps {
     isGlobalAdmin: boolean;
 }
 
-const MemberStatusBadge = ({ isAdmin }: { isAdmin: GroupAdminStatus }) => {
+const MemberStatusBadge = ({ isAdmin }: { isAdmin: GroupAdminStatus }): ReactElement => {
     return (
         <Badge variant={isAdmin === 'Admin' ? 'default' : 'secondary'}>
             {isAdmin === 'Admin' && (

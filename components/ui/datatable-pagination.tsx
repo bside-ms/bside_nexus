@@ -1,3 +1,5 @@
+/* eslint-disable react/jsx-no-bind */
+
 import type { Table } from '@tanstack/react-table';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import type { ReactElement } from 'react';

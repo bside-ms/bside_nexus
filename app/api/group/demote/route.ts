@@ -23,11 +23,14 @@ export async function POST(req: Request): Promise<NextResponse> {
         }
 
         return removeAdminFromGroup(userIdToBeDemoted, groupId, userId);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+    } catch (error: unknown) {
         return NextResponse.json(
-            { error: error.message || 'Die Benutzer*in konnte nicht aus der Gruppe der Administrator*innen entfernt werden.' },
+            {
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : 'Die Benutzer*in konnte nicht aus der Gruppe der Administrator*innen entfernt werden.',
+            },
             { status: 500 },
         );
     }

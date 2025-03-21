@@ -1,3 +1,5 @@
+/* eslint-disable react/jsx-no-bind */
+
 import type { Column } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ChevronsUpDown, EyeOff } from 'lucide-react';
 import type { ReactElement } from 'react';

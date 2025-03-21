@@ -1,3 +1,5 @@
+/* eslint-disable react/jsx-no-bind */
+
 'use client';
 
 import { type ReactElement } from 'react';

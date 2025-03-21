@@ -23,11 +23,9 @@ export async function POST(req: Request): Promise<NextResponse> {
         }
 
         return addUserToGroup(userIdToBeAdded, groupId, userId);
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
+    } catch (error: unknown) {
         return NextResponse.json(
-            { error: error.message || 'Die Benutzer*in konnte nicht zur Gruppe hinzugefügt werden.' },
+            { error: error instanceof Error ? error.message : 'Die Benutzer*in konnte nicht zur Gruppe hinzugefügt werden.' },
             { status: 500 },
         );
     }

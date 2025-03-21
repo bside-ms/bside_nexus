@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react/jsx-no-bind */
+
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import type { ReactElement } from 'react';

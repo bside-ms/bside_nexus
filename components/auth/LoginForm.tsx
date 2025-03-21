@@ -15,10 +15,10 @@ export function LoginForm(): ReactElement {
         <div className="grid min-h-svh lg:grid-cols-2">
             <div className="flex flex-col gap-4 p-6">
                 <div className="flex justify-center gap-2 md:justify-start">
-                    <a href="#" className="flex items-center gap-2 font-medium">
+                    <span className="flex items-center gap-2 font-medium">
                         B-Side
                         <small className="px-4">Interner Bereich</small>
-                    </a>
+                    </span>
                     <div className="ml-auto">
                         <ThemeToggle />
                     </div>
@@ -44,7 +44,7 @@ export function LoginForm(): ReactElement {
                 </div>
             </div>
             <div className="relative hidden lg:block">
-                <img src="/login.jpeg" alt="Image" className="absolute inset-0 size-full object-cover dark:brightness-[0.75]" />
+                <img src="/login.jpeg" alt="" className="absolute inset-0 size-full object-cover dark:brightness-[0.75]" />
             </div>
         </div>
     );

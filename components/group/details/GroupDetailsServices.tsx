@@ -38,7 +38,7 @@ export function GroupDetailsServices({ services }: GroupServicesCardProps): Reac
                                     <Icon className=" size-4" />
                                     <span>{service.name}</span>
                                 </div>
-                                {service.url && (
+                                {service.url !== undefined && (
                                     <Button variant="link" className="h-auto p-0" asChild>
                                         <a href={service.url} target="_blank" rel="noopener noreferrer">
                                             Öffnen

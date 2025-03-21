@@ -190,7 +190,7 @@ const GroupOverviewCard = async ({ group }: { group: Group }): Promise<ReactElem
 
             {!isEmpty(group.description) && <CardContent>{group.description}</CardContent>}
 
-            {subGroups && subGroups.length > 0 && (
+            {subGroups.length > 0 && (
                 <CardContent className="grid flex-1 gap-6">
                     <div>
                         <div className="mb-1 flex items-center">
