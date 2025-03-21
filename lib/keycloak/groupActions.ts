@@ -1,6 +1,7 @@
 import type GroupRepresentation from '@keycloak/keycloak-admin-client/lib/defs/groupRepresentation';
 import { isNil } from 'lodash-es';
 import getClient from '@/lib/keycloak/getClient';
+import getKeycloakClient from '@/lib/keycloak/getClient';
 import type { AugmentedUserRepresentation } from '@/lib/keycloak/userActions';
 import { augmentUser } from '@/lib/keycloak/userActions';
 import isEmptyString from '@/lib/utils/isEmptyString';
@@ -141,4 +142,41 @@ export const keycloakGetAllGroups = async (): Promise<Map<AugmentedGroupRepresen
 export const keycloakGetDirectMembers = async (groupId: string): Promise<Array<AugmentedUserRepresentation>> => {
     const groupMembers = await (await getClient()).groups.listMembers({ id: groupId, first: 0, max: 9999 });
     return groupMembers.map(augmentUser).filter((user): user is AugmentedUserRepresentation => user !== null);
+};
+
+export const keycloakUpdateGroupAttributes = async ({
+    groupId,
+    description,
+    websiteLink,
+    wikiLink,
+}: {
+    groupId: string;
+    description?: string;
+    websiteLink?: string;
+    wikiLink?: string;
+}): Promise<void> => {
+    const client = await getKeycloakClient();
+    const group = await client.groups.findOne({ id: groupId });
+
+    if (group === undefined) {
+        throw new Error('Group not found');
+    }
+
+    if (group.attributes === undefined) {
+        group.attributes = {};
+    }
+
+    if (description !== undefined) {
+        group.attributes.description = [description];
+    }
+
+    if (websiteLink !== undefined) {
+        group.attributes.websiteLink = [websiteLink];
+    }
+
+    if (wikiLink !== undefined) {
+        group.attributes.wikiLink = [wikiLink];
+    }
+
+    await client.groups.update({ id: groupId, realm: process.env.KEYCLOAK_REALM }, group);
 };

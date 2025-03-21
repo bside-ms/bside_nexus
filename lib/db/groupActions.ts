@@ -7,6 +7,7 @@ import type { Group, User } from '@/db/schema';
 import { usersTable } from '@/db/schema';
 import { groupsTable, membersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
+import { keycloakUpdateGroupAttributes } from '@/lib/keycloak/groupActions';
 import { keycloakAddUserToGroup, keycloakRemoveUserFromGroup } from '@/lib/keycloak/userActions';
 
 export const getUserGroups = async (): Promise<Array<Group>> => {
@@ -380,20 +381,20 @@ export const updateGroupDescription = async (
 
     const currentDescription = isEmpty(dbGroup.description) ? undefined : dbGroup.description;
     if (currentDescription !== description) {
+        await keycloakUpdateGroupAttributes({ groupId, description: description ?? '' });
         await updateDescription(groupId, description);
-        // ToDo: Update keycloak attribute.
     }
 
     const currentWebsiteLink = isEmpty(dbGroup.websiteLink) ? undefined : dbGroup.websiteLink;
     if (currentWebsiteLink !== websiteLink) {
+        await keycloakUpdateGroupAttributes({ groupId, websiteLink: websiteLink ?? '' });
         await updateWebsiteLink(groupId, websiteLink);
-        // ToDo: Update keycloak attribute.
     }
 
     const currentWikiLink = isEmpty(dbGroup.wikiLink) ? undefined : dbGroup.wikiLink;
     if (currentWikiLink !== wikiLink) {
+        await keycloakUpdateGroupAttributes({ groupId, wikiLink: wikiLink ?? '' });
         await updateWikiLink(groupId, wikiLink);
-        // ToDo: Update keycloak attribute.
     }
 
     // ToDo: Log the event.
