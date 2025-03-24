@@ -1,9 +1,11 @@
 import isEmpty from 'lodash-es/isEmpty';
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
 import { removeAdminFromGroup } from '@/lib/db/groupActions';
+import { getClientIP } from '@/lib/utils/getClientIP';
 
-export async function POST(req: Request): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         const user = await getUserSession();
 
@@ -22,7 +24,8 @@ export async function POST(req: Request): Promise<NextResponse> {
             return NextResponse.json({ error: 'Die Benutzer*in oder die Gruppe konnte nicht identifiziert werden.' }, { status: 400 });
         }
 
-        return removeAdminFromGroup(userIdToBeDemoted, groupId, userId);
+        const ipAddress = getClientIP(req);
+        return removeAdminFromGroup(userIdToBeDemoted, groupId, userId, ipAddress);
     } catch (error: unknown) {
         return NextResponse.json(
             {

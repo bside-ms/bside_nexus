@@ -1,8 +1,10 @@
-import { boolean, pgTable, primaryKey, text, varchar } from 'drizzle-orm/pg-core';
+import { boolean, pgTable, primaryKey, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm/sql';
 
 export type Group = typeof groupsTable.$inferSelect;
 export type User = typeof usersTable.$inferSelect;
-export type Members = typeof membersTable.$inferSelect;
+export type MemberEntry = typeof membersTable.$inferSelect;
+export type LogEntry = typeof logsTable.$inferSelect;
 
 export const groupsTable = pgTable('groups', {
     id: varchar({ length: 255 }).primaryKey(),
@@ -42,3 +44,20 @@ export const membersTable = pgTable(
         primaryKey: primaryKey(members.userId, members.groupId),
     }),
 );
+
+export const logsTable = pgTable('logs', {
+    id: varchar({ length: 36 }).primaryKey(),
+    timestamp: timestamp()
+        .default(sql`now()`)
+        .notNull(),
+    userId: varchar({ length: 255 })
+        .notNull()
+        .references(() => usersTable.id),
+    ipAddress: varchar({ length: 255 }).notNull(),
+    eventType: varchar({ length: 255 }).notNull(),
+    affectedUserId: varchar({ length: 255 }).references(() => usersTable.id),
+    affectedGroupId: varchar({ length: 255 }).references(() => groupsTable.id),
+    // resourceType: varchar({ length: 255 }).notNull(),
+    // resourceId: varchar({ length: 255 }),
+    description: text().notNull().default(''),
+});

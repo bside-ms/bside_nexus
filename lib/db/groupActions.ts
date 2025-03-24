@@ -7,6 +7,7 @@ import type { Group, User } from '@/db/schema';
 import { usersTable } from '@/db/schema';
 import { groupsTable, membersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
+import { writeLogEntry } from '@/lib/db/logActions';
 import { keycloakUpdateGroupAttributes } from '@/lib/keycloak/groupActions';
 import { keycloakAddUserToGroup, keycloakRemoveUserFromGroup } from '@/lib/keycloak/userActions';
 
@@ -210,8 +211,14 @@ const updateWikiLink = async (groupId: string, wikiLink?: string): Promise<numbe
  * @param userIdToBeDemoted
  * @param groupId
  * @param executingUserId
+ * @param ipAddress
  */
-export const removeAdminFromGroup = async (userIdToBeDemoted: string, groupId: string, executingUserId: string): Promise<NextResponse> => {
+export const removeAdminFromGroup = async (
+    userIdToBeDemoted: string,
+    groupId: string,
+    executingUserId: string,
+    ipAddress: string,
+): Promise<NextResponse> => {
     const idpGroup = await getGroupById(groupId);
     if (idpGroup === null) {
         return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
@@ -236,7 +243,15 @@ export const removeAdminFromGroup = async (userIdToBeDemoted: string, groupId: s
     await removeAdminFromDbGroup(userIdToBeDemoted, dbGroup.id);
 
     // ToDo: Force a refresh in our other tools.
-    // ToDo: Log the event.
+
+    await writeLogEntry({
+        userId: executingUserId,
+        ipAddress,
+        eventType: 'group.demote',
+        affectedUserId: userIdToBeDemoted,
+        affectedGroupId: groupId,
+        description: 'Als Administrator*in der Gruppe entfernt.',
+    });
 
     return NextResponse.json({ success: true });
 };
@@ -247,8 +262,14 @@ export const removeAdminFromGroup = async (userIdToBeDemoted: string, groupId: s
  * @param userIdToBePromoted
  * @param groupId
  * @param executingUserId
+ * @param ipAddress
  */
-export const addAdminToGroup = async (userIdToBePromoted: string, groupId: string, executingUserId: string): Promise<NextResponse> => {
+export const addAdminToGroup = async (
+    userIdToBePromoted: string,
+    groupId: string,
+    executingUserId: string,
+    ipAddress: string,
+): Promise<NextResponse> => {
     const idpGroup = await getGroupById(groupId);
     if (idpGroup === null) {
         return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
@@ -273,12 +294,33 @@ export const addAdminToGroup = async (userIdToBePromoted: string, groupId: strin
     await addAdminToDbGroup(userIdToBePromoted, dbGroup.id);
 
     // ToDo: Force a refresh in our other tools.
-    // ToDo: Log the event.
+
+    await writeLogEntry({
+        userId: executingUserId,
+        ipAddress,
+        eventType: 'group.promote',
+        affectedUserId: userIdToBePromoted,
+        affectedGroupId: groupId,
+        description: 'Als Administrator*in der Gruppe hinzugefügt.',
+    });
 
     return NextResponse.json({ success: true });
 };
 
-export const addUserToGroup = async (userIdToBeAdded: string, groupId: string, executingUserId: string): Promise<NextResponse> => {
+/**
+ * Adds a user from a group.
+ * This function is triggered by the /api/group/add endpoint.
+ * @param userIdToBeAdded
+ * @param groupId
+ * @param executingUserId
+ * @param ipAddress
+ */
+export const addUserToGroup = async (
+    userIdToBeAdded: string,
+    groupId: string,
+    executingUserId: string,
+    ipAddress: string,
+): Promise<NextResponse> => {
     const idpGroup = await getGroupById(groupId);
     if (idpGroup === null) {
         return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
@@ -303,7 +345,15 @@ export const addUserToGroup = async (userIdToBeAdded: string, groupId: string, e
     await addUserToDbGroup(userIdToBeAdded, dbGroup.id);
 
     // ToDo: Force a refresh in our other tools.
-    // ToDo: Log the event.
+
+    await writeLogEntry({
+        userId: executingUserId,
+        ipAddress,
+        eventType: 'group.add',
+        affectedUserId: userIdToBeAdded,
+        affectedGroupId: groupId,
+        description: 'Als Mitglied der Gruppe hinzugefügt.',
+    });
 
     return NextResponse.json({ success: true });
 };
@@ -314,8 +364,14 @@ export const addUserToGroup = async (userIdToBeAdded: string, groupId: string, e
  * @param userIdToBeRemoved
  * @param groupId
  * @param executingUserId
+ * @param ipAddress
  */
-export const removeUserFromGroup = async (userIdToBeRemoved: string, groupId: string, executingUserId: string): Promise<NextResponse> => {
+export const removeUserFromGroup = async (
+    userIdToBeRemoved: string,
+    groupId: string,
+    executingUserId: string,
+    ipAddress: string,
+): Promise<NextResponse> => {
     const idpGroup = await getGroupById(groupId);
     if (idpGroup === null) {
         return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
@@ -347,7 +403,15 @@ export const removeUserFromGroup = async (userIdToBeRemoved: string, groupId: st
     }
 
     // ToDo: Force a refresh in our other tools.
-    // ToDo: Log the event.
+
+    await writeLogEntry({
+        userId: executingUserId,
+        ipAddress,
+        eventType: 'group.remove',
+        affectedUserId: userIdToBeRemoved,
+        affectedGroupId: groupId,
+        description: 'Als Mitglied der Gruppe entfernt.',
+    });
 
     return NextResponse.json({ success: true });
 };

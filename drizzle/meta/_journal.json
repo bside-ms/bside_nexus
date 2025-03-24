@@ -36,6 +36,13 @@
       "when": 1739787023031,
       "tag": "0004_groups_details",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1742832500169,
+      "tag": "0005_logs",
+      "breakpoints": true
     }
   ]
 }
