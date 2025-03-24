@@ -2,7 +2,7 @@ import isEmpty from 'lodash-es/isEmpty';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
-import { removeAdminFromGroup } from '@/lib/db/groupActions';
+import { removeAdminFromGroup } from '@/lib/groups';
 import { getClientIP } from '@/lib/utils/getClientIP';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

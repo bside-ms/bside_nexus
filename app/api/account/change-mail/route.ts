@@ -24,6 +24,8 @@ export async function POST(req: Request): Promise<NextResponse> {
 
         await keycloakChangeMail(userId, newEmail);
         await invalidateMattermostSession(user.username);
+        // ToDo: Change mail in database.
+        // ToDo: Log the mail change.
 
         return NextResponse.json({ success: true });
     } catch (error: unknown) {

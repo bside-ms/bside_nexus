@@ -1,9 +1,11 @@
 import { isEmpty } from 'lodash-es';
+import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
-import { updateGroupDescription } from '@/lib/db/groupActions';
+import { updateGroupDescription } from '@/lib/groups';
+import { getClientIP } from '@/lib/utils/getClientIP';
 
-export async function POST(req: Request): Promise<NextResponse> {
+export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         const user = await getUserSession();
 
@@ -26,7 +28,10 @@ export async function POST(req: Request): Promise<NextResponse> {
         const newDescription = isEmpty(description) ? undefined : description;
         const newWikiLink = isEmpty(wikiLink) ? undefined : wikiLink;
         const newWebsiteLink = isEmpty(websiteLink) ? undefined : websiteLink;
-        return updateGroupDescription(groupId, userId, newDescription, newWikiLink, newWebsiteLink);
+
+        const ipAddress = getClientIP(req);
+
+        return updateGroupDescription(groupId, userId, ipAddress, newDescription, newWikiLink, newWebsiteLink);
     } catch (error: unknown) {
         return NextResponse.json(
             {

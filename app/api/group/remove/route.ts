@@ -1,7 +1,7 @@
 import isEmpty from 'lodash-es/isEmpty';
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
-import { removeUserFromGroup } from '@/lib/db/groupActions';
+import { removeUserFromGroup } from '@/lib/groups';
 import { getClientIP } from '@/lib/utils/getClientIP';
 
 export async function POST(req: Request): Promise<NextResponse> {

@@ -24,6 +24,8 @@ export async function POST(req: Request): Promise<NextResponse> {
 
         await keycloakChangeDisplayname(userId, newDisplayname);
         await changeMattermostDisplayname(user.username, newDisplayname);
+        // ToDo: Change displayname in database.
+        // ToDo: Log the displayname change.
 
         return NextResponse.json({ success: true });
     } catch (error: unknown) {

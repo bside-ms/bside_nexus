@@ -24,6 +24,8 @@ export async function POST(req: Request): Promise<NextResponse> {
 
         await keycloakChangeUsername(userId, newUsername);
         await invalidateMattermostSession(user.username);
+        // ToDo: Change username in database.
+        // ToDo: Log the username change.
 
         return NextResponse.json({ success: true });
     } catch (error: unknown) {
