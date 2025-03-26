@@ -37,7 +37,21 @@ async function populateGroups(): Promise<void> {
                     parentGroup: parentGroup.id,
                 };
 
-                await db.insert(groupsTable).values([subGroupEntry]).onConflictDoNothing({ target: groupsTable.id });
+                await db
+                    .insert(groupsTable)
+                    .values([subGroupEntry])
+                    .onConflictDoUpdate({
+                        target: groupsTable.id,
+                        set: {
+                            name: subgroup.name,
+                            path: subgroup.path,
+                            groupType: subgroup.attributes.groupType ?? '',
+                            categoryName: subgroup.attributes.categoryName ?? '',
+                            displayName: subgroup.attributes.displayName ?? subgroup.name,
+                            description: subgroup.attributes.description,
+                            parentGroup: parentGroup.id,
+                        },
+                    });
             }
         }
 
@@ -55,7 +69,24 @@ async function populateGroups(): Promise<void> {
             adminGroup,
         };
 
-        await db.insert(groupsTable).values([groupEntry]).onConflictDoNothing({ target: groupsTable.id });
+        await db
+            .insert(groupsTable)
+            .values([groupEntry])
+            .onConflictDoUpdate({
+                target: groupsTable.id,
+                set: {
+                    name: parentGroup.name,
+                    path: parentGroup.path,
+                    groupType: parentGroup.attributes.groupType ?? '',
+                    categoryName: parentGroup.attributes.categoryName ?? '',
+                    displayName: parentGroup.attributes.displayName ?? parentGroup.name,
+                    description: parentGroup.attributes.description,
+                    wikiLink: parentGroup.attributes.wikiLink,
+                    websiteLink: parentGroup.attributes.websiteLink,
+                    memberGroup,
+                    adminGroup,
+                },
+            });
     }
 
     // eslint-disable-next-line no-console
@@ -75,7 +106,18 @@ async function populateUsers(): Promise<void> {
             enabled: user.enabled,
         };
 
-        await db.insert(usersTable).values([userEntry]).onConflictDoNothing({ target: usersTable.id });
+        await db
+            .insert(usersTable)
+            .values([userEntry])
+            .onConflictDoUpdate({
+                target: usersTable.id,
+                set: {
+                    username: user.username!,
+                    displayName: !isEmpty(user.firstName) ? user.firstName : null,
+                    email: user.email!,
+                    enabled: user.enabled,
+                },
+            });
     }
 
     // eslint-disable-next-line no-console
@@ -142,8 +184,6 @@ async function populateMembers(): Promise<void> {
 
 async function cleanTables(): Promise<void> {
     await db.delete(membersTable);
-    await db.delete(usersTable);
-    await db.delete(groupsTable);
 
     // eslint-disable-next-line no-console
     console.log('Tables successfully cleaned.');
@@ -154,6 +194,9 @@ async function main(): Promise<void> {
     await populateGroups();
     await populateUsers();
     await populateMembers();
+
+    // ToDo: Deleted users and groups are currently not deleted from the database.
+    // I am not sure what problems this might cause. Manually deleting the users and groups from the database is a good idea.
 }
 
 main();
