@@ -2,7 +2,7 @@
 
 import { Fragment, type ReactElement } from 'react';
 import { type LucideIcon } from 'lucide-react';
-import { SidebarGroup, SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
+import { SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 
 export interface NavbarItems {
     title: string;
@@ -15,7 +15,7 @@ export interface NavbarItems {
 
 export function NavbarPrimary({ navbar }: { navbar: Array<NavbarItems> }): ReactElement {
     return (
-        <SidebarGroup className="mt-4 group-data-[collapsible=icon]:hidden">
+        <Fragment>
             {navbar.map((item) => (
                 <Fragment key={item.title}>
                     <SidebarGroupLabel>{item.title}</SidebarGroupLabel>
@@ -33,6 +33,6 @@ export function NavbarPrimary({ navbar }: { navbar: Array<NavbarItems> }): React
                     </SidebarMenu>
                 </Fragment>
             ))}
-        </SidebarGroup>
+        </Fragment>
     );
 }

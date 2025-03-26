@@ -8,14 +8,16 @@ import { AppSidebarFooter } from '@/components/sidebar/AppSidebarFooter';
 import { AppSidebarHeader } from '@/components/sidebar/AppSidebarHeader';
 import { Sidebar } from '@/components/ui/sidebar';
 import getUserSession from '@/lib/auth/getUserSession';
+import { getUserGroups } from '@/lib/db/groupActions';
 
 export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>): Promise<ReactElement> {
     const user = await getUserSession();
+    const groups = await getUserGroups();
 
     return (
         <Sidebar variant="inset" {...props}>
             <AppSidebarHeader />
-            <AppSidebarContent />
+            <AppSidebarContent groups={groups} />
             {user && (
                 <AppSidebarFooter
                     user={{

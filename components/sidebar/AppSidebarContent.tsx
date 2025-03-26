@@ -1,35 +1,40 @@
 'use client';
 
 import { type ReactElement } from 'react';
-import { PieChart, Settings2, SquareTerminal } from 'lucide-react';
-import type { NavbarItems } from '@/components/sidebar/NavbarPrimary';
-import { NavbarPrimary } from '@/components/sidebar/NavbarPrimary';
-import { NavbarSecondary } from '@/components/sidebar/NavbarSecondary';
-import { SidebarContent } from '@/components/ui/sidebar';
+import { PieChart, Settings2 } from 'lucide-react';
+import { SidebarContent, SidebarGroup } from '../ui/sidebar';
+import { NavbarSecondary } from './NavbarSecondary';
+import { NavbarGroups } from '@/components/sidebar/NavbarGroups';
+import { type NavbarItems, NavbarPrimary } from '@/components/sidebar/NavbarPrimary';
+import type { Group } from '@/db/schema';
 
-const sidebarData: Array<NavbarItems> = [
+const upperSidebarData: Array<NavbarItems> = [
     {
         title: 'Home',
         items: [{ title: 'Dashboard', url: '/', icon: PieChart }],
     },
+];
+
+const lowerSidebarData: Array<NavbarItems> = [
     {
-        title: 'Gruppenverwaltung',
-        items: [
-            { title: 'Meine Gruppen', url: '/groups', icon: PieChart },
-            { title: 'Alle Gruppen', url: '/groups/all', icon: SquareTerminal },
-        ],
-    },
-    {
-        title: 'Einstellungen',
-        items: [{ title: 'Mein Account', url: '/settings', icon: Settings2 }],
+        title: 'Mein Account',
+        items: [{ title: 'Einstellungen', url: '/settings', icon: Settings2 }],
     },
 ];
 
-export function AppSidebarContent(): ReactElement {
+interface AppSidebarContentProps {
+    groups?: Array<Group>;
+}
+
+export function AppSidebarContent({ groups }: AppSidebarContentProps): ReactElement {
     return (
         <SidebarContent>
-            <NavbarPrimary navbar={sidebarData ?? []} />
+            <SidebarGroup className="mt-4 group-data-[collapsible=icon]:hidden">
+                <NavbarPrimary navbar={upperSidebarData ?? []} />
+                <NavbarGroups groups={groups} />
+                <NavbarPrimary navbar={lowerSidebarData ?? []} />
+            </SidebarGroup>
             <NavbarSecondary className="mt-auto" />
         </SidebarContent>
-    );
+    ) as ReactElement;
 }
