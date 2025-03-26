@@ -49,6 +49,9 @@ export function NavbarGroups({ groups }: AppSidebarContentProps): ReactElement {
                 </SidebarMenuItem>
 
                 {sortedGroups.map((category) => {
+                    if (category.length === 0) {
+                        return null;
+                    }
                     const categoryName =
                         category[0]?.categoryName !== undefined && predefinedCategories.includes(category[0]?.categoryName)
                             ? category[0]?.categoryName
@@ -74,8 +77,8 @@ export function NavbarGroups({ groups }: AppSidebarContentProps): ReactElement {
                                         {category.map((group) => (
                                             <SidebarMenuSubItem key={group.id}>
                                                 <SidebarMenuSubButton asChild>
-                                                    <a href={`/groups/${group.id}`} className="whitespace-nowrap">
-                                                        {group.displayName}
+                                                    <a href={`/groups/${group.id}`} className="whitespace-nowrap truncate">
+                                                        <span>{group.displayName}</span>
                                                     </a>
                                                 </SidebarMenuSubButton>
                                             </SidebarMenuSubItem>

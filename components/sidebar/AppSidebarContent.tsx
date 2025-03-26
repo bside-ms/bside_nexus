@@ -17,7 +17,7 @@ const upperSidebarData: Array<NavbarItems> = [
 
 const lowerSidebarData: Array<NavbarItems> = [
     {
-        title: 'Mein Account',
+        title: 'Dein Account',
         items: [{ title: 'Einstellungen', url: '/settings', icon: Settings2 }],
     },
 ];
