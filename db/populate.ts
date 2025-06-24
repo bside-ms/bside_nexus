@@ -170,12 +170,14 @@ async function populateMembers(): Promise<void> {
             }
         });
 
-        await db
-            .insert(membersTable)
-            .values(entries)
-            .onConflictDoNothing({
-                target: [membersTable.userId, membersTable.groupId],
-            });
+        if (entries.length > 0) {
+            await db
+                .insert(membersTable)
+                .values(entries)
+                .onConflictDoNothing({
+                    target: [membersTable.userId, membersTable.groupId],
+                });
+        }
     }
 
     // eslint-disable-next-line no-console

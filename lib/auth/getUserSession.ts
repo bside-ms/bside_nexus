@@ -1,7 +1,6 @@
 import type { Session } from 'next-auth';
-import { getServerSession } from 'next-auth';
-import authOptions from '@/lib/auth/authOptions';
+import { auth } from '@/auth';
 
-const getUserSession = async (): Promise<Session['user'] | null> => (await getServerSession(authOptions))?.user ?? null;
+const getUserSession = async (): Promise<Session['user'] | null> => (await auth())?.user ?? null;
 
 export default getUserSession;

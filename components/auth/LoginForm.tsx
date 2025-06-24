@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { signIn } from 'next-auth/react';
 import type { ReactElement } from 'react';
 import { GrLogin } from 'react-icons/gr';
@@ -9,7 +10,10 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export function LoginForm(): ReactElement {
-    const login = useCallback(() => signIn('keycloak'), []);
+    const searchParams = useSearchParams();
+    const callbackUrl = searchParams.get('callbackUrl') ?? '/';
+
+    const login = useCallback(() => signIn('keycloak', { callbackUrl }), []);
 
     return (
         <div className="grid min-h-svh lg:grid-cols-2">

@@ -9,6 +9,7 @@ declare module 'next-auth' {
             email: string;
             username: string;
             id: string;
+            members: Array<string>;
         };
     }
 }
@@ -16,12 +17,12 @@ declare module 'next-auth' {
 declare module 'next-auth/jwt' {
     interface JWT {
         username: string;
+        members: Array<string>;
     }
 }
 
 declare module 'next-auth/providers/keycloak' {
     interface KeycloakProfile {
         given_name: string;
-        members: Array<string>;
     }
 }

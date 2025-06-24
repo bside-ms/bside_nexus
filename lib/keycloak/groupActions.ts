@@ -93,7 +93,7 @@ const getAllGroupsFlat = async (): Promise<Array<AugmentedGroupRepresentation>> 
 export const membersGroupIdentifier = 'mitglieder';
 export const adminGroupIdentifier = 'admin';
 const ignoredSubgroups = ['eingeschränkt', 'erweitert'];
-const relevantParentGroups = ['koerperschaften', 'kreise'];
+const relevantParentGroups = ['koerperschaften', 'kreise', 'status', 'permission'];
 
 export const getSubGroupsByGroup = async (group: AugmentedGroupRepresentation): Promise<Array<AugmentedGroupRepresentation>> =>
     (await getAllGroupsFlat()).filter(({ path }) => path !== group.path && path.startsWith(group.path));
@@ -136,6 +136,8 @@ export const keycloakGetAllGroups = async (): Promise<Map<AugmentedGroupRepresen
         groupMap.set(parent, children);
     });
 
+    console.log(groupMap);
+
     return groupMap;
 };
 
@@ -162,9 +164,7 @@ export const keycloakUpdateGroupAttributes = async ({
         throw new Error('Group not found');
     }
 
-    if (group.attributes === undefined) {
-        group.attributes = {};
-    }
+    group.attributes ??= {};
 
     if (description !== undefined) {
         group.attributes.description = [description];
