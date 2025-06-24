@@ -11,14 +11,14 @@ import type { Group } from '@/db/schema';
 const upperSidebarData: Array<NavbarItems> = [
     {
         title: 'Home',
-        items: [{ title: 'Dashboard', url: '/', icon: PieChart }],
+        items: [{ title: 'Dashboard', url: '/portal', icon: PieChart }],
     },
 ];
 
 const lowerSidebarData: Array<NavbarItems> = [
     {
         title: 'Dein Account',
-        items: [{ title: 'Einstellungen', url: '/settings', icon: Settings2 }],
+        items: [{ title: 'Einstellungen', url: '/portal/settings', icon: Settings2 }],
     },
 ];
 

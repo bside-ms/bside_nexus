@@ -41,7 +41,7 @@ export function NavbarGroups({ groups }: AppSidebarContentProps): ReactElement {
             <SidebarMenu className="mb-4">
                 <SidebarMenuItem className="">
                     <SidebarMenuButton asChild>
-                        <Link href="/groups">
+                        <Link href="/portal/groups">
                             <PieChart />
                             <span>Gruppenübersicht</span>
                         </Link>
@@ -77,7 +77,7 @@ export function NavbarGroups({ groups }: AppSidebarContentProps): ReactElement {
                                         {category.map((group) => (
                                             <SidebarMenuSubItem key={group.id}>
                                                 <SidebarMenuSubButton asChild>
-                                                    <a href={`/groups/${group.id}`} className="whitespace-nowrap truncate">
+                                                    <a href={`/portal/groups/${group.id}`} className="whitespace-nowrap truncate">
                                                         <span>{group.displayName}</span>
                                                     </a>
                                                 </SidebarMenuSubButton>
@@ -92,7 +92,7 @@ export function NavbarGroups({ groups }: AppSidebarContentProps): ReactElement {
 
                 <SidebarMenuItem className="">
                     <SidebarMenuButton asChild>
-                        <Link href="/groups/all">
+                        <Link href="/portal/groups/all">
                             <PieChart />
                             <span>Alle Gruppen</span>
                         </Link>

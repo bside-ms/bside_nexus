@@ -25,17 +25,17 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
 
     // Handle when the group is not found
     if (group === null) {
-        redirect('/groups');
+        redirect('/portal/groups');
     }
 
     const breadCrumbs = [
         {
             title: 'Meine Gruppen',
-            url: `/groups`,
+            url: `/portal/groups`,
         },
         {
             title: group.categoryName ?? '',
-            url: `/groups`,
+            url: `/portal/groups`,
         },
         {
             title: group.displayName ?? '',

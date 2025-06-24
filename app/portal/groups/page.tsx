@@ -45,7 +45,7 @@ export default async function Page(): Promise<ReactElement> {
                                 Dokumente du aktuell zugreifen kannst.
                             </p>
                         </div>
-                        <Link href="/groups/all">
+                        <Link href="/portal/groups/all">
                             <Button size="lg" variant="destructive">
                                 Zur Gesamtübersicht
                             </Button>
@@ -71,7 +71,7 @@ export default async function Page(): Promise<ReactElement> {
                             <h2 className="text-2xl font-bold tracking-tight">Meine Gruppen</h2>
                             <p>Hier findest du eine Übersicht über alle deine Gruppen der B-Side.</p>
                         </div>
-                        <Link href="/groups/all">
+                        <Link href="/portal/groups/all">
                             <Button size="lg" variant="destructive" className="">
                                 Zur Gesamtübersicht
                             </Button>

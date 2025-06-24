@@ -10,7 +10,7 @@ import getUserSession from '@/lib/auth/getUserSession';
 const breadCrumbs = [
     {
         title: 'Settings',
-        url: '/settings',
+        url: '/portal/settings',
     },
     {
         title: 'Account',

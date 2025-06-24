@@ -168,7 +168,7 @@ export function GroupDetailsMembersForm({ groupId }: ComponentProps<'form'> & Pa
                         )}
                     </Button>
 
-                    <Link href={`/groups/${groupId!}`}>
+                    <Link href={`/portal/groups/${groupId!}`}>
                         <Button variant="destructive" type="button" className="w-full">
                             Abbrechen
                         </Button>

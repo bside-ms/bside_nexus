@@ -69,7 +69,7 @@ export function AppSidebarFooter({
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         <DropdownMenuGroup>
-                            <Link href="/settings" onClick={isMobile && state === 'expanded' ? toggleSidebar : void 0}>
+                            <Link href="/portal/settings" onClick={isMobile && state === 'expanded' ? toggleSidebar : void 0}>
                                 <DropdownMenuItem>
                                     <Settings />
                                     Account
