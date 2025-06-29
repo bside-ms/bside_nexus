@@ -1,4 +1,7 @@
 import { Fragment, type ReactElement } from 'react';
+import Link from 'next/link';
+import { BiArrowBack } from 'react-icons/bi';
+import { Button } from '../ui/button';
 import { ThemeToggle } from '@/components/theming/ThemeToggle';
 import {
     Breadcrumb,
@@ -17,6 +20,7 @@ interface BreadcrumbItemProps {
         url?: string;
         active?: boolean;
     }>;
+    sidebar?: boolean;
 }
 
 export default function NavbarTop(props: BreadcrumbItemProps): ReactElement {
@@ -24,7 +28,15 @@ export default function NavbarTop(props: BreadcrumbItemProps): ReactElement {
 
     return (
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-            <SidebarTrigger className="-ml-1" />
+            {props.sidebar !== false && <SidebarTrigger className="-ml-1" />}
+            {props.sidebar === false && (
+                <Button variant="outline">
+                    <Link href="/portal" className="whitespace-nowrap flex items-center gap-2">
+                        <BiArrowBack />
+                        Zurück zum Portal
+                    </Link>
+                </Button>
+            )}
             {breadcrumbLength > 0 && (
                 <>
                     <Separator orientation="vertical" className="mr-2 h-4" />

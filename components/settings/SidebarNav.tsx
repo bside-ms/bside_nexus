@@ -9,11 +9,11 @@ import { cn } from '@/lib/utils';
 const sidebarNavItems = [
     {
         title: 'Mein Profil',
-        href: '/settings/profile',
+        href: '/portal/settings/profile',
     },
     {
         title: 'Mein Account',
-        href: '/settings/account',
+        href: '/portal/settings/account',
     },
 ];
 

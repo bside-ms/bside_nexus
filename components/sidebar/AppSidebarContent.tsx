@@ -11,7 +11,10 @@ import type { Group } from '@/db/schema';
 const upperSidebarData: Array<NavbarItems> = [
     {
         title: 'Home',
-        items: [{ title: 'Dashboard', url: '/portal', icon: PieChart }],
+        items: [
+            { title: 'Dashboard', url: '/portal', icon: PieChart },
+            { title: 'Arbeitszeiterfassung', url: '/hrp', icon: PieChart },
+        ],
     },
 ];
 
