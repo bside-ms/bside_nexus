@@ -10,11 +10,11 @@ export const metadata: Metadata = {
     title: 'B-Side Intern',
 };
 
-const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Promise<ReactElement> => {
+const RootLayout = ({ children }: Readonly<{ children: ReactNode }>): ReactElement => {
     return (
         <html lang="de">
             <body className={GeistSans.className}>
-                <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+                <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
                     <BreakpointContextProvider>{children}</BreakpointContextProvider>
                 </ThemeProvider>
             </body>

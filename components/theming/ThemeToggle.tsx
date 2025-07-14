@@ -1,16 +1,14 @@
 'use client';
 
-/* eslint-disable react/jsx-no-bind */
-
-import { Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import type { ReactElement } from 'react';
-import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export const ThemeToggle = ({ variant = 'outline' }: { variant?: 'outline' | 'secondary' }): ReactElement => {
     const { setTheme } = useTheme();
 
+    return <></>;
+
+    /*
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -27,4 +25,5 @@ export const ThemeToggle = ({ variant = 'outline' }: { variant?: 'outline' | 'se
             </DropdownMenuContent>
         </DropdownMenu>
     );
+    */
 };
