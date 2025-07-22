@@ -22,21 +22,21 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
 
     // Handle when the group is not found
     if (group === null) {
-        redirect('/groups');
+        redirect('/portal/groups');
     }
 
     const breadCrumbs = [
         {
             title: 'Meine Gruppen',
-            url: `/groups`,
+            url: `/portal/groups`,
         },
         {
             title: group.categoryName ?? '',
-            url: `/groups`,
+            url: `/portal/groups`,
         },
         {
             title: group.displayName ?? '',
-            url: `/groups/${groupId}`,
+            url: `/portal/groups/${groupId}`,
         },
         {
             title: 'Mitglieder hinzufügen',
@@ -46,7 +46,7 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
 
     const isAdmin = await isGroupAdmin(user?.id ?? '', group.id, true);
     if (!isAdmin) {
-        redirect(`/groups/${groupId}`);
+        redirect(`/portal/groups/${groupId}`);
     }
 
     return (

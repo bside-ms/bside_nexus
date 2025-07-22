@@ -207,7 +207,7 @@ const GroupOverviewCard = async ({ group }: { group: Group }): Promise<ReactElem
             )}
 
             <CardFooter className="pt-2">
-                <Link className="w-full" href={`/groups/${group.id}`}>
+                <Link className="w-full" href={`/portal/groups/${group.id}`}>
                     <Button size="default" variant="outline" className="w-full text-base">
                         Zu den Gruppendetails
                         <ArrowRight className="ml-2 size-4" />

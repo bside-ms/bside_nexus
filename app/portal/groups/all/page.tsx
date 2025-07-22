@@ -9,7 +9,7 @@ import { getAllGroups } from '@/lib/db/groupActions';
 const breadCrumbs = [
     {
         title: 'Meine Gruppen',
-        url: '/groups',
+        url: '/portal/groups',
     },
     {
         title: 'Alle Gruppen',

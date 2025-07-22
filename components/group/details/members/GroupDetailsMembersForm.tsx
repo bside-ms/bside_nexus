@@ -112,7 +112,7 @@ export function GroupDetailsMembersForm({ groupId }: ComponentProps<'form'> & Pa
                 duration: 10000,
             });
 
-            setTimeout(() => (window.location.href = `/groups/${groupId!}`), 1000);
+            setTimeout(() => (window.location.href = `/portal/groups/${groupId!}`), 1000);
         } catch {
             toast.error('Fehler beim Hinzufügen der Mitglieder zur Gruppe.', {
                 description: 'Bitte versuche es später erneut.',

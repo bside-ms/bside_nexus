@@ -28,7 +28,7 @@ export function GroupDetailsMembers({ groupId, groupMembers, isAdmin, isGlobalAd
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle>Mitglieder</CardTitle>
                 {isAdminOrGlobalAdmin && (
-                    <Link href={`/groups/${groupId}/add`}>
+                    <Link href={`/portal/groups/${groupId}/add`}>
                         <Button size="sm" variant="outline">
                             <PlusCircle className="mr-2 size-4" />
                             Mitglieder hinzufügen
