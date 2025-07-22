@@ -5,7 +5,6 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { ReactElement } from 'react';
-import { Alert, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
@@ -18,9 +17,9 @@ interface EventOption {
 
 const EVENTS: Array<EventOption> = [
     { label: 'Kommen', type: 'start' },
+    { label: 'Gehen', type: 'stop' },
     { label: 'Pause', type: 'pause' },
     { label: 'Pause: Ende', type: 'pause_end' },
-    { label: 'Gehen', type: 'stop' },
 ];
 
 export default function QuickEntry(): ReactElement {
@@ -44,7 +43,7 @@ export default function QuickEntry(): ReactElement {
     const handleButtonClick = (event: EventOption): void => {
         const now = new Date();
         // Zeit im standardisierten ISO-Format an API schicken, aber für UI in de-DE anzeigen
-        setPendingTimestamp(now.toLocaleTimeString('de-DE')); // für Modal und Anzeige
+        setPendingTimestamp(now.toLocaleTimeString('de-DE'));
         setPendingEvent(event);
         setModalOpen(true);
     };
@@ -94,43 +93,30 @@ export default function QuickEntry(): ReactElement {
         setPendingTimestamp(null);
     };
 
+    const closeResultModal = (): void => {
+        setError(null);
+        setSuccess(null);
+    };
+
     return (
         <Card>
             <CardHeader className="text-xl underline underline-offset-4">Schnellerfassung</CardHeader>
             <CardContent>
                 <p>Aktueller Zeitstempel: {currentTime}</p>
                 <p className="mt-4">Wähle eine der folgenden Aktionen um deine Arbeitszeit zu erfassen:</p>
-                <div className="py-2 flex flex-col space-y-2 max-w-xs">
+                <div className="mt-4 py-2 flex flex-col space-y-2 w-[240px]">
                     {EVENTS.map((event) => (
                         <Button
                             key={event.type}
                             onClick={(): void => handleButtonClick(event)}
                             disabled={loading === event.type}
                             variant={loading === event.type ? 'outline' : 'outline'}
-                            className="w-full"
+                            className="w-full mt-2"
                         >
                             {event.label}
                         </Button>
                     ))}
                 </div>
-
-                {(error || success) && (
-                    <div className="pt-4 text-lg max-w-xs">
-                        <Alert variant={error ? 'destructive' : 'default'}>
-                            {error ? (
-                                <>
-                                    <AlertCircle className="h-5 w-5 text-red-500 dark:text-red-500" />
-                                    <AlertTitle className="dark:text-red-500">{error}</AlertTitle>
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                    <AlertTitle className="text-green-700 dark:text-green-500">{success}</AlertTitle>
-                                </>
-                            )}
-                        </Alert>
-                    </div>
-                )}
             </CardContent>
 
             {modalOpen && pendingEvent && pendingTimestamp && (
@@ -150,6 +136,31 @@ export default function QuickEntry(): ReactElement {
                             </Button>
                             <Button variant="default" onClick={handleConfirm}>
                                 Bestätigen
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {(error || success) && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                    <div className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-xl shadow-lg p-6 max-w-sm w-full border border-zinc-200 dark:border-zinc-700">
+                        <div className="flex items-center mb-4 text-lg">
+                            {error ? (
+                                <>
+                                    <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-red-500" />
+                                    <span className="">{error}</span>
+                                </>
+                            ) : (
+                                <>
+                                    <CheckCircle2 className="h-5 w-5 mr-2 flex-shrink-0 text-green-500" />
+                                    <span className="">{success}</span>
+                                </>
+                            )}
+                        </div>
+                        <div className="flex justify-end">
+                            <Button variant="secondary" onClick={closeResultModal}>
+                                Schließen
                             </Button>
                         </div>
                     </div>

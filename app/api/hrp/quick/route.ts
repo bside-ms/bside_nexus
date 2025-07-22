@@ -1,6 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
+import { writeHrpEntry } from '@/lib/db/hrpActions';
+import { getClientIP } from '@/lib/utils/getClientIP';
 
 const validEvents = ['start', 'pause', 'pause_end', 'stop'];
 
@@ -39,11 +41,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     if (time < fiveMinutesAgo) {
-        return NextResponse.json({ success: false, message: 'Der Zeitstempel darf liegt zu weit in der Vergangenheit.' }, { status: 400 });
+        return NextResponse.json({ success: false, message: 'Der Zeitstempel liegt zu weit in der Vergangenheit.' }, { status: 400 });
     }
 
-    // ToDo: Save into Database.
-    console.log(`[HRP] Erfasstes Ereignis: ${event} | Zeit: ${new Date().toISOString()}`);
+    // ToDo: Pausenzeitenvalidierung.
+    // ToDo: Prüfe ob es eine Start-Event innerhalb der letzten 18 Stunden ohne Stop-Event gibt.
+
+    const ipAddress = getClientIP(req);
+    try {
+        await writeHrpEntry({
+            userId: session.id,
+            ipAddress,
+            eventType: 'quick',
+            entryType: event,
+            timestamp: time,
+            comment: null,
+        });
+    } catch {
+        return NextResponse.json(
+            { success: false, message: 'Fehler beim Speichern des Ereignisses. Bitte versuche es später erneut.' },
+            { status: 500 },
+        );
+    }
 
     return NextResponse.json({ success: true, received: event });
 }

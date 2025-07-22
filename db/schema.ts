@@ -6,6 +6,7 @@ export type User = typeof usersTable.$inferSelect;
 export type UserProfile = typeof userProfilesTable.$inferSelect;
 export type MemberEntry = typeof membersTable.$inferSelect;
 export type LogEntry = typeof logsTable.$inferSelect;
+export type HrpEventLogEntry = typeof hrpEventLogTable.$inferSelect;
 
 export const groupsTable = pgTable('groups', {
     id: varchar({ length: 255 }).primaryKey(),
@@ -44,9 +45,9 @@ export const userProfilesTable = pgTable(
         phoneNumber: varchar({ length: 50 }),
         emailAddress: varchar({ length: 50 }),
         description: text(),
-        createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-        updatedAt: timestamp('updated_at', { withTimezone: true }),
-        deleteAt: timestamp('delete_at', { withTimezone: true }),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+        updatedAt: timestamp('updated_at'),
+        deleteAt: timestamp('delete_at'),
     },
     (table) => {
         return {
@@ -79,9 +80,7 @@ export const membersTable = pgTable(
 
 export const logsTable = pgTable('logs', {
     id: varchar({ length: 36 }).primaryKey(),
-    timestamp: timestamp()
-        .default(sql`now()`)
-        .notNull(),
+    timestamp: timestamp().defaultNow().notNull(),
     userId: varchar({ length: 255 })
         .notNull()
         .references(() => usersTable.id),
@@ -92,4 +91,20 @@ export const logsTable = pgTable('logs', {
     // resourceType: varchar({ length: 255 }).notNull(),
     // resourceId: varchar({ length: 255 }),
     description: text().notNull().default(''),
+});
+
+export const hrpEventLogTable = pgTable('hrp_event_log', {
+    id: varchar({ length: 36 }).primaryKey(),
+    userId: varchar({ length: 255 })
+        .notNull()
+        .references(() => usersTable.id),
+    ipAddress: varchar({ length: 255 }).notNull(),
+    entryType: varchar({ length: 255 }).notNull(),
+    eventType: varchar({ length: 255 }).notNull(),
+    loggedTimestamp: timestamp().notNull(),
+    comment: varchar({ length: 500 }),
+    approvedBy: varchar({ length: 255 }).references(() => usersTable.id),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    approvedAt: timestamp('approved_at'),
+    deletedAt: timestamp('deleted_at'),
 });

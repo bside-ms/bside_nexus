@@ -1,5 +1,13 @@
 'use client';
 
+import { Fragment, type ReactElement } from 'react';
+
+export const ThemeToggle = (): ReactElement => {
+    // eslint-disable-next-line react/jsx-no-useless-fragment
+    return <Fragment />;
+};
+
+/*
 import { useTheme } from 'next-themes';
 import type { ReactElement } from 'react';
 
@@ -8,7 +16,6 @@ export const ThemeToggle = ({ variant = 'outline' }: { variant?: 'outline' | 'se
 
     return <></>;
 
-    /*
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -25,5 +32,5 @@ export const ThemeToggle = ({ variant = 'outline' }: { variant?: 'outline' | 'se
             </DropdownMenuContent>
         </DropdownMenu>
     );
-    */
 };
+*/
