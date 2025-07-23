@@ -136,8 +136,6 @@ export const keycloakGetAllGroups = async (): Promise<Map<AugmentedGroupRepresen
         groupMap.set(parent, children);
     });
 
-    console.log(groupMap);
-
     return groupMap;
 };
 

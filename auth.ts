@@ -17,7 +17,7 @@ export const authOptions: NextAuthConfig = {
         signIn: '/auth/signin',
     },
 
-    secret: process.env.NEXTAUTH_SECRET,
+    secret: process.env.AUTH_SECRET,
 
     callbacks: {
         jwt: ({ token, profile }) => {

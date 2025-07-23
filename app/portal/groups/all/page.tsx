@@ -17,6 +17,8 @@ const breadCrumbs = [
     },
 ];
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
     title: 'B-Side Intern',
     description: 'Der interne Bereich der B-Side',

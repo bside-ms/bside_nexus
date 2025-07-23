@@ -5,8 +5,8 @@ declare namespace NodeJS {
         DB_USER: string;
         DB_PASS: string;
 
-        NEXTAUTH_URL: string;
-        NEXTAUTH_SECRET: string;
+        AUTH_URL: string;
+        AUTH_SECRET: string;
 
         KEYCLOAK_URL: string;
         KEYCLOAK_REALM: string;

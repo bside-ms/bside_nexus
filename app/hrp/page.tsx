@@ -42,7 +42,7 @@ export default function Page(): ReactElement {
                                     Pausen gelten nicht als Arbeitszeit. Sie müssen tatsächlich genommen und dokumentiert werden.
                                 </li>
                             </ul>
-                            <p className="mt-4">
+                            <p className="mt-4 hidden">
                                 Bitte beachte, dass Zeitbuchungen ohne die Einhaltung dieser Regelungen nicht möglich sind.
                             </p>
                         </CardContent>
