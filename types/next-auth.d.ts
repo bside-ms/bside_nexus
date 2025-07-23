@@ -18,6 +18,7 @@ declare module 'next-auth/jwt' {
     interface JWT {
         username: string;
         members: Array<string>;
+        auth_time: number;
     }
 }
 

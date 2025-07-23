@@ -1,3 +1,4 @@
+import { isEmpty } from 'lodash-es';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ success: false, message: 'Unbekanntes Ereignis' }, { status: 400 });
     }
 
-    if (comment.length > 500) {
+    if (!isEmpty(comment) && comment.length > 500) {
         return NextResponse.json({ success: false, message: 'Der Kommentar ist zu lang (max. 500 Zeichen)' }, { status: 400 });
     }
 

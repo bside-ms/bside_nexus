@@ -104,7 +104,7 @@ export default function QuickEntry(): ReactElement {
             <CardContent>
                 <p>Aktueller Zeitstempel: {currentTime}</p>
                 <p className="mt-4">Wähle eine der folgenden Aktionen um deine Arbeitszeit zu erfassen:</p>
-                <div className="mt-4 py-2 flex flex-col space-y-2 w-[240px]">
+                <div className="mt-4 py-2 flex flex-col space-y-2 lg:w-[240px]">
                     {EVENTS.map((event) => (
                         <Button
                             key={event.type}

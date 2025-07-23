@@ -1,41 +1,112 @@
+/* eslint-disable react/jsx-no-bind */
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { isEmpty } from 'lodash-es';
+import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import type { HrpEventLogEntry } from '@/db/schema';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
+async function fetchDates(year: number, month: number): Promise<Array<Date>> {
+    const res = await fetch('/api/hrp/dates', {
+        method: 'POST',
+        body: JSON.stringify({ year, month }),
+        headers: { 'Content-Type': 'application/json' },
+    });
+
+    const resJson = await res.json();
+    if (!resJson.success || !resJson.dates || !Array.isArray(resJson.dates)) {
+        return [];
+    }
+
+    const dates: Array<Date> = resJson.dates.map((dateString: string) => {
+        const date = new Date(dateString);
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    });
+
+    return dates;
+}
+
+async function fetchEntries(year: number, month: number, day: number): Promise<Array<Partial<HrpEventLogEntry>>> {
+    const res = await fetch('/api/hrp/entries', {
+        method: 'POST',
+        body: JSON.stringify({ year, month, day }),
+        headers: { 'Content-Type': 'application/json' },
+    });
+
+    const resJson = await res.json();
+    if (!resJson.success || !resJson.entries || !Array.isArray(resJson.entries)) {
+        return [];
+    }
+
+    // @ts-expect-error resJson.entries is not typed
+    const entries: Array<Partial<HrpEventLogEntry>> = resJson.entries.map((entry) => {
+        entry.loggedTimestamp = new Date(entry.loggedTimestamp);
+        return entry;
+    });
+
+    return entries;
+}
+
+const parseEntryType = (entryType: string): string => {
+    switch (entryType) {
+        case 'start':
+            return 'Kommen';
+        case 'stop':
+            return 'Gehen';
+        case 'pause':
+            return 'Pause';
+        case 'pause_end':
+            return 'Pause: Ende';
+        default:
+            return entryType;
+    }
+};
+
 export default function Overview(): ReactElement {
     const [isLoading, setIsLoading] = useState(false);
+    const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+    const [datesWithHrpEntries, setDatesWithHrpEntries] = useState<Array<Date>>([]);
+    const [hrpEntries, setHrpEntries] = useState<Array<Partial<HrpEventLogEntry>>>([]);
 
     const [date, setDate] = useState<Date | undefined>(new Date());
+    const today = new Date();
 
-    const daysWithBookings = [new Date(2025, 6, 12), new Date(2025, 6, 19)];
+    useEffect(() => {
+        async function loadData(): Promise<void> {
+            setIsLoading(true);
+            const result = await fetchDates(calendarMonth.getFullYear(), calendarMonth.getMonth());
 
-    const events = [
-        {
-            title: 'Kommen',
-            from: '2025-06-12T09:00:00',
-        },
-        {
-            title: 'Pause',
-            from: '2025-06-12T14:00:00',
-        },
-        {
-            title: 'Pause: Ende',
-            from: '2025-06-12T14:00:00',
-        },
-        {
-            title: 'Gehen',
-            from: '2025-06-12T14:00:00',
-            comment: 'Viel los heute.',
-        },
-    ];
+            setDatesWithHrpEntries(result);
+            setIsLoading(false);
+        }
+        loadData();
+    }, [calendarMonth]);
+
+    useEffect(() => {
+        async function loadData(): Promise<void> {
+            setIsLoading(true);
+            const result = await fetchEntries(
+                date?.getFullYear() ?? today.getFullYear(),
+                date?.getMonth() ?? today.getMonth(),
+                date?.getDate() ?? today.getDate(),
+            );
+            setHrpEntries(result);
+            setIsLoading(false);
+        }
+        loadData();
+    }, [date]);
+
+    function handleMonthChange(newMonth: Date): void {
+        setCalendarMonth(newMonth);
+    }
 
     return (
-        <div className="grid auto-rows-min gap-4 md:grid-cols-2">
+        <div className="grid auto-rows-min gap-4 md:grid-cols-3">
             <Card className="">
                 <CardContent className="relative p-0">
                     <div className="p-6">
@@ -46,8 +117,9 @@ export default function Overview(): ReactElement {
                             defaultMonth={date}
                             disabled={false}
                             showOutsideDays={true}
+                            onMonthChange={handleMonthChange}
                             modifiers={{
-                                bookings: daysWithBookings,
+                                bookings: datesWithHrpEntries,
                             }}
                             modifiersClassNames={{
                                 bookings: 'bg-blue-300 text-black rounded-2xl',
@@ -62,29 +134,55 @@ export default function Overview(): ReactElement {
                 </CardContent>
             </Card>
 
-            <Card className="gap-0 p-0">
-                <CardHeader className="text-lg">
+            <Card>
+                <CardHeader className="text-xl underline underline-offset-4">
+                    Zeitbuchungen am{' '}
                     {date?.toLocaleDateString('de-DE', {
                         day: 'numeric',
                         month: 'long',
                         year: 'numeric',
                     })}
                 </CardHeader>
-                <CardContent className="relative p-0">
-                    <div className="flex w-[480px] flex-col gap-2">
-                        {events.length === 0 && <p>Keine Einträge</p>}
-                        {events.length > 0 &&
-                            events.map((event) => (
+                <CardContent>
+                    <div className=" gap-2">
+                        {isLoading && (
+                            <div className="bg-gray-100 after:bg-gray-300/70 relative rounded-md p-2 pl-6 text-sm after:absolute after:inset-y-2 after:left-2 after:w-1 after:rounded-full">
+                                Lade Einträge...
+                            </div>
+                        )}
+                        {!isLoading && hrpEntries.length === 0 && (
+                            <div className="bg-gray-100 after:bg-gray-300/70 relative rounded-md p-2 pl-6 text-sm after:absolute after:inset-y-2 after:left-2 after:w-1 after:rounded-full">
+                                Keine Einträge für diesen Tag
+                            </div>
+                        )}
+                        {!isLoading &&
+                            hrpEntries.length > 0 &&
+                            hrpEntries.map((event) => (
                                 <div
-                                    key={event.title}
-                                    className="mx-2 bg-gray-100 after:bg-green-300/70 relative rounded-md p-2 pl-6 text-sm after:absolute after:inset-y-2 after:left-2 after:w-1 after:rounded-full"
+                                    key={event.id}
+                                    className="bg-gray-100 after:bg-green-300/70 relative rounded-md p-2 pl-6 text-sm after:absolute after:inset-y-2 after:left-2 after:w-1 after:rounded-full"
                                 >
-                                    <div className="font-medium">{event.title}</div>
-                                    <div className="text-muted-foreground">{format(Date.parse(event.from), 'pp', { locale: de })}</div>
-                                    {event.comment && <div className="text-muted-foreground mt-2">Kommentar: {event.comment}</div>}
+                                    <div className="font-medium">{parseEntryType(event.entryType!)}</div>
+                                    <div className="text-muted-foreground">{format(event.loggedTimestamp!, 'pp', { locale: de })}</div>
+                                    {!isEmpty(event.comment) && (
+                                        <div className="text-muted-foreground mt-2">Kommentar: {event.comment}</div>
+                                    )}
                                 </div>
                             ))}
                     </div>
+                </CardContent>
+            </Card>
+
+            <Card className="">
+                <CardHeader className="text-xl underline underline-offset-4">Mögliche Probleme</CardHeader>
+                <CardContent className="">
+                    <p>
+                        Sollten irgendwelche Probleme auftreten, trage die Arbeitszeiten bitte über das alte Excel-Dokument ein und&nbsp;
+                        <Link className="underline" href="mailto:it@b-side.ms">
+                            schreibe eine kurze Mail unsere IT
+                        </Link>
+                        &nbsp;damit sie sich das Problem anschauen können.
+                    </p>
                 </CardContent>
             </Card>
         </div>

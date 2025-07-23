@@ -30,6 +30,7 @@ export const authOptions: NextAuthConfig = {
             token.username = profile.preferred_username;
             token.sub = profile.sub;
             token.members = profile.members;
+            token.auth_time = Math.floor(Date.now() / 1000);
 
             return token;
         },
