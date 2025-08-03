@@ -163,7 +163,7 @@ export default function Overview(): ReactElement {
                                     className="bg-gray-100 after:bg-green-300/70 relative rounded-md p-2 pl-6 text-sm after:absolute after:inset-y-2 after:left-2 after:w-1 after:rounded-full"
                                 >
                                     <div className="font-medium">{parseEntryType(event.entryType!)}</div>
-                                    <div className="text-muted-foreground">{format(event.loggedTimestamp!, 'pp', { locale: de })}</div>
+                                    <div className="text-muted-foreground">{format(event.loggedTimestamp!, 'PP - pp', { locale: de })}</div>
                                     {!isEmpty(event.comment) && (
                                         <div className="text-muted-foreground mt-2">Kommentar: {event.comment}</div>
                                     )}

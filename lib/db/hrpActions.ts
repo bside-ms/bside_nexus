@@ -1,4 +1,4 @@
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, lt } from 'drizzle-orm';
 import { db } from '@/db';
 import type { HrpEventLogEntry } from '@/db/schema';
 import { hrpEventLogTable } from '@/db/schema';
@@ -41,8 +41,8 @@ export async function writeHrpEntry({
 }
 
 export const getDatesWithHrpEntries = async (userId: string, year: number, month: number): Promise<Array<Date>> => {
-    const startOfMonth = new Date(Date.UTC(year, month, 1));
-    const endOfMonth = new Date(Date.UTC(year, month + 1, 0, 23, 59, 59, 999));
+    const startOfMonth = new Date(year, month, 1, 7, 0, 0, 0);
+    const endOfMonth = new Date(year, month + 1, 1, 7, 0, 0, 0);
 
     const entries = await db
         .select()
@@ -51,7 +51,7 @@ export const getDatesWithHrpEntries = async (userId: string, year: number, month
             and(
                 eq(hrpEventLogTable.userId, userId),
                 gte(hrpEventLogTable.loggedTimestamp, startOfMonth),
-                lte(hrpEventLogTable.loggedTimestamp, endOfMonth),
+                lt(hrpEventLogTable.loggedTimestamp, endOfMonth),
             ),
         )
         .orderBy(hrpEventLogTable.loggedTimestamp);
@@ -59,11 +59,18 @@ export const getDatesWithHrpEntries = async (userId: string, year: number, month
     const daysSeen = new Set<string>();
     const result: Array<Date> = [];
     for (const entry of entries) {
-        const localDateStr = entry.loggedTimestamp.toLocaleDateString('de-DE', { timeZone: 'Europe/Berlin' });
+        // A "day" starts at 7am. To find the correct calendar day for an entry,
+        // we can subtract 7 hours from its timestamp. This shifts the "day start" to midnight.
+        const adjustedTimestamp = new Date(entry.loggedTimestamp.getTime() - 7 * 60 * 60 * 1000);
 
-        if (!daysSeen.has(localDateStr)) {
-            daysSeen.add(localDateStr);
-            result.push(entry.loggedTimestamp);
+        // We use the UTC date string 'YYYY-MM-DD' for grouping to avoid timezone issues.
+        const dateString = adjustedTimestamp.toISOString().substring(0, 10);
+
+        if (!daysSeen.has(dateString)) {
+            daysSeen.add(dateString);
+            // We return a new Date object representing the start of that day in UTC.
+            // The frontend will handle displaying it in the user's local timezone.
+            result.push(new Date(dateString));
         }
     }
 
@@ -76,8 +83,8 @@ export const getHrpEntriesForDate = async (
     month: number,
     day: number,
 ): Promise<Array<Partial<HrpEventLogEntry>>> => {
-    const startOfDay = new Date(year, month, day, 0, 0, 0, 0);
-    const endOfDay = new Date(year, month, day, 23, 59, 59, 999);
+    const startOfDay = new Date(year, month, day, 7, 0, 0, 0);
+    const endOfDay = new Date(year, month, day + 1, 7, 0, 0, 0);
 
     const entries = await db
         .select()
@@ -86,7 +93,7 @@ export const getHrpEntriesForDate = async (
             and(
                 eq(hrpEventLogTable.userId, userId),
                 gte(hrpEventLogTable.loggedTimestamp, startOfDay),
-                lte(hrpEventLogTable.loggedTimestamp, endOfDay),
+                lt(hrpEventLogTable.loggedTimestamp, endOfDay),
             ),
         )
         .orderBy(hrpEventLogTable.loggedTimestamp);
