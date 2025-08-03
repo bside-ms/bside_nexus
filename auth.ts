@@ -25,7 +25,6 @@ export const authOptions: NextAuthConfig = {
                 try {
                     const issuerUrl = `${process.env.KEYCLOAK_URL}auth/realms/${process.env.KEYCLOAK_REALM}`;
                     const logOutUrl = new URL(`${issuerUrl}/protocol/openid-connect/logout`);
-                    // @ts-expect-error id_token is not defined in the type.
                     logOutUrl.searchParams.set('id_token_hint', data.token.id_token);
                     await fetch(logOutUrl);
                 } catch {
@@ -41,12 +40,13 @@ export const authOptions: NextAuthConfig = {
                 return token;
             }
 
-            token.id_token = account ? account.id_token : undefined;
+            token.id_token = account ? (account.id_token ?? '') : '';
             token.name = profile.given_name;
             token.email = profile.email;
             token.username = profile.preferred_username;
             token.sub = profile.sub;
             token.members = profile.members;
+            token.roles = profile.roles;
             token.auth_time = Math.floor(Date.now() / 1000);
 
             return token;
@@ -59,6 +59,7 @@ export const authOptions: NextAuthConfig = {
                 username: token.username ?? '',
                 id: token.sub ?? '',
                 members: token.members ?? [],
+                roles: token.roles ?? [],
             };
 
             return session;

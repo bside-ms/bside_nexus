@@ -37,7 +37,7 @@ export function GroupDetailsMembers({ groupId, groupMembers, isAdmin, isGlobalAd
                     </Link>
                 )}
             </CardHeader>
-            {isAdmin === 'Admin' ? (
+            {isAdminOrGlobalAdmin ? (
                 <CardContent>
                     {groupMembers.length > 0 && isLg && <DataTable columns={GroupMembersColumnsAdmin} data={groupMembers} />}
                 </CardContent>

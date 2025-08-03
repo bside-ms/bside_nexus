@@ -23,8 +23,8 @@ export default function Page(): ReactElement {
     return (
         <div className="">
             <NavbarTop items={breadCrumbs} sidebar={true} />
-            <div className="flex flex-1 flex-col gap-4 p-4">
-                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+            <div className="flex flex-1 flex-col gap2 lg:gap-4 p-4">
+                <div className="grid auto-rows-min gap-4 md:grid-cols-1 lg:grid-cols-3">
                     <Card>
                         <CardHeader className="text-xl underline underline-offset-4">Informationen zur Arbeitszeiterfassung</CardHeader>
                         <CardContent>

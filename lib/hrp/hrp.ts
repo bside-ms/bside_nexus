@@ -1,3 +1,5 @@
+import { createHash } from 'crypto';
+
 interface TimestampValidationResult {
     success: boolean;
     message?: string;
@@ -21,3 +23,14 @@ export const isValidTimestamp = (timestamp: string): TimestampValidationResult =
 
     return { success: true };
 };
+
+export function shortVerificationCode(guid: string): string {
+    const hash = createHash('sha256').update(guid).digest();
+    let num = 0;
+    for (let i = 0; i < 8; i++) {
+        // @ts-expect-error Hash is a Buffer, which is iterable.
+        // eslint-disable-next-line no-bitwise
+        num = (num * 256 + hash[i]) >>> 0;
+    }
+    return (num % 100_000_000).toString().padStart(8, '0');
+}

@@ -106,8 +106,8 @@ export default function Overview(): ReactElement {
     }
 
     return (
-        <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-            <Card className="">
+        <div className="grid auto-rows-min gap-2 xl:gap-4 xl:grid-cols-3">
+            <Card className="col-span-2 2xl:col-span-1">
                 <CardContent className="relative p-0">
                     <div className="p-6">
                         <Calendar
@@ -135,7 +135,7 @@ export default function Overview(): ReactElement {
             </Card>
 
             <Card>
-                <CardHeader className="text-xl underline underline-offset-4">
+                <CardHeader className="text-xl underline underline-offset-4 col-span-3">
                     Zeitbuchungen am{' '}
                     {date?.toLocaleDateString('de-DE', {
                         day: 'numeric',

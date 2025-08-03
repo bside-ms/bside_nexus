@@ -10,6 +10,7 @@ declare module 'next-auth' {
             username: string;
             id: string;
             members: Array<string>;
+            roles: Array<string>;
         };
     }
 }
@@ -19,6 +20,8 @@ declare module 'next-auth/jwt' {
         username: string;
         members: Array<string>;
         auth_time: number;
+        id_token: string;
+        roles: Array<string>;
     }
 }
 
