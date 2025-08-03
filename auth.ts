@@ -19,12 +19,29 @@ export const authOptions: NextAuthConfig = {
 
     secret: process.env.AUTH_SECRET,
 
+    events: {
+        signOut: async (data) => {
+            if ('token' in data && data.token && data.token.id_token) {
+                try {
+                    const issuerUrl = `${process.env.KEYCLOAK_URL}auth/realms/${process.env.KEYCLOAK_REALM}`;
+                    const logOutUrl = new URL(`${issuerUrl}/protocol/openid-connect/logout`);
+                    // @ts-expect-error id_token is not defined in the type.
+                    logOutUrl.searchParams.set('id_token_hint', data.token.id_token);
+                    await fetch(logOutUrl);
+                } catch {
+                    // Do nothing.
+                }
+            }
+        },
+    },
+
     callbacks: {
-        jwt: ({ token, profile }) => {
+        jwt: ({ token, profile, account }) => {
             if (!isKeycloakProfile(profile)) {
                 return token;
             }
 
+            token.id_token = account ? account.id_token : undefined;
             token.name = profile.given_name;
             token.email = profile.email;
             token.username = profile.preferred_username;
