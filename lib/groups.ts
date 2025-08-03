@@ -312,3 +312,8 @@ export const updateGroupDescription = async (
 };
 
 export const hiddenSubGroups = ['01320ea0-c06e-4c7d-be5a-14a556209f2a', 'cf8e85a7-f828-4ae0-87d6-67a4959dcf83'];
+
+export const isKollektivMitglied = async (): Promise<boolean> => {
+    const user = await getUserSession();
+    return user?.members?.includes('/koerperschaften/kollektiv/mitglieder') === true;
+};

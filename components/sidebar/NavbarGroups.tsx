@@ -20,6 +20,7 @@ const predefinedCategories: Array<string> = ['Kollektiv', 'Kulturverein', 'GmbH'
 interface AppSidebarContentProps {
     groups?: Array<Group>;
 }
+
 export function NavbarGroups({ groups }: AppSidebarContentProps): ReactElement {
     if (groups === undefined) {
         return <div />;
@@ -89,15 +90,6 @@ export function NavbarGroups({ groups }: AppSidebarContentProps): ReactElement {
                         </Collapsible>
                     );
                 })}
-
-                <SidebarMenuItem className="">
-                    <SidebarMenuButton asChild>
-                        <Link href="/portal/groups/all">
-                            <PieChart />
-                            <span>Alle Gruppen</span>
-                        </Link>
-                    </SidebarMenuButton>
-                </SidebarMenuItem>
             </SidebarMenu>
         </Fragment>
     );

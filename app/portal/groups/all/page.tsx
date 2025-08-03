@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { Toaster } from 'sonner';
 import GroupOverviewCard from '@/components/group/overview/GroupOverviewCard';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Separator } from '@/components/ui/separator';
-import { getAllGroups } from '@/lib/db/groupActions';
+import getUserSession from '@/lib/auth/getUserSession';
+import { getAllGroups, isGlobalAdmin } from '@/lib/db/groupActions';
 
 const breadCrumbs = [
     {
@@ -26,6 +28,11 @@ export const metadata: Metadata = {
 };
 
 export default async function Page(): Promise<ReactElement> {
+    const user = await getUserSession();
+    if (user?.members?.includes('/koerperschaften/kollektiv/mitglieder') !== true) {
+        redirect('/portal');
+    }
+
     const groups = await getAllGroups();
 
     const circles = groups
@@ -33,7 +40,7 @@ export default async function Page(): Promise<ReactElement> {
         .sort((a, b) => (a?.displayName ?? 'zzz').localeCompare(b?.displayName ?? 'zzz') ?? 0);
 
     const bodies = groups
-        .filter((group) => group.groupType === 'koerperschaft')
+        .filter((group) => group.groupType === 'koerperschaft' && (group.displayName !== 'Kollektiv' || isGlobalAdmin(user?.id)))
         .sort((a, b) => a?.displayName?.localeCompare(b?.displayName ?? '') ?? 0);
 
     return (

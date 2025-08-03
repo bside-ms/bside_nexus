@@ -71,7 +71,7 @@ export const getGroupMemberCount = async (groupId: string): Promise<number> => {
     return groupMembers[0]?.count ?? 0;
 };
 
-const isGlobalAdmin = (userId: string): boolean => {
+export const isGlobalAdmin = (userId: string): boolean => {
     // ToDo: Implement this function.
     return userId === '58722002-5ebc-4039-802f-01bb499978ae';
 };

@@ -7,6 +7,7 @@ import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { getUserGroups } from '@/lib/db/groupActions';
+import { isKollektivMitglied } from '@/lib/groups';
 
 const breadCrumbs = [
     {
@@ -45,11 +46,13 @@ export default async function Page(): Promise<ReactElement> {
                                 Dokumente du aktuell zugreifen kannst.
                             </p>
                         </div>
-                        <Link href="/portal/groups/all">
-                            <Button size="lg" variant="destructive">
-                                Zur Gesamtübersicht
-                            </Button>
-                        </Link>
+                        {(await isKollektivMitglied()) && (
+                            <Link href="/portal/groups/all">
+                                <Button size="lg" variant="outline">
+                                    Zur Gesamtübersicht
+                                </Button>
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -71,11 +74,13 @@ export default async function Page(): Promise<ReactElement> {
                             <h2 className="text-2xl font-bold tracking-tight">Meine Gruppen</h2>
                             <p>Hier findest du eine Übersicht über alle deine Gruppen der B-Side.</p>
                         </div>
-                        <Link href="/portal/groups/all">
-                            <Button size="lg" variant="destructive" className="">
-                                Zur Gesamtübersicht
-                            </Button>
-                        </Link>
+                        {(await isKollektivMitglied()) && (
+                            <Link href="/portal/groups/all">
+                                <Button size="lg" variant="outline">
+                                    Zur Gesamtübersicht
+                                </Button>
+                            </Link>
+                        )}
                     </div>
                 </div>
 
