@@ -103,6 +103,20 @@ export const getGroupAdminStatus = async (userId: string, groupId: string): Prom
     }
 };
 
+export const isSubGroupMember = async (userId: string, groupId: string): Promise<boolean> => {
+    if (isEmpty(userId) || isEmpty(groupId)) {
+        return false;
+    }
+
+    const groupMembers = await db
+        .select()
+        .from(membersTable)
+        .where(and(eq(membersTable.userId, userId), eq(membersTable.groupId, groupId)))
+        .limit(1);
+
+    return groupMembers.length > 0;
+};
+
 export const getSubgroups = async (groupId: string): Promise<Array<Group>> => {
     const subgroups = await db.select().from(groupsTable).where(eq(groupsTable.parentGroup, groupId));
     return (subgroups as Array<Group>) ?? [];

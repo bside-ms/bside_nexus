@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { useBreakpointContext } from '@/components/common/BreakpointContext';
 import type { GroupMember } from '@/components/group/details/members/GroupMembersColumns';
+import { GroupMembersColumnsAdmin } from '@/components/group/details/members/GroupMembersColumns';
 import { GroupMembersColumns } from '@/components/group/details/members/GroupMembersColumns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,7 +37,15 @@ export function GroupDetailsMembers({ groupId, groupMembers, isAdmin, isGlobalAd
                     </Link>
                 )}
             </CardHeader>
-            <CardContent>{groupMembers.length > 0 && isLg && <DataTable columns={GroupMembersColumns} data={groupMembers} />}</CardContent>
+            {isAdmin === 'Admin' ? (
+                <CardContent>
+                    {groupMembers.length > 0 && isLg && <DataTable columns={GroupMembersColumnsAdmin} data={groupMembers} />}
+                </CardContent>
+            ) : (
+                <CardContent>
+                    {groupMembers.length > 0 && isLg && <DataTable columns={GroupMembersColumns} data={groupMembers} />}
+                </CardContent>
+            )}
         </Card>
     );
 }

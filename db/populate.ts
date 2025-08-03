@@ -1,4 +1,4 @@
-import { isNull } from 'drizzle-orm';
+import { eq, isNull, or } from 'drizzle-orm';
 import { isEmpty } from 'lodash-es';
 import 'dotenv/config';
 import { db } from '@/db/index';
@@ -125,7 +125,10 @@ async function populateUsers(): Promise<void> {
 }
 
 async function populateMembers(): Promise<void> {
-    const groups = await db.select().from(groupsTable).where(isNull(groupsTable.parentGroup));
+    const groups = await db
+        .select()
+        .from(groupsTable)
+        .where(or(isNull(groupsTable.parentGroup), eq(groupsTable.groupType, 'subgroup')));
 
     for (const group of groups) {
         const groupId = group.id;
@@ -134,6 +137,10 @@ async function populateMembers(): Promise<void> {
 
         let members: Array<AugmentedUserRepresentation> = [];
         let admins: Array<AugmentedUserRepresentation> = [];
+
+        if (group.groupType === 'subgroup') {
+            members = await keycloakGetDirectMembers(groupId);
+        }
 
         if (memberGroupId !== null) {
             members = await keycloakGetDirectMembers(memberGroupId);

@@ -66,7 +66,7 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
             groupId: group.id,
             displayName: member.displayName ?? '-',
             username: member.username ?? '-',
-            email: member.email ?? '-',
+            email: isAdmin === 'Admin' ? (member.email ?? '-') : '',
             status: !member.enabled ? 'disabled' : member.isAdmin ? 'admin' : 'member',
         });
     });

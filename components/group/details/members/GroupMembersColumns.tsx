@@ -94,7 +94,7 @@ const formatMemberStatus = (status: string): string => {
     }
 };
 
-export const GroupMembersColumns: Array<ColumnDef<GroupMember>> = [
+export const GroupMembersColumnsAdmin: Array<ColumnDef<GroupMember>> = [
     {
         accessorKey: 'avatar',
         header: ({ column }) => <DataTableColumnHeader column={column} title="" />,
@@ -180,6 +180,80 @@ export const GroupMembersColumns: Array<ColumnDef<GroupMember>> = [
                                 Administrator*innen ernennen
                             </DropdownMenuItem>
                         )}
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            );
+        },
+    },
+];
+
+export const GroupMembersColumns: Array<ColumnDef<GroupMember>> = [
+    {
+        accessorKey: 'avatar',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="" />,
+        enableGlobalFilter: false,
+        enableSorting: false,
+        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+        cell: ({ row }): ReactElement => {
+            const username: string = row.getValue('Username') ?? '';
+            return (
+                <div className="flex justify-end">
+                    <Avatar className="size-8 rounded-lg">
+                        <AvatarImage src={`/api/mattermost/${username}`} alt={`Avatar von ${username}`} />
+                        <AvatarFallback className="rounded-lg">{username.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                </div>
+            );
+        },
+    },
+    {
+        accessorKey: 'displayName',
+        id: 'Anzeigename',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Anzeigename" />,
+    },
+    {
+        accessorKey: 'username',
+        id: 'Username',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Username" />,
+        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+        cell: ({ row }): ReactElement => {
+            return <Fragment>@{row.getValue('Username')}</Fragment>;
+        },
+    },
+    {
+        accessorKey: 'status',
+        id: 'Status',
+        enableGlobalFilter: false,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+        cell: ({ row }): ReactElement => {
+            return <Fragment>{formatMemberStatus(row.getValue('Status'))}</Fragment>;
+        },
+    },
+    {
+        id: 'actions',
+        header: 'Aktionen',
+        enableGlobalFilter: false,
+        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+        cell: ({ row }): ReactElement => {
+            const member = row.original;
+
+            return (
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="size-8 p-0">
+                            <span className="sr-only">Menü öffenen</span>
+                            <MoreHorizontal className="size-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Aktionen: {member.displayName}</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(member.username)}>
+                            Kopiere den Mattermost-Namen
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => navigator.clipboard.writeText(member.email)}>
+                            Kopiere die Mail-Adresse
+                        </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
             );

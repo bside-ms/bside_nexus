@@ -3,8 +3,13 @@ import type { ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Group } from '@/db/schema';
+import getUserSession from '@/lib/auth/getUserSession';
+import { isSubGroupMember } from '@/lib/db/groupActions';
+import { hiddenSubGroups } from '@/lib/groups';
 
-export function GroupDetailsSubgroups({ subgroups }: { subgroups: Array<Group> }): ReactElement {
+export async function GroupDetailsSubgroups({ subgroups }: { subgroups: Array<Group> }): Promise<ReactElement> {
+    const user = await getUserSession();
+
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -18,12 +23,19 @@ export function GroupDetailsSubgroups({ subgroups }: { subgroups: Array<Group> }
                 <CardDescription className="mb-4">Liste der Untergruppen innerhalb dieser Gruppe</CardDescription>
                 <ul className="space-y-2">
                     {subgroups.length > 0 &&
-                        subgroups.map((subgroup) => (
-                            <li key={subgroup.id} className="flex items-center space-x-2">
-                                <Users className="size-4" />
-                                <span>{subgroup.displayName}</span>
-                            </li>
-                        ))}
+                        subgroups.map(async (subgroup) => {
+                            const displayName =
+                                hiddenSubGroups.includes(`${subgroup.id}`) && !(await isSubGroupMember(user?.id ?? '', subgroup.id ?? ''))
+                                    ? '(Geschützte Gruppe)'
+                                    : subgroup.displayName;
+
+                            return (
+                                <li key={subgroup.id} className="flex items-center space-x-2">
+                                    <Users className="size-4" />
+                                    <span>{displayName}</span>
+                                </li>
+                            );
+                        })}
                     {subgroups.length <= 0 && (
                         <li key="none" className="flex items-center space-x-2">
                             <Users className="size-4" />

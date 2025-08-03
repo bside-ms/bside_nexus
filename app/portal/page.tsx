@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
 import NavbarTop from '@/components/sidebar/NavbarTop';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
 const breadCrumbs = [
     {
@@ -25,7 +26,15 @@ export default function Page(): ReactElement {
             <NavbarTop items={breadCrumbs} />
             <div className="flex flex-1 flex-col gap-4 p-4">
                 <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <div className="aspect-video rounded-xl bg-zinc-100 dark:bg-zinc-800/50" />
+                    <Card>
+                        <CardHeader className="text-xl underline underline-offset-4">Informationen zur Webseite</CardHeader>
+                        <CardContent className="px-6">
+                            <p>Diese Webseite befindet sich noch in der aktiven Entwicklung.</p>
+                            <p className="py-4">
+                                Bei Rückfragen aller Art wendet euch bitte an: <a href="mailto:it@b-side.ms">it@b-side.ms</a>
+                            </p>
+                        </CardContent>
+                    </Card>
                     <div className="aspect-video rounded-xl bg-zinc-100 dark:bg-zinc-800/50" />
                     <div className="aspect-video rounded-xl bg-zinc-100 dark:bg-zinc-800/50" />
                 </div>

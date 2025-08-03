@@ -10,7 +10,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import type { Group } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
-import { getGroupAdminStatus, getGroupMemberCount, getSubgroups } from '@/lib/db/groupActions';
+import { getGroupAdminStatus, getGroupMemberCount, getSubgroups, isSubGroupMember } from '@/lib/db/groupActions';
+import { hiddenSubGroups } from '@/lib/groups';
 
 const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
     const { categoryName } = group;
@@ -198,9 +199,14 @@ const GroupOverviewCard = async ({ group }: { group: Group }): Promise<ReactElem
                             <span className="font-semibold">Untergruppen:</span>
                         </div>
                         <ul className="list-inside list-disc">
-                            {subGroups.map((subGroup) => (
-                                <li key={subGroup.id}>{subGroup.displayName}</li>
-                            ))}
+                            {subGroups.map(async (subGroup) => {
+                                const subGroupName =
+                                    hiddenSubGroups.includes(`${subGroup.id}`) &&
+                                    !(await isSubGroupMember(user?.id ?? '', subGroup.id ?? ''))
+                                        ? '(Geschützte Gruppe)'
+                                        : subGroup.displayName;
+                                return <li key={subGroup.id}>{subGroupName}</li>;
+                            })}
                         </ul>
                     </div>
                 </CardContent>
