@@ -61,6 +61,8 @@ export default function AdvancedEntry(): ReactElement {
         defaultValues: {
             date: new Date(),
             time: format(new Date(), 'pp', { locale: de }),
+            comment: '',
+            eventType: undefined,
         },
     });
 
@@ -103,6 +105,9 @@ export default function AdvancedEntry(): ReactElement {
     };
 
     const closeResultModal = (): void => {
+        if (success) {
+            form.reset();
+        }
         setError(null);
         setSuccess(null);
     };
@@ -122,7 +127,7 @@ export default function AdvancedEntry(): ReactElement {
                             render={({ field }) => (
                                 <FormItem className="flex flex-col my-2">
                                     <FormLabel>Ereignis</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value ?? ''}>
                                         <FormControl className="w-[240px]">
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Bitte wähle ein Ereignis" />
