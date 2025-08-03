@@ -101,6 +101,20 @@ export default function Overview(): ReactElement {
         loadData();
     }, [date]);
 
+    useEffect(() => {
+        const handleEntryAdded = (event: CustomEvent<{ date: Date }>): void => {
+            const newDate = event.detail.date;
+            setDate(newDate);
+            setCalendarMonth(newDate);
+        };
+
+        window.addEventListener('hrpEntryAdded', handleEntryAdded as EventListener);
+
+        return () => {
+            window.removeEventListener('hrpEntryAdded', handleEntryAdded as EventListener);
+        };
+    }, []);
+
     function handleMonthChange(newMonth: Date): void {
         setCalendarMonth(newMonth);
     }
@@ -114,10 +128,10 @@ export default function Overview(): ReactElement {
                             mode="single"
                             selected={date}
                             onSelect={setDate}
-                            defaultMonth={date}
+                            month={calendarMonth}
+                            onMonthChange={handleMonthChange}
                             disabled={false}
                             showOutsideDays={true}
-                            onMonthChange={handleMonthChange}
                             modifiers={{
                                 bookings: datesWithHrpEntries,
                             }}

@@ -97,6 +97,12 @@ export default function AdvancedEntry(): ReactElement {
             }
 
             setSuccess(data.message || 'Deine Eintragung wurde erfasst!');
+
+            const displayDate = new Date(values.date);
+            if (combinedDate.getHours() < 7) {
+                displayDate.setDate(displayDate.getDate() - 1);
+            }
+            window.dispatchEvent(new CustomEvent('hrpEntryAdded', { detail: { date: displayDate } }));
         } catch {
             setError('Es ist ein Fehler aufgetreten.');
         } finally {
@@ -106,7 +112,12 @@ export default function AdvancedEntry(): ReactElement {
 
     const closeResultModal = (): void => {
         if (success) {
-            form.reset();
+            form.reset({
+                date: form.getValues('date'),
+                time: format(new Date(), 'pp', { locale: de }),
+                comment: '',
+                eventType: undefined,
+            });
         }
         setError(null);
         setSuccess(null);
@@ -177,6 +188,7 @@ export default function AdvancedEntry(): ReactElement {
                                                 mode="single"
                                                 selected={field.value}
                                                 onSelect={field.onChange}
+                                                defaultMonth={field.value}
                                                 disabled={(date) => date > tomorrow || date < new Date('2025-01-01')}
                                                 captionLayout="dropdown"
                                             />

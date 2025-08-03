@@ -58,7 +58,8 @@ export default function QuickEntry(): ReactElement {
         setSuccess(null);
         setModalOpen(false);
 
-        const tsISO = new Date().toISOString();
+        const now = new Date();
+        const tsISO = now.toISOString();
 
         try {
             const res = await fetch('/api/hrp/quick', {
@@ -78,6 +79,12 @@ export default function QuickEntry(): ReactElement {
             }
 
             setSuccess(data.message || 'Deine Eintragung wurde erfasst!');
+
+            const displayDate = now;
+            if (displayDate.getHours() < 7) {
+                displayDate.setDate(displayDate.getDate() - 1);
+            }
+            window.dispatchEvent(new CustomEvent('hrpEntryAdded', { detail: { date: displayDate } }));
         } catch {
             setError('Es ist ein Fehler aufgetreten.');
         } finally {
