@@ -39,9 +39,10 @@ const formSchema = z.object({
     date: z.date({
         message: 'Gebe ein gültiges Datum ein.',
     }),
-    time: z.string().time({
-        message: 'Gebe eine gültige Uhrzeit an.',
-    }),
+    time: z
+        .string()
+        .regex(/^\d{2}:\d{2}$/, { message: 'Gebe eine gültige Uhrzeit an.' })
+        .transform((v) => `${v}:00`),
     comment: z
         .string()
         .max(500, {
@@ -60,7 +61,7 @@ export default function AdvancedEntry(): ReactElement {
 
         defaultValues: {
             date: new Date(),
-            time: format(new Date(), 'pp', { locale: de }),
+            time: format(new Date(), 'HH:mm'),
             comment: '',
             eventType: undefined,
         },
@@ -210,7 +211,7 @@ export default function AdvancedEntry(): ReactElement {
                                         <Input
                                             type="time"
                                             id="time-picker"
-                                            step="1"
+                                            step="60"
                                             {...field}
                                             className="bg-background appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                                         />
