@@ -187,7 +187,21 @@ export default function Overview(): ReactElement {
                 </CardContent>
             </Card>
 
-            <Card className="">
+            <Card>
+                <CardHeader className="text-xl underline underline-offset-4">Gesamtübersicht</CardHeader>
+                <CardContent className="">
+                    <p>
+                        <Link href="/hrp/my" className="underline">
+                            Hier
+                        </Link>{' '}
+                        gelangst du zu{' '}
+                        <Link href="/hrp/my" className="underline">
+                            deiner persönlichen Übersicht
+                        </Link>{' '}
+                        über alle deine Arbeitszeiten.
+                    </p>
+                </CardContent>
+
                 <CardHeader className="text-xl underline underline-offset-4">Mögliche Probleme</CardHeader>
                 <CardContent className="">
                     <p>

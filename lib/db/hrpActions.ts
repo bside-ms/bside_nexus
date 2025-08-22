@@ -1,6 +1,7 @@
 import { and, eq, gte, lt } from 'drizzle-orm';
 import { db } from '@/db';
 import type { HrpEventLogEntry } from '@/db/schema';
+import { usersTable } from '@/db/schema';
 import { hrpEventLogTable } from '@/db/schema';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -99,4 +100,91 @@ export const getHrpEntriesForDate = async (
         .orderBy(hrpEventLogTable.loggedTimestamp);
 
     return entries.map(({ approvedBy, ipAddress, deletedAt, createdAt, userId: user, approvedAt, eventType, ...rest }) => rest);
+};
+
+export const getHrpLogForUser = async (
+    userId: string,
+    year: number,
+    month: number,
+): Promise<Record<number, Array<Partial<HrpEventLogEntry>>>> => {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const results = await Promise.all(
+        Array.from({ length: daysInMonth }, (_, i) => {
+            const day = i + 1;
+            return getHrpEntriesForDate(userId, year, month, day).then((entries) => ({
+                day,
+                entries,
+            }));
+        }),
+    );
+
+    const byDay: Record<number, Array<Partial<HrpEventLogEntry>>> = {};
+    for (const { day, entries } of results) {
+        byDay[day] = entries;
+    }
+
+    return byDay;
+};
+
+export const getHrpLogsForAllUsers = async (
+    year: number,
+    month: number,
+): Promise<
+    Record<
+        string,
+        {
+            user: { id: string; username: string; displayName: string | null };
+            logs: Record<number, Array<Partial<HrpEventLogEntry>>>;
+        }
+    >
+> => {
+    const startOfMonth = new Date(year, month, 1, 7, 0, 0, 0);
+    const endOfMonth = new Date(year, month + 1, 1, 7, 0, 0, 0);
+
+    // Fetch distinct users with entries in the month, including username/displayName
+    const rows = await db
+        .select({
+            userId: hrpEventLogTable.userId,
+            username: usersTable.username,
+            displayName: usersTable.displayName,
+        })
+        .from(hrpEventLogTable)
+        .leftJoin(usersTable, eq(usersTable.id, hrpEventLogTable.userId))
+        .where(and(gte(hrpEventLogTable.loggedTimestamp, startOfMonth), lt(hrpEventLogTable.loggedTimestamp, endOfMonth)));
+
+    const userMeta = new Map<string, { username: string; displayName: string | null }>();
+    for (const r of rows) {
+        if (!r.userId) {
+            continue;
+        }
+        // username is non-nullable in schema; displayName can be null
+        userMeta.set(r.userId, { username: r.username ?? r.userId, displayName: r.displayName ?? null });
+    }
+
+    const userIds = Array.from(userMeta.keys());
+
+    const perUser = await Promise.all(
+        userIds.map(async (uid) => {
+            const logs = await getHrpLogForUser(uid, year, month);
+            const meta = userMeta.get(uid)!;
+            return [
+                uid,
+                {
+                    user: { id: uid, username: meta.username, displayName: meta.displayName },
+                    logs,
+                },
+            ] as const;
+        }),
+    );
+
+    const result: Record<
+        string,
+        { user: { id: string; username: string; displayName: string | null }; logs: Record<number, Array<Partial<HrpEventLogEntry>>> }
+    > = {};
+    for (const [uid, value] of perUser) {
+        result[uid] = value;
+    }
+
+    return result;
 };
