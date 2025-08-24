@@ -41,8 +41,9 @@ const formSchema = z.object({
     }),
     time: z
         .string()
-        .regex(/^\d{2}:\d{2}$/, { message: 'Gebe eine gültige Uhrzeit an.' })
-        .transform((v) => `${v}:00`),
+        .regex(/^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/, { message: 'Gebe eine gültige Uhrzeit an.' })
+        .transform((v) => (v.length === 5 ? `${v}:00` : v)),
+
     comment: z
         .string()
         .max(500, {

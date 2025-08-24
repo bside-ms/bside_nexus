@@ -56,8 +56,10 @@ const altPeriodLabel = (year: number, monthZeroBased: number): string => {
     const prevEdge = new Date(year, monthZeroBased, 0); // letzter Tag Vormonat
     const prevY = prevEdge.getFullYear();
     const prevM = prevEdge.getMonth();
-    const prevMonthName = cap(new Date(prevY, prevM, 1).toLocaleDateString('de-DE', { month: 'long' }));
-    const currMonthName = cap(new Date(year, monthZeroBased, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' }));
+    const prevMonthName = cap(new Date(prevY, prevM, 1).toLocaleDateString('de-DE', { month: 'long', timeZone: 'Europe/Berlin' }));
+    const currMonthName = cap(
+        new Date(year, monthZeroBased, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric', timeZone: 'Europe/Berlin' }),
+    );
     return `23. ${prevMonthName} – 22. ${currMonthName}`;
 };
 
@@ -65,7 +67,7 @@ const toTimeStr = (d: Date | null | undefined): string => {
     if (!d || isNaN(d.getTime?.() ?? NaN)) {
         return '–';
     }
-    return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' });
 };
 
 interface Entry {
