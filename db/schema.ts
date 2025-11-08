@@ -1,4 +1,4 @@
-import { boolean, index, pgTable, primaryKey, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, pgTable, primaryKey, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm/sql';
 
 export type Group = typeof groupsTable.$inferSelect;
@@ -7,6 +7,8 @@ export type UserProfile = typeof userProfilesTable.$inferSelect;
 export type MemberEntry = typeof membersTable.$inferSelect;
 export type LogEntry = typeof logsTable.$inferSelect;
 export type HrpEventLogEntry = typeof hrpEventLogTable.$inferSelect;
+export type keysBaseEntry = typeof keysBaseTable.$inferSelect;
+export type keyAssignmentEntry = typeof keyAssignmentTable.$inferSelect;
 
 export const groupsTable = pgTable('groups', {
     id: varchar({ length: 255 }).primaryKey(),
@@ -48,6 +50,7 @@ export const userProfilesTable = pgTable(
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at'),
         deleteAt: timestamp('delete_at'),
+        createdBy: varchar({ length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
     },
     (table) => {
         return {
@@ -107,4 +110,28 @@ export const hrpEventLogTable = pgTable('hrp_event_log', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     approvedAt: timestamp('approved_at'),
     deletedAt: timestamp('deleted_at'),
+});
+
+export const keysBaseTable = pgTable('keys', {
+    id: varchar({ length: 36 }).primaryKey(),
+    keyNr: integer().notNull(),
+    keyDescription: text().notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at'),
+    deleteAt: timestamp('delete_at'),
+    createdBy: varchar('created_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
+});
+
+export const keyAssignmentTable = pgTable('key_assignment', {
+    id: varchar({ length: 255 }).primaryKey(),
+    keyId: varchar({ length: 255 }).references(() => keysBaseTable.id, { onDelete: 'cascade' }),
+    userId: varchar({ length: 255 }).references(() => usersTable.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdBy: varchar('created_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
+    handoverProtocolId: integer().notNull(),
+    returnedAt: timestamp('returned_at'),
+    returnedBy: varchar('returned_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
+    handbackProtocolId: integer().notNull(),
+    deletedAt: timestamp('deleted_at'),
+    deletedBy: varchar('deleted_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
 });

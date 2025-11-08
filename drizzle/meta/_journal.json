@@ -50,6 +50,13 @@
       "when": 1753225008990,
       "tag": "0006_user profiles and hrp",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1762606911698,
+      "tag": "0007_key management",
+      "breakpoints": true
     }
   ]
 }
