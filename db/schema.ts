@@ -8,6 +8,8 @@ export type MemberEntry = typeof membersTable.$inferSelect;
 export type LogEntry = typeof logsTable.$inferSelect;
 export type HrpEventLogEntry = typeof hrpEventLogTable.$inferSelect;
 export type keysBaseEntry = typeof keysBaseTable.$inferSelect;
+export type keyItemEntry = typeof keyItemsTable.$inferSelect;
+export type keyProtocolEntry = typeof keyProtocolsTable.$inferSelect;
 export type keyAssignmentEntry = typeof keyAssignmentTable.$inferSelect;
 
 export const groupsTable = pgTable('groups', {
@@ -37,7 +39,9 @@ export const userProfilesTable = pgTable(
     'user_profiles',
     {
         id: varchar({ length: 255 }).primaryKey(),
-        userId: varchar({ length: 255 }).references(() => usersTable.id, { onDelete: 'cascade' }),
+        userId: varchar({ length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
+        // Fortlaufende Profilnummer für Quittungen
+        profileNumber: integer().generatedAlwaysAsIdentity(),
         firstName: varchar({ length: 255 }).notNull(),
         lastName: varchar({ length: 255 }),
         addressStreet: varchar({ length: 255 }),
@@ -54,13 +58,16 @@ export const userProfilesTable = pgTable(
     },
     (table) => {
         return {
-            // Alle Versionen einer Benutzer*in.
+            // Alle Versionen einer Benutzer*in
             userProfileVersionsIdx: index('user_profiles_user_id_version_created_at_idx').on(table.userId, table.createdAt),
 
-            // Nur eine aktive Version.
+            // Nur eine aktive Version (nur unique, wenn userId vorhanden ist).
             currentUserProfileIdx: uniqueIndex('user_profiles_user_id_current_unique_idx')
                 .on(table.userId)
-                .where(sql`${table.updatedAt} IS NULL AND ${table.deleteAt} IS NULL`),
+                .where(sql`${table.updatedAt} IS NULL AND ${table.deleteAt} IS NULL AND ${table.userId} IS NOT NULL`),
+
+            // Eindeutige fortlaufende Profilnummer
+            userProfileNumberUniqueIdx: uniqueIndex('user_profiles_profile_number_unique_idx').on(table.profileNumber),
         };
     },
 );
@@ -112,26 +119,78 @@ export const hrpEventLogTable = pgTable('hrp_event_log', {
     deletedAt: timestamp('deleted_at'),
 });
 
-export const keysBaseTable = pgTable('keys', {
+export const keysBaseTable = pgTable('key_types', {
     id: varchar({ length: 36 }).primaryKey(),
-    keyNr: integer().notNull(),
+    keyNr: integer().notNull(), // z.B. 1 oder 58
     keyDescription: text().notNull(),
+    totalQuantity: integer().default(0),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at'),
     deleteAt: timestamp('delete_at'),
     createdBy: varchar('created_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
+}, (table) => {
+    return {
+        // Jede Schließung hat eine eindeutige Nummer
+        keyNrUniqueIdx: uniqueIndex('key_types_key_nr_unique_idx').on(table.keyNr),
+    };
+});
+
+export const keyItemsTable = pgTable('key_items', {
+    id: varchar({ length: 36 }).primaryKey(),
+    keyTypeId: varchar('key_type_id', { length: 36 })
+        .notNull()
+        .references(() => keysBaseTable.id, { onDelete: 'restrict' }),
+    seqNumber: integer().notNull(),
+    status: varchar({ length: 50 }).notNull().default('active'), // 'active', 'inactive', 'lost', 'broken', 'destroyed'
+    comment: text(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => {
+    return {
+        // Je Schließung ist die laufende Nummer eindeutig
+        keyItemSeqUniqueIdx: uniqueIndex('key_items_key_type_id_seq_unique_idx').on(table.keyTypeId, table.seqNumber),
+    };
+});
+
+export const keyProtocolsTable = pgTable('key_protocols', {
+    id: varchar({ length: 36 }).primaryKey(),
+    protocolType: varchar({ length: 50 }).notNull(), // 'issuance' / 'return'
+    userProfileId: varchar('user_profile_id', { length: 255 })
+        .notNull()
+        .references(() => userProfilesTable.id),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    createdBy: varchar('created_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }), // Mitarbeiter, der die Quittung erstellt
+    signatureDate: timestamp('signature_date'),
 });
 
 export const keyAssignmentTable = pgTable('key_assignment', {
     id: varchar({ length: 255 }).primaryKey(),
-    keyId: varchar({ length: 255 }).references(() => keysBaseTable.id, { onDelete: 'cascade' }),
-    userId: varchar({ length: 255 }).references(() => usersTable.id, { onDelete: 'cascade' }),
+
+    keyItemId: varchar('key_item_id', { length: 36 })
+        .notNull()
+        .references(() => keyItemsTable.id, { onDelete: 'restrict' }),
+
+    userProfileId: varchar('user_profile_id', { length: 255 })
+        .notNull()
+        .references(() => userProfilesTable.id, { onDelete: 'cascade' }),
+
+    issuanceProtocolId: varchar('issuance_protocol_id', { length: 36 })
+        .notNull()
+        .references(() => keyProtocolsTable.id),
+
+    returnProtocolId: varchar('return_protocol_id', { length: 36 }).references(() => keyProtocolsTable.id),
+
+    receivedAt: timestamp('received_at').defaultNow().notNull(), // Zeitpunkt der Ausgabe
+    returnedAt: timestamp('returned_at'), // Zeitpunkt der tatsächlichen Rückgabe
+
+    lostAt: timestamp('lost_at'),
+
     createdAt: timestamp('created_at').defaultNow().notNull(),
     createdBy: varchar('created_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
-    handoverProtocolId: integer().notNull(),
-    returnedAt: timestamp('returned_at'),
-    returnedBy: varchar('returned_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
-    handbackProtocolId: integer().notNull(),
-    deletedAt: timestamp('deleted_at'),
-    deletedBy: varchar('deleted_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
+}, (table) => {
+    return {
+        // Pro Schlüssel darf es nur eine aktive (nicht zurückgegebene, nicht verlorene) Zuweisung geben
+        activeAssignmentUniqueIdx: uniqueIndex('key_assignment_active_unique_idx')
+            .on(table.keyItemId)
+            .where(sql`${table.returnedAt} IS NULL AND ${table.lostAt} IS NULL`),
+    };
 });

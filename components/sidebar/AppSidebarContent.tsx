@@ -1,14 +1,14 @@
 'use client';
 
 import { type ReactElement } from 'react';
-import { PieChart, Settings2 } from 'lucide-react';
+import { Key, PieChart, Settings2 } from 'lucide-react';
 import { SidebarContent, SidebarGroup } from '../ui/sidebar';
 import { NavbarSecondary } from './NavbarSecondary';
 import { NavbarGroups } from '@/components/sidebar/NavbarGroups';
 import { type NavbarItems, NavbarPrimary } from '@/components/sidebar/NavbarPrimary';
 import type { Group } from '@/db/schema';
 
-const upperSidebarData: Array<NavbarItems> = [
+const baseUpperSidebarData: Array<NavbarItems> = [
     {
         title: 'Home',
         items: [
@@ -27,9 +27,18 @@ const lowerSidebarData: Array<NavbarItems> = [
 
 interface AppSidebarContentProps {
     groups?: Array<Group>;
+    hasKeyRole?: boolean;
 }
 
-export function AppSidebarContent({ groups }: AppSidebarContentProps): ReactElement {
+export function AppSidebarContent({ groups, hasKeyRole }: AppSidebarContentProps): ReactElement {
+    // Clone base and inject key management if allowed
+    const upperSidebarData: Array<NavbarItems> = baseUpperSidebarData.map((section) => ({
+        ...section,
+        items: [...section.items],
+    }));
+    if (hasKeyRole) {
+        upperSidebarData[0].items.push({ title: 'Schlüsselverwaltung', url: '/key', icon: Key });
+    }
     return (
         <SidebarContent>
             <SidebarGroup className="mt-4 group-data-[collapsible=icon]:hidden">

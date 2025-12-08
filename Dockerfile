@@ -1,18 +1,22 @@
-FROM node:20.18-alpine as base
-
+# Basis wechseln: Debian statt Alpine
+FROM node:20-bookworm-slim as base
 
 FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
-RUN apk add --no-cache libc6-compat
-
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --force
 
-
-
 FROM base AS runner
 WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# LibreOffice + Fonts (ohne Recommends, um das Image kleiner zu halten)
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+       libreoffice-writer libreoffice-core \
+       fonts-dejavu fontconfig \
+  && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED 1
@@ -32,6 +36,9 @@ ARG KEYCLOAK_CLIENT_SECRET
 ARG MATTERMOST_URL
 ARG MATTERMOST_AUTH_TOKEN
 
+ARG PDF_DOCX_ENABLED
+ARG PDF_TIMEOUT_MS
+
 # Setze sie als ENV damit sie beim Build verfügbar sind
 ENV DATABASE_URL=$DATABASE_URL
 
@@ -46,7 +53,10 @@ ENV KEYCLOAK_CLIENT_ID=$KEYCLOAK_CLIENT_ID
 ENV KEYCLOAK_CLIENT_SECRET=$KEYCLOAK_CLIENT_SECRET
 
 ENV MATTERMOST_URL=$MATTERMOST_URL
-ENV MATTERMOST_AUTH_TOKEN=$MATTERMOST_AUTH_TOKEN
+ENV MATTERMOST_AUTH_TOKEN=$
+
+ENV PDF_DOCX_ENABLED=$PDF_DOCX_ENABLED
+ENV PDF_TIMEOUT_MS=$PDF_TIMEOUT_MS
 
 
 COPY --from=deps /app/node_modules ./node_modules

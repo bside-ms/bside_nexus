@@ -13,11 +13,12 @@ import { getUserGroups } from '@/lib/db/groupActions';
 export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>): Promise<ReactElement> {
     const user = await getUserSession();
     const groups = await getUserGroups();
+    const hasKeyRole = user?.roles?.includes('schluesselverwaltung') ?? false;
 
     return (
         <Sidebar variant="inset" {...props}>
             <AppSidebarHeader />
-            <AppSidebarContent groups={groups} />
+            <AppSidebarContent groups={groups} hasKeyRole={hasKeyRole} />
             {user && (
                 <AppSidebarFooter
                     user={{
