@@ -14,7 +14,8 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # LibreOffice + Fonts (ohne Recommends, um das Image kleiner zu halten)
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-       libreoffice-writer libreoffice-core \
+       libreoffice \
+       default-jre-headless \
        fonts-dejavu fontconfig \
   && rm -rf /var/lib/apt/lists/*
 
