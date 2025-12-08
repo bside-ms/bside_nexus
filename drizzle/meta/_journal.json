@@ -57,6 +57,13 @@
       "when": 1762606911698,
       "tag": "0007_key management",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1765208012412,
+      "tag": "0008_key management",
+      "breakpoints": true
     }
   ]
 }
