@@ -1,44 +1,36 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db';
-import {
-    keyAssignmentTable,
-    keyItemsTable,
-    keyProtocolsTable,
-    keysBaseTable,
-    userProfilesTable,
-} from '@/db/schema';
+import { keyAssignmentTable, keyItemsTable, keyProtocolsTable, keysBaseTable, userProfilesTable } from '@/db/schema';
 
-export type ProtocolRow = {
+export interface ProtocolRow {
     id: string;
     protocolType: 'issuance' | 'return';
     userProfileId: string;
     createdAt: Date;
     createdBy: string | null;
-};
+}
 
-export type ProtocolItemRow = {
+export interface ProtocolItemRow {
     keyId: string; // key_items.id
     keyNr: number;
     seqNumber: number;
     description: string;
-};
+}
 
-export type ProtocolDetails = {
+export interface ProtocolDetails {
     protocol: ProtocolRow | null;
     profile: typeof userProfilesTable.$inferSelect | null;
     items: Array<ProtocolItemRow>;
-};
+}
 
 export const getProtocolDetails = async (protocolId: string): Promise<ProtocolDetails> => {
     const rows = await db.select().from(keyProtocolsTable).where(eq(keyProtocolsTable.id, protocolId)).limit(1);
     const protocol = rows[0] ?? null;
-    if (!protocol) return { protocol: null, profile: null, items: [] };
+    if (!protocol) {
+        return { protocol: null, profile: null, items: [] };
+    }
 
-    const [profile] = await db
-        .select()
-        .from(userProfilesTable)
-        .where(eq(userProfilesTable.id, protocol.userProfileId))
-        .limit(1);
+    const [profile] = await db.select().from(userProfilesTable).where(eq(userProfilesTable.id, protocol.userProfileId)).limit(1);
 
     const isIssuance = protocol.protocolType === 'issuance';
     const assignmentJoin = await db
@@ -59,6 +51,8 @@ export const getProtocolDetails = async (protocolId: string): Promise<ProtocolDe
                 : and(eq(keyAssignmentTable.returnProtocolId, protocolId), eq(keyAssignmentTable.userProfileId, protocol.userProfileId)),
         );
 
+    // ToDo: Fix this.
+    // @ts-expect-error asdf
     const items: Array<ProtocolItemRow> = assignmentJoin.map((r) => ({
         keyId: r.keyItemId,
         keyNr: r.keyNr,

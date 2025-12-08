@@ -1,12 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import requireRole from '@/lib/auth/requireRole';
 import { getProtocolDetails } from '@/lib/db/keyProtocolQueries';
-import { generateReceiptPdfBuffer } from '@/lib/pdf/generateReceiptPdf';
 import { isDocxEnabled, renderDocxPdfOrNull } from '@/lib/pdf/renderProtocolPdf';
 
 // PDF-Download-Endpoint: erzeugt eine einfache PDF-Quittung basierend auf den Protokolldaten.
-// Hinweis: Später kann hier ein DOCX→PDF-Flow integriert werden. Aktuell wird direkt eine PDF erzeugt.
-export async function GET(_: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(_: NextRequest, ctx: { params: Promise<{ id: string }> }): Promise<NextResponse> {
     const guard = await requireRole('schluesselverwaltung');
     if (!guard.isAllowed) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

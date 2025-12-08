@@ -34,10 +34,11 @@ export function AppSidebarContent({ groups, hasKeyRole }: AppSidebarContentProps
     // Clone base and inject key management if allowed
     const upperSidebarData: Array<NavbarItems> = baseUpperSidebarData.map((section) => ({
         ...section,
-        items: [...section.items],
+        items: [...(section.items ?? [])],
     }));
-    if (hasKeyRole) {
-        upperSidebarData[0].items.push({ title: 'Schlüsselverwaltung', url: '/key', icon: Key });
+    if (hasKeyRole && upperSidebarData.length > 0) {
+        const first = upperSidebarData[0]!;
+        first.items = [...(first.items ?? []), { title: 'Schlüsselverwaltung', url: '/key', icon: Key }];
     }
     return (
         <SidebarContent>

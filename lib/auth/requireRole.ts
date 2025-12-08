@@ -1,10 +1,10 @@
 import getUserSession from '@/lib/auth/getUserSession';
 
-export type RoleGuardResult = {
+interface RoleGuardResult {
     isAllowed: boolean;
     userId: string | null;
     displayName: string | null;
-};
+}
 
 /**
  * Simple role guard using NextAuth session roles array.

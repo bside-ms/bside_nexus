@@ -5,7 +5,7 @@ import { keyAssignmentTable, keyItemsTable, keysBaseTable } from '@/db/schema';
 import requireRole from '@/lib/auth/requireRole';
 
 // Liefert alle verfügbaren, nicht zugewiesenen Schlüssel (status=active und keine aktive Zuweisung)
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
     const guard = await requireRole('schluesselverwaltung');
     if (!guard.isAllowed) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

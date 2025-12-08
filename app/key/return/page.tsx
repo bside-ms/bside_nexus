@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -16,7 +16,7 @@ interface ActiveAssignment {
     profileNumber?: number | null;
 }
 
-export default function ReturnPage() {
+export default function ReturnPage(): ReactElement {
     const [rows, setRows] = useState<Array<ActiveAssignment>>([]);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [loading, setLoading] = useState(false);

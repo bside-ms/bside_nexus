@@ -73,14 +73,14 @@ const fmtAddress = (d: ProtocolDetails) => {
     return [a, c].filter(Boolean).join(', ');
 };
 
-export const generateReceiptPdfBuffer = async (details: ProtocolDetails, issuerName: string): Promise<Buffer> => {
+export const generateReceiptPdfBuffer = (details: ProtocolDetails, issuerName: string): Buffer<ArrayBuffer> => {
     const proto = details.protocol!;
     const p = details.profile;
     const isIssuance = proto.protocolType === 'issuance';
 
     const header = isIssuance ? 'Schlüssel-Ausgabequittung' : 'Schlüssel-Rückgabequittung';
     const name = p ? `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim() : '';
-    const profileNr = p?.profileNumber != null ? String(p.profileNumber) : '';
+    const profileNr = p?.profileNumber !== null && p?.profileNumber !== undefined ? String(p.profileNumber) : '';
     const address = fmtAddress(details);
     const mail = p?.emailAddress ?? '';
     const phone = p?.phoneNumber ?? '';
@@ -121,6 +121,7 @@ export const generateReceiptPdfBuffer = async (details: ProtocolDetails, issuerN
     // Object 5: Content stream
     const objects: Array<string> = [];
     const xref: Array<number> = [];
+    const pdfParts: Array<string> = [];
     const pushObj = (s: string) => {
         const prevLen = Buffer.byteLength(pdfParts.join(''), PDF_TEXT_ENCODING);
         xref.push(prevLen);
@@ -129,8 +130,6 @@ export const generateReceiptPdfBuffer = async (details: ProtocolDetails, issuerN
 
     const contentBytes = Buffer.from(stream, PDF_TEXT_ENCODING);
     const contentLen = contentBytes.byteLength;
-
-    const pdfParts: Array<string> = [];
     pdfParts.push('%PDF-1.4\n');
 
     // 1 0 obj: Catalog

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,7 +20,7 @@ interface AvailableItem {
     keyDescription: string;
 }
 
-export default function IssuancePage() {
+export default function IssuancePage(): ReactElement {
     const [profiles, setProfiles] = useState<Array<UserProfile>>([]);
     const [q, setQ] = useState('');
     const [selectedProfileId, setSelectedProfileId] = useState<string>('');
@@ -157,7 +157,7 @@ export default function IssuancePage() {
                         <option value="">– Profil auswählen –</option>
                         {profiles.map((p) => (
                             <option value={p.id} key={p.id}>
-                                {p.profileNumber != null ? `#${p.profileNumber} ` : ''}
+                                {p.profileNumber !== null ? `#${p.profileNumber} ` : ''}
                                 {`${p.firstName} ${p.lastName ?? ''}`.trim()}
                             </option>
                         ))}

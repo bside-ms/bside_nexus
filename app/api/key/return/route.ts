@@ -3,7 +3,7 @@ import requireRole from '@/lib/auth/requireRole';
 import { returnKeys } from '@/lib/db/keyActions';
 import { parseOrError, returnSchema } from '@/lib/validation/keySchemas';
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
     const guard = await requireRole('schluesselverwaltung');
     if (!guard.isAllowed) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

@@ -6,7 +6,7 @@ import requireRole from '@/lib/auth/requireRole';
 import { createKeyItem } from '@/lib/db/keyActions';
 import { keyItemCreateSchema, parseOrError } from '@/lib/validation/keySchemas';
 
-export async function GET(req: NextRequest) {
+export async function GET(req: NextRequest): Promise<NextResponse> {
     const guard = await requireRole('schluesselverwaltung');
     if (!guard.isAllowed) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(rows);
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: NextRequest): Promise<NextResponse> {
     const guard = await requireRole('schluesselverwaltung');
     if (!guard.isAllowed) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import requireRole from '@/lib/auth/requireRole';
 import { getProtocolDetails } from '@/lib/db/keyProtocolQueries';
 
-export async function GET(_: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(_: NextRequest, ctx: { params: Promise<{ id: string }> }): Promise<NextResponse> {
     const guard = await requireRole('schluesselverwaltung');
     if (!guard.isAllowed) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

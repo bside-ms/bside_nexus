@@ -1,5 +1,7 @@
+/* eslint-disable jsx-a11y/label-has-associated-control */
+
 'use client';
-import { useEffect, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -10,7 +12,7 @@ interface KeyType {
     keyDescription: string;
 }
 
-export default function KeyTypesPage() {
+export default function KeyTypesPage(): ReactElement {
     const [items, setItems] = useState<Array<KeyType>>([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);

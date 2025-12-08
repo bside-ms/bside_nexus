@@ -60,10 +60,15 @@ export const reactivateSchema = z.object({
     keyItemId: idSchema,
 });
 
-export type ZodErrorShape = { error: string; issues?: z.ZodIssue[] };
+export interface ZodErrorShape {
+    error: string;
+    issues?: Array<z.ZodIssue>;
+}
 
 export const parseOrError = <T>(schema: z.ZodType<T>, data: unknown): { ok: true; data: T } | { ok: false; error: ZodErrorShape } => {
     const res = schema.safeParse(data);
-    if (res.success) return { ok: true, data: res.data };
+    if (res.success) {
+        return { ok: true, data: res.data };
+    }
     return { ok: false, error: { error: 'Validation failed', issues: res.error.issues } };
 };
