@@ -66,6 +66,8 @@ RUN npm run build && mkdir -p /app/.next/cache
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+RUN mkdir -p /home/nextjs && chown nextjs:nodejs /home/nextjs
+ENV HOME=/home/nextjs
 
 USER nextjs
 
