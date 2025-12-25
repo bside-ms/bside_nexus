@@ -34,13 +34,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const now = new Date();
-    const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+    const tolerance = 5 * 60 * 1000;
 
-    if (time > now) {
+    if (time > new Date(now.getTime() + tolerance)) {
         return NextResponse.json({ success: false, message: 'Der Zeitstempel liegt in der Zukunft' }, { status: 400 });
     }
 
-    if (time < fiveMinutesAgo) {
+    if (time < new Date(now.getTime() - tolerance)) {
         return NextResponse.json({ success: false, message: 'Der Zeitstempel liegt zu weit in der Vergangenheit.' }, { status: 400 });
     }
 

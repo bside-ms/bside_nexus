@@ -18,7 +18,7 @@ export async function GET(_: NextRequest, ctx: { params: Promise<{ id: string }>
 
     const issuerName = guard.displayName ?? '—';
 
-    // Enforce DOCX→PDF only (no fallback). If disabled or conversion fails, return an error.
+    // If disabled or conversion fails, return an error.
     if (!isDocxEnabled()) {
         return NextResponse.json(
             {
