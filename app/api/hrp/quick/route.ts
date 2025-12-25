@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
-import { writeHrpEntry } from '@/lib/db/hrpActions';
+import { getHrpEntriesForDate, writeHrpEntry } from '@/lib/db/hrpActions';
+import { validateBreaks } from '@/lib/hrp/hrpLogic';
 import { getClientIP } from '@/lib/utils/getClientIP';
 
 const validEvents = ['start', 'pause', 'pause_end', 'stop'];
@@ -15,10 +16,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         });
     }
 
-    // ToDo: Prüfe die Berechtigung für die Zeiterfassung.
-
     const body = await req.json();
-    const { event, timestamp }: { event: string; timestamp: string } = body;
+    const { event, timestamp, force }: { event: string; timestamp: string; force?: boolean } = body;
 
     if (!validEvents.includes(event)) {
         return NextResponse.json({ success: false, message: 'Unbekanntes Ereignis' }, { status: 400 });
@@ -44,8 +43,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ success: false, message: 'Der Zeitstempel liegt zu weit in der Vergangenheit.' }, { status: 400 });
     }
 
-    // ToDo: Pausenzeitenvalidierung.
-    // ToDo: Prüfe ob es eine Start-Event innerhalb der letzten 18 Stunden ohne Stop-Event gibt.
+    // Pausenzeitenvalidierung.
+    if (event === 'stop' && !force) {
+        const fiveMinutesInMs = 5 * 60 * 1000;
+        const isFutureBooking = time.getTime() > now.getTime() + fiveMinutesInMs;
+
+        if (!isFutureBooking) {
+            const existingEntries = await getHrpEntriesForDate(session.id, time.getFullYear(), time.getMonth(), time.getDate());
+
+            const validation = validateBreaks(existingEntries, { entryType: event, timestamp: time });
+            if (!validation.isValid) {
+                return NextResponse.json(
+                    {
+                        success: false,
+                        needsConfirmation: true,
+                        message: validation.warning,
+                    },
+                    { status: 200 },
+                );
+            }
+        }
+    }
 
     const ipAddress = getClientIP(req);
     try {

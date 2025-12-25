@@ -27,6 +27,7 @@ export default function QuickEntry(): ReactElement {
     const [loading, setLoading] = useState<EventType | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [warning, setWarning] = useState<string | null>(null);
 
     const [modalOpen, setModalOpen] = useState<boolean>(false);
     const [pendingEvent, setPendingEvent] = useState<EventOption | null>(null);
@@ -48,7 +49,7 @@ export default function QuickEntry(): ReactElement {
         setModalOpen(true);
     };
 
-    const handleConfirm = async (): Promise<void> => {
+    const handleConfirm = async (force = false): Promise<void> => {
         if (!pendingEvent || !pendingTimestamp) {
             return;
         }
@@ -56,7 +57,9 @@ export default function QuickEntry(): ReactElement {
         setLoading(pendingEvent.type);
         setError(null);
         setSuccess(null);
-        setModalOpen(false);
+        if (!force) {
+            setWarning(null);
+        }
 
         const now = new Date();
         const tsISO = now.toISOString();
@@ -68,10 +71,19 @@ export default function QuickEntry(): ReactElement {
                 body: JSON.stringify({
                     event: pendingEvent.type,
                     timestamp: tsISO,
+                    force,
                 }),
             });
 
             const data = await res.json();
+
+            if (data.needsConfirmation) {
+                setWarning(data.message);
+                setLoading(null);
+                return;
+            }
+
+            setModalOpen(false);
 
             if (!res.ok || data.success === false) {
                 setError(data.message || data.error || 'Es ist ein unbekannter Fehler aufgetreten.');
@@ -80,9 +92,9 @@ export default function QuickEntry(): ReactElement {
 
             setSuccess(data.message || 'Deine Eintragung wurde erfasst!');
 
-            const displayDate = now;
-            if (displayDate.getHours() < 7) {
-                displayDate.setDate(displayDate.getDate() - 1);
+            let displayDate = now;
+            if (pendingEvent.type !== 'start' && now.getHours() < 7) {
+                displayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             }
             window.dispatchEvent(new CustomEvent('hrpEntryAdded', { detail: { date: displayDate } }));
         } catch {
@@ -98,6 +110,7 @@ export default function QuickEntry(): ReactElement {
         setModalOpen(false);
         setPendingEvent(null);
         setPendingTimestamp(null);
+        setWarning(null);
     };
 
     const closeResultModal = (): void => {
@@ -137,13 +150,28 @@ export default function QuickEntry(): ReactElement {
                         <div className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">
                             Zeitstempel: <span className="font-mono">{pendingTimestamp}</span>
                         </div>
+                        {warning && (
+                            <div className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800">
+                                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <p className="font-semibold">Warnung</p>
+                                    <p>{warning}</p>
+                                </div>
+                            </div>
+                        )}
                         <div className="flex justify-end gap-2">
                             <Button variant="secondary" onClick={handleCancel}>
                                 Abbrechen
                             </Button>
-                            <Button variant="default" onClick={handleConfirm}>
-                                Bestätigen
-                            </Button>
+                            {warning ? (
+                                <Button variant="destructive" onClick={(): Promise<void> => handleConfirm(true)}>
+                                    Trotzdem bestätigen
+                                </Button>
+                            ) : (
+                                <Button variant="default" onClick={(): Promise<void> => handleConfirm(false)}>
+                                    Bestätigen
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </div>

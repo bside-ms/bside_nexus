@@ -117,6 +117,9 @@ export const hrpEventLogTable = pgTable('hrp_event_log', {
     createdAt: timestamp('created_at').defaultNow().notNull(),
     approvedAt: timestamp('approved_at'),
     deletedAt: timestamp('deleted_at'),
+    abgerechnet: boolean().default(false).notNull(),
+    deletedBy: varchar({ length: 255 }).references(() => usersTable.id),
+    deletionReason: text(),
 });
 
 export const keysBaseTable = pgTable(

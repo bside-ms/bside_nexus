@@ -13,6 +13,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         });
     }
 
-    const result = await getHrpEntriesForDate(session.id, year, month, day);
+    const result = await getHrpEntriesForDate(session.id, year, month, day, true);
     return NextResponse.json({ success: true, entries: result }, { status: 200 });
 }

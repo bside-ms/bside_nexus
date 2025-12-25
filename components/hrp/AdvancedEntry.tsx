@@ -56,6 +56,8 @@ export default function AdvancedEntry(): ReactElement {
     const [isLoading, setIsLoading] = useState(false);
     const [success, setSuccess] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [warning, setWarning] = useState<string | null>(null);
+    const [pendingValues, setPendingValues] = useState<z.infer<typeof formSchema> | null>(null);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -68,10 +70,14 @@ export default function AdvancedEntry(): ReactElement {
         },
     });
 
-    const onSubmit = async (values: z.infer<typeof formSchema>): Promise<void> => {
+    const onSubmit = async (values: z.infer<typeof formSchema>, force = false): Promise<void> => {
         setIsLoading(true);
         setError(null);
         setSuccess(null);
+        if (!force) {
+            setWarning(null);
+            setPendingValues(null);
+        }
 
         const datePart = format(values.date, 'yyyy-MM-dd');
 
@@ -88,10 +94,18 @@ export default function AdvancedEntry(): ReactElement {
                     event: values.eventType,
                     timestamp: dateTimeIso,
                     comment: values.comment ?? null,
+                    force,
                 }),
             });
 
             const data = await res.json();
+
+            if (data.needsConfirmation) {
+                setWarning(data.message);
+                setPendingValues(values);
+                setIsLoading(false);
+                return;
+            }
 
             if (!res.ok || data.success === false) {
                 setError(data.message || data.error || 'Es ist ein unbekannter Fehler aufgetreten.');
@@ -99,9 +113,11 @@ export default function AdvancedEntry(): ReactElement {
             }
 
             setSuccess(data.message || 'Deine Eintragung wurde erfasst!');
+            setWarning(null);
+            setPendingValues(null);
 
             const displayDate = new Date(values.date);
-            if (combinedDate.getHours() < 7) {
+            if (values.eventType !== 'start' && combinedDate.getHours() < 7) {
                 displayDate.setDate(displayDate.getDate() - 1);
             }
             window.dispatchEvent(new CustomEvent('hrpEntryAdded', { detail: { date: displayDate } }));
@@ -116,13 +132,15 @@ export default function AdvancedEntry(): ReactElement {
         if (success) {
             form.reset({
                 date: form.getValues('date'),
-                time: format(new Date(), 'pp', { locale: de }),
+                time: format(new Date(), 'HH:mm'),
                 comment: '',
                 eventType: undefined,
             });
         }
         setError(null);
         setSuccess(null);
+        setWarning(null);
+        setPendingValues(null);
     };
 
     const tomorrow = new Date();
@@ -254,27 +272,50 @@ export default function AdvancedEntry(): ReactElement {
                         </Button>
                     </CardFooter>
 
-                    {(error || success) && (
+                    {(error || success || (warning && pendingValues)) && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
                             <div className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-xl shadow-lg p-6 max-w-sm w-full border border-zinc-200 dark:border-zinc-700">
-                                <div className="flex items-center mb-4 text-lg">
-                                    {error ? (
-                                        <>
-                                            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-red-500" />
-                                            <span className="">{error}</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <CheckCircle2 className="h-5 w-5 mr-2 flex-shrink-0 text-green-500" />
-                                            <span className="">{success}</span>
-                                        </>
-                                    )}
-                                </div>
-                                <div className="flex justify-end">
-                                    <Button variant="secondary" onClick={closeResultModal}>
-                                        Schließen
-                                    </Button>
-                                </div>
+                                {warning ? (
+                                    <>
+                                        <div className="flex items-center mb-4 text-lg font-semibold text-amber-600">
+                                            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                                            <span>Pausenzeiten-Warnung</span>
+                                        </div>
+                                        <div className="mb-4 text-sm text-zinc-700 dark:text-zinc-300">{warning}</div>
+                                        <div className="mb-4 text-sm text-zinc-600 dark:text-zinc-400 italic">
+                                            Möchtest du die Buchung trotzdem speichern?
+                                        </div>
+                                        <div className="flex justify-end gap-2">
+                                            <Button variant="secondary" onClick={closeResultModal}>
+                                                Abbrechen
+                                            </Button>
+                                            <Button variant="destructive" onClick={(): Promise<void> => onSubmit(pendingValues!, true)}>
+                                                Trotzdem speichern
+                                            </Button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="flex items-center mb-4 text-lg">
+                                            {error ? (
+                                                <>
+                                                    <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-red-500" />
+                                                    <span className="">{error}</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle2 className="h-5 w-5 mr-2 flex-shrink-0 text-green-500" />
+                                                    <span className="">{success}</span>
+                                                </>
+                                            )}
+                                        </div>
+                                        <div className="flex justify-end">
+                                            <Button variant="secondary" onClick={closeResultModal}>
+                                                Schließen
+                                            </Button>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                         </div>
                     )}

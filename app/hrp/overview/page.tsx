@@ -6,6 +6,8 @@ import { db } from '@/db';
 import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getHrpLogsForAllUsers } from '@/lib/db/hrpActions';
+import type { DayEntries } from '@/lib/hrp/hrpLogic';
+import { computeDayStats, toTimeStr } from '@/lib/hrp/hrpLogic';
 
 const breadCrumbs = [
     { title: 'Zeiterfassung', url: '/hrp' },
@@ -65,180 +67,10 @@ const altPeriodLabel = (year: number, monthZeroBased: number): string => {
     return `23. ${prevMonthName} – 22. ${currMonthName}`;
 };
 
-const toTimeStr = (d: Date | null | undefined): string => {
-    if (!d || isNaN(d.getTime?.() ?? NaN)) {
-        return '–';
-    }
-    return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' });
-};
-
-interface Entry {
-    id?: string;
-    entryType?: string | null; // 'start' | 'stop' | 'pause' | 'pause_end'
-    loggedTimestamp?: Date | string | null;
-    comment?: string | null;
-}
-type DayEntries = Array<Entry>;
-
-const minutesBetween = (a?: Date, b?: Date): number => {
-    if (!a || !b) {
-        return 0;
-    }
-    return Math.max(0, Math.round((b.getTime() - a.getTime()) / 60000));
-};
-
 const sumToHHMM = (totalMinutes: number): string => {
     const h = Math.floor(totalMinutes / 60);
     const m = totalMinutes % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-};
-
-interface DayStats {
-    starts: Array<Date>;
-    stops: Array<Date>;
-    startStopPairs: Array<{ from?: Date; to?: Date }>;
-    breakPairs: Array<{ from?: Date; to?: Date }>;
-    sessionMinutes: number; // Brutto (Summe Start-Stop)
-    actualBreakMinutes: number; // Tatsächliche Pausen
-    requiredBreakMinutes: number; // Erforderliche Pausen gem. Schwellen
-    adjustedBreakMinutes: number; // max(actual, required)
-    netMinutes: number; // Brutto - adjustedBreakMinutes
-    totalEntries: number;
-    startCount: number;
-    stopCount: number;
-    breakWarning: 'ok' | 'under30' | 'under45';
-    issues: Array<string>;
-}
-
-const emptyStats = (): DayStats => {
-    return {
-        starts: [],
-        stops: [],
-        startStopPairs: [],
-        breakPairs: [],
-        sessionMinutes: 0,
-        actualBreakMinutes: 0,
-        requiredBreakMinutes: 0,
-        adjustedBreakMinutes: 0,
-        netMinutes: 0,
-        totalEntries: 0,
-        startCount: 0,
-        stopCount: 0,
-        breakWarning: 'ok',
-        issues: [],
-    };
-};
-
-// Gesetzliche Mindestpause abhängig von der Netto-Arbeitszeit
-const requiredBreakForNet = (netMinutes: number): number => {
-    if (netMinutes > 9 * 60) {
-        return 45;
-    }
-    if (netMinutes > 6 * 60) {
-        return 30;
-    }
-    return 0;
-};
-
-// Tagesberechnung mit Guards
-const computeDayStats = (entries: DayEntries): DayStats => {
-    if (!entries || entries.length === 0) {
-        const es = emptyStats();
-        es.issues.push('Keine Buchungen');
-        return es;
-    }
-
-    const byTime = [...entries]
-        .map((e) => ({ ...e, ts: e.loggedTimestamp ? new Date(String(e.loggedTimestamp)) : undefined }))
-        .filter((e) => e.ts && !isNaN(e.ts.getTime()))
-        .sort((a, b) => a.ts!.getTime() - b.ts!.getTime()) as Array<Entry & { ts: Date }>;
-
-    const starts: Array<Date> = [];
-    const stops: Array<Date> = [];
-    const pauseStarts: Array<Date> = [];
-    const pauseEnds: Array<Date> = [];
-
-    for (const e of byTime) {
-        const t = (e.entryType ?? '').toLowerCase();
-        if (t === 'start') {
-            starts.push(e.ts);
-        } else if (t === 'stop') {
-            stops.push(e.ts);
-        } else if (t === 'pause') {
-            pauseStarts.push(e.ts);
-        } else if (t === 'pause_end') {
-            pauseEnds.push(e.ts);
-        }
-    }
-
-    const issues: Array<string> = [];
-
-    // Sessions
-    let sessionMinutes = 0;
-    const startStopPairs: Array<{ from?: Date; to?: Date }> = [];
-    const sessionPairCount = Math.min(starts.length, stops.length);
-    for (let i = 0; i < sessionPairCount; i++) {
-        const from = starts[i];
-        const to = stops[i];
-        startStopPairs.push({ from, to });
-        if (from && to && to > from) {
-            sessionMinutes += minutesBetween(from, to);
-        } else {
-            issues.push('Start/Stop-Reihenfolge fehlerhaft');
-        }
-    }
-    if (starts.length !== stops.length) {
-        issues.push('Fehlendes Start/Stop');
-    }
-
-    // Breaks
-    let actualBreakMinutes = 0;
-    const breakPairs: Array<{ from?: Date; to?: Date }> = [];
-    const breakPairCount = Math.min(pauseStarts.length, pauseEnds.length);
-    for (let i = 0; i < breakPairCount; i++) {
-        const from = pauseStarts[i];
-        const to = pauseEnds[i];
-        breakPairs.push({ from, to });
-        if (from && to && to > from) {
-            actualBreakMinutes += minutesBetween(from, to);
-        } else {
-            issues.push('Pausen-Reihenfolge fehlerhaft');
-        }
-    }
-    if (pauseStarts.length !== pauseEnds.length) {
-        issues.push('Unvollständige Pause');
-    }
-
-    // Netto-Kandidat, Pflichtpause, Anpassung
-    const netCandidate = Math.max(0, sessionMinutes - actualBreakMinutes);
-    const requiredBreakMinutes = requiredBreakForNet(netCandidate);
-    const adjustedBreakMinutes = Math.max(actualBreakMinutes, requiredBreakMinutes);
-    const netMinutes = Math.max(0, sessionMinutes - adjustedBreakMinutes);
-
-    // Warnung
-    let breakWarning: 'ok' | 'under30' | 'under45' = 'ok';
-    if (requiredBreakMinutes === 45 && actualBreakMinutes < 45) {
-        breakWarning = 'under45';
-    } else if (requiredBreakMinutes === 30 && actualBreakMinutes < 30) {
-        breakWarning = 'under30';
-    }
-
-    return {
-        starts,
-        stops,
-        startStopPairs,
-        breakPairs,
-        sessionMinutes,
-        actualBreakMinutes,
-        requiredBreakMinutes,
-        adjustedBreakMinutes,
-        netMinutes,
-        totalEntries: entries.length,
-        startCount: starts.length,
-        stopCount: stops.length,
-        breakWarning,
-        issues,
-    };
 };
 
 function buildDayArray<T>(count: number, map: (indexZero: number) => T): Array<T> {
@@ -251,8 +83,8 @@ const getUserLabel = (u: { username: string; displayName: string | null }): stri
 
 // Mitarbeitende mit Einträgen im Kalenderjahr
 const getUsersWithEntriesForYear = async (year: number) => {
-    const startOfYear = new Date(year, 0, 1, 7, 0, 0, 0);
-    const startOfNextYear = new Date(year + 1, 0, 1, 7, 0, 0, 0);
+    const startOfYear = new Date(year, 0, 1, 0, 0, 0, 0);
+    const startOfNextYear = new Date(year + 1, 0, 1, 0, 0, 0, 0);
 
     const rows = await db
         .select({
@@ -677,8 +509,7 @@ export default async function Page({
                                             </ul>
                                         ) : (
                                             <span className="text-muted-foreground">
-                                                Hinweis: Tage beginnen um 07:00 Uhr, daher sind Einträge zwischen 00:00–06:59 dem Vortag
-                                                zugeordnet.
+                                                Hinweis: Schichten, die vor Mitternacht beginnen, werden dem Start-Tag zugeordnet.
                                             </span>
                                         )}
                                     </td>
