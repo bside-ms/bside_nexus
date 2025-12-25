@@ -112,8 +112,7 @@ export default function Overview(): ReactElement {
                 const data = await res.json();
                 alert(data.message || 'Fehler beim Löschen');
             }
-        } catch (error) {
-            console.error(error);
+        } catch {
             alert('Es ist ein Fehler aufgetreten.');
         } finally {
             setIsDeleting(false);
