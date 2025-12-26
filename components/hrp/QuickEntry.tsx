@@ -64,6 +64,7 @@ export default function QuickEntry(): ReactElement {
         const now = new Date();
         const tsISO = now.toISOString();
 
+        let shouldClear = true;
         try {
             const res = await fetch('/api/hrp/quick', {
                 method: 'POST',
@@ -80,6 +81,7 @@ export default function QuickEntry(): ReactElement {
             if (data.needsConfirmation) {
                 setWarning(data.message);
                 setLoading(null);
+                shouldClear = false;
                 return;
             }
 
@@ -101,8 +103,10 @@ export default function QuickEntry(): ReactElement {
             setError('Es ist ein Fehler aufgetreten.');
         } finally {
             setLoading(null);
-            setPendingEvent(null);
-            setPendingTimestamp(null);
+            if (shouldClear) {
+                setPendingEvent(null);
+                setPendingTimestamp(null);
+            }
         }
     };
 

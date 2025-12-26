@@ -128,6 +128,11 @@ export default function AdvancedEntry(): ReactElement {
         }
     };
 
+    // Wrapper function that matches SubmitHandler signature for react-hook-form
+    const handleFormSubmit = async (values: z.infer<typeof formSchema>): Promise<void> => {
+        await onSubmit(values, false);
+    };
+
     const closeResultModal = (): void => {
         if (success) {
             form.reset({
@@ -148,7 +153,7 @@ export default function AdvancedEntry(): ReactElement {
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
                 <Card>
                     <CardHeader className="text-xl underline underline-offset-4">Ausführliche Erfassung</CardHeader>
                     <CardContent>

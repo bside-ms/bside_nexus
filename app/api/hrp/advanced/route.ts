@@ -3,8 +3,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getHrpEntriesForDate, writeHrpEntry } from '@/lib/db/hrpActions';
-import { isValidTimestamp } from '@/lib/hrp/hrp';
-import { validateBreaks } from '@/lib/hrp/hrpLogic';
+import { isValidTimestamp, validateBreaks } from '@/lib/hrp/hrpLogic';
 import { getClientIP } from '@/lib/utils/getClientIP';
 
 const validEvents = ['start', 'pause', 'pause_end', 'stop'];
@@ -43,7 +42,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const isFutureBooking = time.getTime() > now.getTime() + fiveMinutesInMs;
 
         if (!isFutureBooking) {
-            const existingEntries = await getHrpEntriesForDate(session.id, time.getFullYear(), time.getMonth(), time.getDate());
+            const yesterday = new Date(time);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            const [entriesToday, entriesYesterday] = await Promise.all([
+                getHrpEntriesForDate(session.id, time.getFullYear(), time.getMonth(), time.getDate()),
+                getHrpEntriesForDate(session.id, yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate()),
+            ]);
+
+            const existingEntries = [...entriesYesterday, ...entriesToday];
 
             const validation = validateBreaks(existingEntries, { entryType: event, timestamp: time });
             if (!validation.isValid) {

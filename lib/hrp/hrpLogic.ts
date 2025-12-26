@@ -26,6 +26,30 @@ export interface DayStats {
     issues: Array<string>;
 }
 
+interface TimestampValidationResult {
+    success: boolean;
+    message?: string;
+}
+
+export const isValidTimestamp = (timestamp: string): TimestampValidationResult => {
+    if (!timestamp) {
+        return { success: false, message: 'Es ist ein Fehler aufgetreten.' };
+    }
+
+    const time = new Date(timestamp);
+    if (isNaN(time.getTime())) {
+        return { success: false, message: 'Ungültiges Zeitstempel-Format' };
+    }
+    const now = new Date();
+    const fourtyFiveMinutesAhead = new Date(now.getTime() + 45 * 60 * 1000);
+
+    if (time > fourtyFiveMinutesAhead) {
+        return { success: false, message: 'Der Zeitstempel liegt zu weit in der Zukunft' };
+    }
+
+    return { success: true };
+};
+
 export const minutesBetween = (a?: Date, b?: Date): number => {
     if (!a || !b) {
         return 0;
@@ -177,34 +201,6 @@ export interface BreakValidationResult {
     warning?: string;
 }
 
-export function validateBreaks(
-    existingEntries: Array<Partial<HrpEventLogEntry>>,
-    newEntry: { entryType: string; timestamp: Date },
-): BreakValidationResult {
-    if (newEntry.entryType.toLowerCase() !== 'stop') {
-        return { isValid: true, requiredMinutes: 0, actualMinutes: 0 };
-    }
-
-    // Kombiniere vorhandene Einträge mit dem neuen Eintrag
-    const allEntries = [...existingEntries, { entryType: newEntry.entryType, loggedTimestamp: newEntry.timestamp }];
-    const stats = computeDayStats(allEntries as DayEntries);
-
-    if (stats.breakWarning !== 'ok') {
-        return {
-            isValid: false,
-            requiredMinutes: stats.requiredBreakMinutes,
-            actualMinutes: stats.actualBreakMinutes,
-            warning: `Pausenzeiten unterschritten: Erforderlich ${stats.requiredBreakMinutes} Min, Aktuell ${stats.actualBreakMinutes} Min.`,
-        };
-    }
-
-    return {
-        isValid: true,
-        requiredMinutes: stats.requiredBreakMinutes,
-        actualMinutes: stats.actualBreakMinutes,
-    };
-}
-
 /**
  * Gruppiert Einträge nach dem logischen Arbeitstag.
  * Ein Arbeitstag beginnt mit einem 'start'-Event. Alle folgenden Events bis zum nächsten 'stop'
@@ -213,7 +209,7 @@ export function validateBreaks(
  */
 export function groupEntriesByWorkday<T extends Entry>(entries: Array<T>): Record<string, Array<T>> {
     const sorted = [...entries]
-        .map((e) => ({ ...e, ts: e.loggedTimestamp ? new Date(String(e.loggedTimestamp)) : undefined }))
+        .map((e) => ({ ...e, ts: e.loggedTimestamp ? new Date(e.loggedTimestamp) : undefined }))
         .filter((e) => e.ts && !isNaN(e.ts.getTime()))
         .sort((a, b) => a.ts!.getTime() - b.ts!.getTime()) as Array<T & { ts: Date }>;
 
@@ -242,4 +238,67 @@ export function groupEntriesByWorkday<T extends Entry>(entries: Array<T>): Recor
     }
 
     return groups;
+}
+
+/**
+ * Safely converts loggedTimestamp to Date object
+ */
+const toDate = (timestamp: Date | string | null | undefined): Date | null => {
+    if (!timestamp) {
+        return null;
+    }
+    if (timestamp instanceof Date) {
+        return timestamp;
+    }
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? null : date;
+};
+
+export function validateBreaks(
+    existingEntries: Array<Partial<HrpEventLogEntry>>,
+    newEntry: { entryType: string; timestamp: Date },
+): BreakValidationResult {
+    if (newEntry.entryType.toLowerCase() !== 'stop') {
+        return { isValid: true, requiredMinutes: 0, actualMinutes: 0 };
+    }
+
+    // Kombiniere vorhandene Einträge mit dem neuen Eintrag
+    const newEntryObj: Entry = { entryType: newEntry.entryType, loggedTimestamp: newEntry.timestamp };
+    const allEntries: DayEntries = [...existingEntries, newEntryObj];
+
+    const groups = groupEntriesByWorkday(allEntries);
+    let relevantEntries: DayEntries = [];
+    const newEntryTime = newEntry.timestamp.getTime();
+
+    for (const groupEntries of Object.values(groups)) {
+        if (
+            groupEntries.some((e) => {
+                if (e.entryType !== newEntry.entryType) {
+                    return false;
+                }
+                const entryDate = toDate(e.loggedTimestamp);
+                return entryDate !== null && entryDate.getTime() === newEntryTime;
+            })
+        ) {
+            relevantEntries = groupEntries;
+            break;
+        }
+    }
+
+    const stats = computeDayStats(relevantEntries);
+
+    if (stats.breakWarning !== 'ok') {
+        return {
+            isValid: false,
+            requiredMinutes: stats.requiredBreakMinutes,
+            actualMinutes: stats.actualBreakMinutes,
+            warning: `Pausenzeiten unterschritten: Erforderlich ${stats.requiredBreakMinutes} Min, Aktuell ${stats.actualBreakMinutes} Min.`,
+        };
+    }
+
+    return {
+        isValid: true,
+        requiredMinutes: stats.requiredBreakMinutes,
+        actualMinutes: stats.actualBreakMinutes,
+    };
 }
