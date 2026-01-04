@@ -213,3 +213,24 @@ export const updateWikiLink = async (groupId: string, wikiLink?: string): Promis
     const result = await db.update(groupsTable).set({ wikiLink: newWikiLink }).where(eq(groupsTable.id, groupId)).returning();
     return result.length;
 };
+
+export const getGroupsWithMembers = async (groupIds: Array<string>): Promise<Array<{ group: Group; members: Array<GroupMember> }>> => {
+    const results = [];
+
+    for (const groupId of groupIds) {
+        const group = await getGroup(groupId);
+        if (group) {
+            const members = await getGroupMembers(groupId);
+            members.sort((a, b) => {
+                if (a.displayName === null || b.displayName === null) {
+                    return 0;
+                }
+
+                return a.displayName > b.displayName ? 1 : -1;
+            });
+            results.push({ group, members });
+        }
+    }
+
+    return results;
+};

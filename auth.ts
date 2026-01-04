@@ -41,7 +41,7 @@ export const authOptions: NextAuthConfig = {
             }
 
             token.id_token = account ? (account.id_token ?? '') : '';
-            token.name = profile.given_name;
+            token.name = profile.name;
             token.email = profile.email;
             token.username = profile.preferred_username;
             token.sub = profile.sub;

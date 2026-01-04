@@ -9,17 +9,21 @@ import { v4 as uuidv4 } from 'uuid';
 export async function writeHrpEntry({
     userId,
     ipAddress,
+    contractId,
     entryType,
     eventType,
     timestamp,
     comment,
+    abgerechnet = false,
 }: {
     userId: string;
     ipAddress: string;
+    contractId: string;
     entryType: string;
     eventType: string;
     timestamp: Date;
     comment: string | null;
+    abgerechnet: boolean;
 }): Promise<HrpEventLogEntry> {
     const id = uuidv4();
 
@@ -27,10 +31,12 @@ export async function writeHrpEntry({
         id,
         userId,
         ipAddress,
+        contractId,
         entryType,
         eventType,
         loggedTimestamp: timestamp,
         comment,
+        abgerechnet,
     };
 
     const insertedEntry = await db.insert(hrpEventLogTable).values(newEntry).returning();
@@ -80,12 +86,15 @@ export const getHrpEntriesForDate = async (
     month: number,
     day: number,
     includeDeleted = false,
+    contractId?: string | null,
 ): Promise<Array<Partial<HrpEventLogEntry>>> => {
-    // Um eine Session zu finden, die evtl. am Vortag begann oder am Folgetag endet,
-    // laden wir einen großzügigen Bereich um den Tag herum.
+    // Um eine Session zu finden, die evtl. am Vortag begann oder am Folgetag endet, großzügig laden.
     const requestedDate = new Date(year, month, day);
+
+    // Grouping bei YYYY-MM-DD.
     const requestedDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(requestedDate);
 
+    // Wir laden von "Gestern 00:00" bis "Morgen 23:59"
     const startRange = new Date(year, month, day - 1, 0, 0, 0, 0);
     const endRange = new Date(year, month, day + 1, 23, 59, 59, 999);
 
@@ -99,6 +108,10 @@ export const getHrpEntriesForDate = async (
         whereConditions.push(isNull(hrpEventLogTable.deletedAt));
     }
 
+    if (contractId) {
+        whereConditions.push(eq(hrpEventLogTable.contractId, contractId));
+    }
+
     const entries = await db
         .select()
         .from(hrpEventLogTable)
@@ -110,8 +123,6 @@ export const getHrpEntriesForDate = async (
 
     return dayEntries.map(({ approvedBy, ipAddress, createdAt, userId: user, approvedAt, eventType, ...rest }) => {
         if (!includeDeleted) {
-            // Falls nicht angefordert, löschen wir sicherheitshalber auch die Deletion-Felder (sollten eh null sein)
-
             const { deletedAt, deletedBy, deletionReason, ...filtered } = rest;
             return filtered;
         }

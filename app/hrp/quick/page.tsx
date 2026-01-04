@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
 import QuickEntry from '@/components/hrp/QuickEntry';
 import NavbarTop from '@/components/sidebar/NavbarTop';
+import getUserSession from '@/lib/auth/getUserSession';
+import { getActiveContractsForUser } from '@/lib/db/contractActions';
 
 const breadCrumbs = [
     {
@@ -20,12 +22,15 @@ export const metadata: Metadata = {
     robots: 'noindex, nofollow',
 };
 
-export default function Page(): ReactElement {
+export default async function Page(): Promise<ReactElement> {
+    const session = await getUserSession();
+    const contracts = await getActiveContractsForUser(session!.id);
+
     return (
         <div className="">
             <NavbarTop items={breadCrumbs} sidebar={true} />
             <div className="flex flex-1 flex-col gap-4 p-4 max-w-2xl mx-auto">
-                <QuickEntry />
+                <QuickEntry contracts={contracts} />
             </div>
         </div>
     );

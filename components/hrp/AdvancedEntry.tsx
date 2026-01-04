@@ -9,11 +9,13 @@ import { z } from 'zod';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
+import { ContractSelect } from './ContractSelect'; // Import
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import type { HrpContract } from '@/lib/db/contractActions'; // Typ Import
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -33,6 +35,7 @@ const Events: Array<EventOption> = [
 ];
 
 const formSchema = z.object({
+    contractId: z.string({ required_error: 'Bitte wähle einen Bereich aus.' }).min(1), // NEU
     eventType: z.enum(['start', 'pause', 'pause_end', 'stop'], {
         errorMap: () => ({ message: 'Ereignis auswählen' }),
     }),
@@ -52,7 +55,7 @@ const formSchema = z.object({
         .optional(),
 });
 
-export default function AdvancedEntry(): ReactElement {
+export default function AdvancedEntry({ contracts }: { contracts: Array<HrpContract> }): ReactElement {
     const [isLoading, setIsLoading] = useState(false);
     const [success, setSuccess] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -61,12 +64,12 @@ export default function AdvancedEntry(): ReactElement {
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
-
         defaultValues: {
             date: new Date(),
             time: format(new Date(), 'HH:mm'),
             comment: '',
             eventType: undefined,
+            contractId: contracts.length === 1 && contracts[0] !== undefined ? contracts[0].contractId : undefined,
         },
     });
 
@@ -80,10 +83,8 @@ export default function AdvancedEntry(): ReactElement {
         }
 
         const datePart = format(values.date, 'yyyy-MM-dd');
-
         const localDateTimeString = `${datePart}T${values.time}`;
         const combinedDate = new Date(localDateTimeString);
-
         const dateTimeIso = combinedDate.toISOString();
 
         try {
@@ -91,6 +92,7 @@ export default function AdvancedEntry(): ReactElement {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    contractId: values.contractId,
                     event: values.eventType,
                     timestamp: dateTimeIso,
                     comment: values.comment ?? null,
@@ -128,7 +130,6 @@ export default function AdvancedEntry(): ReactElement {
         }
     };
 
-    // Wrapper function that matches SubmitHandler signature for react-hook-form
     const handleFormSubmit = async (values: z.infer<typeof formSchema>): Promise<void> => {
         await onSubmit(values, false);
     };
@@ -140,6 +141,7 @@ export default function AdvancedEntry(): ReactElement {
                 time: format(new Date(), 'HH:mm'),
                 comment: '',
                 eventType: undefined,
+                contractId: form.getValues('contractId'),
             });
         }
         setError(null);
@@ -157,6 +159,18 @@ export default function AdvancedEntry(): ReactElement {
                 <Card>
                     <CardHeader className="text-xl underline underline-offset-4">Ausführliche Erfassung</CardHeader>
                     <CardContent>
+                        {/* Vertragsauswahl als FormField */}
+                        <FormField
+                            control={form.control}
+                            name="contractId"
+                            render={({ field }) => (
+                                <FormItem className="mb-6">
+                                    <ContractSelect contracts={contracts} selectedId={field.value} onChange={field.onChange} />
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
                         <FormField
                             control={form.control}
                             name="eventType"
@@ -182,6 +196,7 @@ export default function AdvancedEntry(): ReactElement {
                             )}
                         />
 
+                        {/* ... Datum, Time, Comment bleiben identisch ... */}
                         <FormField
                             control={form.control}
                             name="date"

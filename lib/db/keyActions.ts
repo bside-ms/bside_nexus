@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull } from 'drizzle-orm';
 import { db } from '@/db';
-import type { keyAssignmentEntry, keyItemEntry, keysBaseEntry } from '@/db/schema';
+import type { KeyAssignmentEntry, KeyItemEntry, KeysBaseEntry } from '@/db/schema';
 import { keyAssignmentTable, keyItemsTable, keyProtocolsTable, keysBaseTable, userProfilesTable } from '@/db/schema';
 
 // Key Types (Schließungen)
@@ -11,7 +11,7 @@ export interface CreateKeyTypeInput {
     createdBy?: string | null;
 }
 
-export const createKeyType = async (input: CreateKeyTypeInput): Promise<keysBaseEntry | undefined> => {
+export const createKeyType = async (input: CreateKeyTypeInput): Promise<KeysBaseEntry | undefined> => {
     const [row] = await db
         .insert(keysBaseTable)
         .values({
@@ -27,17 +27,17 @@ export const createKeyType = async (input: CreateKeyTypeInput): Promise<keysBase
 export const updateKeyType = async (
     id: string,
     patch: Partial<Pick<CreateKeyTypeInput, 'keyNr' | 'keyDescription'>>,
-): Promise<keysBaseEntry | undefined> => {
+): Promise<KeysBaseEntry | undefined> => {
     const [row] = await db.update(keysBaseTable).set(patch).where(eq(keysBaseTable.id, id)).returning();
     return row;
 };
 
-export const softDeleteKeyType = async (id: string): Promise<keysBaseEntry | undefined> => {
+export const softDeleteKeyType = async (id: string): Promise<KeysBaseEntry | undefined> => {
     const [row] = await db.update(keysBaseTable).set({ deleteAt: new Date() }).where(eq(keysBaseTable.id, id)).returning();
     return row;
 };
 
-export const listKeyTypes = async (): Promise<Array<keysBaseEntry>> => {
+export const listKeyTypes = async (): Promise<Array<KeysBaseEntry>> => {
     return db.select().from(keysBaseTable).where(isNull(keysBaseTable.deleteAt)).orderBy(asc(keysBaseTable.keyNr));
 };
 
@@ -49,7 +49,7 @@ export interface CreateKeyItemInput {
     comment?: string | null;
 }
 
-export const createKeyItem = async (input: CreateKeyItemInput): Promise<keyItemEntry | undefined> => {
+export const createKeyItem = async (input: CreateKeyItemInput): Promise<KeyItemEntry | undefined> => {
     const [row] = await db
         .insert(keyItemsTable)
         .values({
@@ -66,7 +66,7 @@ export const createKeyItem = async (input: CreateKeyItemInput): Promise<keyItemE
 export const changeKeyItemStatus = async (
     keyItemId: string,
     status: 'active' | 'inactive' | 'lost' | 'broken' | 'destroyed',
-): Promise<keyItemEntry | undefined> => {
+): Promise<KeyItemEntry | undefined> => {
     // prevent deactivate/destroy while actively assigned (except marking lost which closes via separate flow)
     if (status !== 'active') {
         const active = await db
@@ -213,7 +213,7 @@ export const returnKeys = async (assignmentIds: Array<string>, createdBy?: strin
 };
 
 // Verlust markieren
-export const markLost = async (assignmentId: string): Promise<keyAssignmentEntry | undefined> => {
+export const markLost = async (assignmentId: string): Promise<KeyAssignmentEntry | undefined> => {
     return db.transaction(async (tx) => {
         const aList = await tx.select().from(keyAssignmentTable).where(eq(keyAssignmentTable.id, assignmentId)).limit(1);
         const a = aList[0];
@@ -237,7 +237,7 @@ export const markLost = async (assignmentId: string): Promise<keyAssignmentEntry
     });
 };
 
-export const reactivateFoundKeyItem = async (keyItemId: string): Promise<keyItemEntry | undefined> => {
+export const reactivateFoundKeyItem = async (keyItemId: string): Promise<KeyItemEntry | undefined> => {
     // clear nothing in assignments (history remains), just set item back to active if not assigned
     const active = await db
         .select({ id: keyAssignmentTable.id })

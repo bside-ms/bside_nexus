@@ -5,8 +5,10 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2 } from 'lucide-react';
 import type { ReactElement } from 'react';
+import { ContractSelect } from '@/components/hrp/ContractSelect';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import type { HrpContract } from '@/lib/db/contractActions';
 
 type EventType = 'start' | 'pause' | 'pause_end' | 'stop';
 
@@ -22,8 +24,10 @@ const EVENTS: Array<EventOption> = [
     { label: 'Pause: Ende', type: 'pause_end' },
 ];
 
-export default function QuickEntry(): ReactElement {
+export default function QuickEntry({ contracts }: { contracts: Array<HrpContract> }): ReactElement {
     const [currentTime, setCurrentTime] = useState<string>('');
+    const [contractId, setContractId] = useState<string | null>(null); // State für ausgewählten Vertrag
+
     const [loading, setLoading] = useState<EventType | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -43,14 +47,14 @@ export default function QuickEntry(): ReactElement {
 
     const handleButtonClick = (event: EventOption): void => {
         const now = new Date();
-        // Zeit im standardisierten ISO-Format an API schicken, aber für UI in de-DE anzeigen
+        // Zeit im UI anzeigen (Backend nutzt eigene Serverzeit für Integrität)
         setPendingTimestamp(now.toLocaleTimeString('de-DE'));
         setPendingEvent(event);
         setModalOpen(true);
     };
 
     const handleConfirm = async (force = false): Promise<void> => {
-        if (!pendingEvent || !pendingTimestamp) {
+        if (!pendingEvent || !contractId) {
             return;
         }
 
@@ -61,9 +65,6 @@ export default function QuickEntry(): ReactElement {
             setWarning(null);
         }
 
-        const now = new Date();
-        const tsISO = now.toISOString();
-
         let shouldClear = true;
         try {
             const res = await fetch('/api/hrp/quick', {
@@ -71,7 +72,7 @@ export default function QuickEntry(): ReactElement {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     event: pendingEvent.type,
-                    timestamp: tsISO,
+                    contractId,
                     force,
                 }),
             });
@@ -94,7 +95,10 @@ export default function QuickEntry(): ReactElement {
 
             setSuccess(data.message || 'Deine Eintragung wurde erfasst!');
 
+            // Event feuern, damit Overview aktualisiert wird
+            const now = new Date();
             let displayDate = now;
+            // Wenn Nachtschicht (z.B. 02:00 Uhr), aktualisiere Ansicht für "Gestern"
             if (pendingEvent.type !== 'start' && now.getHours() < 7) {
                 displayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
             }
@@ -126,14 +130,20 @@ export default function QuickEntry(): ReactElement {
         <Card>
             <CardHeader className="text-xl underline underline-offset-4">Schnellerfassung</CardHeader>
             <CardContent>
-                <p>Aktueller Zeitstempel: {currentTime}</p>
-                <p className="mt-4">Wähle eine der folgenden Aktionen um deine Arbeitszeit zu erfassen:</p>
-                <div className="mt-4 py-2 flex flex-col space-y-2 lg:w-[240px]">
+                <div className="mb-6">
+                    <ContractSelect contracts={contracts} selectedId={contractId} onChange={setContractId} />
+                </div>
+
+                <p className="text-sm text-muted-foreground mb-2">
+                    Aktueller Zeitstempel: <span className="font-mono font-medium text-foreground">{currentTime}</span>
+                </p>
+
+                <div className="py-2 flex flex-col space-y-2 lg:w-[240px]">
                     {EVENTS.map((event) => (
                         <Button
                             key={event.type}
                             onClick={(): void => handleButtonClick(event)}
-                            disabled={loading === event.type}
+                            disabled={loading === event.type || !contractId}
                             variant={loading === event.type ? 'outline' : 'outline'}
                             className="w-full mt-2"
                         >
@@ -143,8 +153,9 @@ export default function QuickEntry(): ReactElement {
                 </div>
             </CardContent>
 
+            {/* Bestätigungs-Modal */}
             {modalOpen && pendingEvent && pendingTimestamp && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
                     <div className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-xl shadow-lg p-6 max-w-sm w-full border border-zinc-200 dark:border-zinc-700">
                         <div className="mb-4 text-lg font-semibold">Zeiterfassung bestätigen</div>
                         <div className="mb-2">
@@ -181,8 +192,9 @@ export default function QuickEntry(): ReactElement {
                 </div>
             )}
 
+            {/* Ergebnis-Modal (Erfolg/Fehler) */}
             {(error || success) && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
                     <div className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-xl shadow-lg p-6 max-w-sm w-full border border-zinc-200 dark:border-zinc-700">
                         <div className="flex items-center mb-4 text-lg">
                             {error ? (

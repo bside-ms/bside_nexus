@@ -7,7 +7,8 @@ import { deleteHrpEntry } from '@/lib/db/hrpActions';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
     const session = await getUserSession();
-    if (!session) {
+    const isAllowedRole = session?.roles?.includes('arbeitszeiterfassung') ?? false;
+    if (!session || !isAllowedRole) {
         return NextResponse.json({ success: false, message: 'Nicht eingeloggt' }, { status: 401 });
     }
 
