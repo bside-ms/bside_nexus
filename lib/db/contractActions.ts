@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lte, or } from 'drizzle-orm';
+import { and, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { groupsTable, hrpContractsTable } from '@/db/schema';
 
@@ -16,7 +16,7 @@ export async function getActiveContractsForUser(userId: string): Promise<Array<H
         .select({
             contractId: hrpContractsTable.id,
             type: hrpContractsTable.type,
-            groupName: groupsTable.displayName,
+            groupName: sql<string>`REPLACE(${groupsTable.displayName}, ' - Mitarbeitende', '')`,
             weeklyHours: hrpContractsTable.weeklyHours,
         })
         .from(hrpContractsTable)

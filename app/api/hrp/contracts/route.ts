@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { db } from '@/db';
 import { hrpContractsTable, membersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
+import { getActiveContractsForUser } from '@/lib/db/contractActions';
 import { isGlobalAdmin } from '@/lib/db/groupActions';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -12,6 +13,34 @@ async function isGroupAdmin(userId: string, groupId: string): Promise<boolean> {
         where: and(eq(membersTable.userId, userId), eq(membersTable.groupId, groupId), eq(membersTable.isAdmin, true)),
     });
     return !!member;
+}
+
+export async function GET(): Promise<NextResponse> {
+    const session = await getUserSession();
+
+    if (!session) {
+        return NextResponse.json(
+            {
+                success: false,
+                message: 'Für diese Aktion musst du eingeloggt sein.',
+            },
+            { status: 401 },
+        );
+    }
+
+    const isAllowedRole = session?.roles?.includes('arbeitszeiterfassung') ?? false;
+    if (!isAllowedRole) {
+        return NextResponse.json(
+            {
+                success: false,
+                message: 'Dir fehlen die notwendigen Berechtigungen.',
+            },
+            { status: 403 },
+        );
+    }
+
+    const contracts = await getActiveContractsForUser(session.id);
+    return NextResponse.json({ success: true, contracts }, { status: 200 });
 }
 
 export async function POST(req: Request): Promise<NextResponse> {

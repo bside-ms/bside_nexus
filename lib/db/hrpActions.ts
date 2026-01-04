@@ -176,6 +176,7 @@ export const getHrpEntriesForDate = async (
             id: absence.id,
             entryType: 'absence',
             loggedTimestamp: new Date(absence.date),
+            contractId: absence.contractId,
             absence,
         });
     }
