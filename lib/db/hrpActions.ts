@@ -135,7 +135,10 @@ export const getHrpEntriesForDate = async (
     }
 
     if (contractId) {
-        whereConditions.push(or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId)));
+        const condition = or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId));
+        if (condition) {
+            whereConditions.push(condition);
+        }
     }
 
     const [entries, absences] = await Promise.all([
@@ -203,7 +206,10 @@ export const getHrpLogForUser = async (
     ];
 
     if (contractId) {
-        whereConditions.push(or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId)));
+        const condition = or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId));
+        if (condition) {
+            whereConditions.push(condition);
+        }
     }
 
     const entries = await db
@@ -250,7 +256,10 @@ export const getHrpLogsForAllUsers = async (
     ];
 
     if (contractId) {
-        whereConditions.push(or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId)));
+        const condition = or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId));
+        if (condition) {
+            whereConditions.push(condition);
+        }
     }
 
     // Fetch distinct users with entries in the range
