@@ -19,10 +19,21 @@ async function getManagedGroupIds(userId: string): Promise<Array<string>> {
     return memberships.map((m) => m.groupId);
 }
 
+export interface ManagedContract {
+    id: string;
+    userId: string;
+    userName: string | null;
+    groupName: string;
+    type: string;
+    weeklyHours: number | null;
+    validFrom: Date;
+    validTo: Date | null;
+}
+
 /**
  *  Hole alle Verträge die ein User verwalten darf.
  */
-export async function getManagedContracts(adminUserId: string) {
+export async function getManagedContracts(adminUserId: string): Promise<Array<ManagedContract>> {
     const managedGroupIds = await getManagedGroupIds(adminUserId);
 
     if (managedGroupIds.length === 0) {
@@ -47,18 +58,4 @@ export async function getManagedContracts(adminUserId: string) {
         .orderBy(groupsTable.displayName, usersTable.displayName);
 
     return contracts;
-}
-
-/**
- *  Hole alle User, denen ich einen Vertrag geben könnte (z.B. alle enabled User)
- */
-export async function getAvailableUsers() {
-    return db
-        .select({
-            id: usersTable.id,
-            label: usersTable.displayName, // oder username, je nach Vorliebe
-            email: usersTable.email,
-        })
-        .from(usersTable)
-        .where(eq(usersTable.enabled, true));
 }

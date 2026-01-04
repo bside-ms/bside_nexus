@@ -45,9 +45,8 @@ export default function NewContractPage(): ReactElement {
                 } else {
                     toast.error('Fehler beim Laden der Gruppen');
                 }
-            } catch (error) {
-                console.error('Fetch error:', error);
-                toast.error('Netzwerkfehler beim Laden der Daten');
+            } catch {
+                toast.error('Netzwerkfehler beim Laden der Gruppen.');
             }
         };
 

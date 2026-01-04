@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
+import type { ReactElement } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Contract {
     contractId: string;
-    type: 'fixed_salary' | 'hourly' | string;
+    type: string;
     groupName: string | null;
 }
 
@@ -15,7 +16,7 @@ interface Props {
     onChange: (id: string) => void;
 }
 
-export function ContractSelect({ contracts, selectedId, onChange }: Props) {
+export function ContractSelect({ contracts, selectedId, onChange }: Props): ReactElement {
     // Wenn es nur einen Vertrag gibt, wähle ihn automatisch aus
     useEffect(() => {
         if (contracts.length === 1 && !selectedId && contracts[0] !== undefined) {

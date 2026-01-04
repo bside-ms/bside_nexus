@@ -4,7 +4,7 @@ import { hrpDailyRecordTable, hrpEventLogTable } from '@/db/schema';
 import { computeDayStats, groupEntriesByWorkday } from '@/lib/hrp/hrpLogic';
 import { v4 as uuidv4 } from 'uuid';
 
-export async function aggregateDay(userId: string, dateString: string, contractId: string) {
+export async function aggregateDay(userId: string, dateString: string, contractId: string): Promise<void> {
     const start = new Date(`${dateString}T00:00:00`);
 
     const rawLogs = await db.query.hrpEventLogTable.findMany({

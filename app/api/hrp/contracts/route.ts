@@ -7,14 +7,14 @@ import { isGlobalAdmin } from '@/lib/db/groupActions';
 import { nanoid } from 'nanoid';
 
 // Helper: Darf der User für diese Gruppe einen Vertrag erstellen?
-async function isGroupAdmin(userId: string, groupId: string) {
+async function isGroupAdmin(userId: string, groupId: string): Promise<boolean> {
     const member = await db.query.membersTable.findFirst({
         where: and(eq(membersTable.userId, userId), eq(membersTable.groupId, groupId), eq(membersTable.isAdmin, true)),
     });
     return !!member;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: Request): Promise<NextResponse> {
     const session = await getUserSession();
     const isAllowedRole = session?.roles?.includes('arbeitszeiterfassung-admin') ?? false;
     if (!session || !isAllowedRole) {
