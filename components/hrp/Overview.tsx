@@ -54,7 +54,19 @@ async function fetchEntries(year: number, month: number, day: number): Promise<A
     return entries;
 }
 
-const parseEntryType = (entryType: string): string => {
+const parseEntryType = (entryType: string, absence?: AbsenceInfo): string => {
+    if (entryType === 'absence' && absence) {
+        switch (absence.type) {
+            case 'vacation':
+                return 'Urlaub';
+            case 'sick':
+                return 'Krankheit';
+            case 'holiday':
+                return 'Feiertag';
+            default:
+                return absence.type;
+        }
+    }
     switch (entryType) {
         case 'start':
             return 'Kommen';
@@ -69,13 +81,17 @@ const parseEntryType = (entryType: string): string => {
     }
 };
 
+interface AbsenceInfo {
+    type: string;
+}
+
 export default function Overview(): ReactElement {
     const [isLoading, setIsLoading] = useState(false);
     const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
     const [datesWithHrpEntries, setDatesWithHrpEntries] = useState<Array<Date>>([]);
-    const [hrpEntries, setHrpEntries] = useState<Array<Partial<HrpEventLogEntry>>>([]);
+    const [hrpEntries, setHrpEntries] = useState<Array<Partial<HrpEventLogEntry & { absence?: AbsenceInfo }>>>([]);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-    const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+    const [entryToDelete, setEntryToDelete] = useState<{ id: string; type: string } | null>(null);
     const [deleteReason, setDeleteReason] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -88,10 +104,11 @@ export default function Overview(): ReactElement {
         }
         setIsDeleting(true);
         try {
-            const res = await fetch('/api/hrp/delete', {
-                method: 'POST',
+            const endpoint = entryToDelete.type === 'absence' ? '/api/hrp/absences/manage' : '/api/hrp/delete';
+            const res = await fetch(endpoint, {
+                method: endpoint === '/api/hrp/absences/manage' ? 'DELETE' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: entryToDelete, reason: deleteReason }),
+                body: JSON.stringify({ id: entryToDelete.id, reason: deleteReason }),
             });
             if (res.ok) {
                 // Refresh entries
@@ -235,7 +252,7 @@ export default function Overview(): ReactElement {
                                         <div className="flex justify-between items-start">
                                             <div>
                                                 <div className="font-medium text-base sm:text-sm">
-                                                    {parseEntryType(event.entryType!)}
+                                                    {parseEntryType(event.entryType!, event.absence)}
                                                     {event.deletedAt && (
                                                         <span className="ml-2 text-[10px] font-normal text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 uppercase not-italic">
                                                             Gelöscht
@@ -243,21 +260,28 @@ export default function Overview(): ReactElement {
                                                     )}
                                                 </div>
                                                 <div className="text-muted-foreground text-xs sm:text-sm">
-                                                    {format(event.loggedTimestamp!, 'PP - pp', { locale: de })}
+                                                    {event.entryType === 'absence'
+                                                        ? format(event.loggedTimestamp!, 'PP', { locale: de })
+                                                        : format(event.loggedTimestamp!, 'PP - pp', { locale: de })}
                                                 </div>
                                             </div>
-                                            {!event.abgerechnet && !event.deletedAt && (
-                                                <button
-                                                    onClick={(): void => {
-                                                        setEntryToDelete(event.id!);
-                                                        setDeleteModalOpen(true);
-                                                    }}
-                                                    className="text-red-500 hover:text-red-700 p-2 -mr-2 -mt-1 sm:p-1 sm:mr-0 sm:mt-0 transition-colors"
-                                                    title="Eintrag löschen"
-                                                >
-                                                    <Trash2 className="h-5 w-5 sm:h-4 sm:w-4" />
-                                                </button>
-                                            )}
+                                            {!event.abgerechnet &&
+                                                !event.deletedAt &&
+                                                (event.entryType !== 'absence' || event.absence?.type === 'sick') && (
+                                                    <button
+                                                        onClick={(): void => {
+                                                            setEntryToDelete({
+                                                                id: event.id!,
+                                                                type: event.entryType === 'absence' ? 'absence' : 'log',
+                                                            });
+                                                            setDeleteModalOpen(true);
+                                                        }}
+                                                        className="text-red-500 hover:text-red-700 p-2 -mr-2 -mt-1 sm:p-1 sm:mr-0 sm:mt-0 transition-colors"
+                                                        title="Eintrag löschen"
+                                                    >
+                                                        <Trash2 className="h-5 w-5 sm:h-4 sm:w-4" />
+                                                    </button>
+                                                )}
                                         </div>
                                         {!isEmpty(event.comment) && (
                                             <div className="text-muted-foreground mt-2 text-xs sm:text-sm bg-white/50 p-2 rounded-md border border-zinc-200/50">

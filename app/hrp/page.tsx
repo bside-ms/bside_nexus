@@ -1,4 +1,4 @@
-import { Calculator, Clock, FileClock, FileText, LayoutDashboard } from 'lucide-react';
+import { Calculator, CalendarOff, Clock, FileClock, FileText, LayoutDashboard } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
@@ -34,6 +34,12 @@ export default async function Page(): Promise<ReactElement> {
             description: 'Manuelle Eingabe von Zeiten mit Kommentaren.',
             href: '/hrp/advanced',
             icon: FileText,
+        },
+        {
+            title: 'Abwesenheiten',
+            description: 'Urlaub und Krankheit eintragen.',
+            href: '/hrp/absences',
+            icon: CalendarOff,
         },
         {
             title: 'Überblick',

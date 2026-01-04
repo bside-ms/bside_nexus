@@ -226,7 +226,7 @@ export const keyAssignmentTable = pgTable(
 
 export const hrpContractsTable = pgTable('hrp_contracts', {
     id: varchar({ length: 36 }).primaryKey(),
-    userId: varchar({ length: 255 })
+    userId: varchar('userId', { length: 255 })
         .notNull()
         .references(() => usersTable.id),
     employerGroupId: varchar({ length: 255 })
@@ -262,8 +262,8 @@ export const hrpEventLogTable = pgTable('hrp_event_log', {
     approvedAt: timestamp('approved_at'),
     deletedAt: timestamp('deleted_at'),
     abgerechnet: boolean().default(false).notNull(),
-    deletedBy: varchar({ length: 255 }).references(() => usersTable.id),
-    deletionReason: text(),
+    deletedBy: varchar('deletedBy', { length: 255 }).references(() => usersTable.id),
+    deletionReason: text('deletionReason'),
 });
 
 // Jahreskonten (Urlaub & Überstunden-Übertrag)
@@ -299,9 +299,11 @@ export const hrpAbsencesTable = pgTable('hrp_absences', {
     date: date('date').notNull(), // YYYY-MM-DD
 
     hoursValue: decimal('hours_value', { precision: 10, scale: 2 }).notNull().default('0.00'),
-    status: varchar({ length: 50 }).default('pending'), // 'approved', 'declined'
-
+    status: varchar({ length: 50 }).default('approved'), // 'approved', 'declined'
     createdAt: timestamp('created_at').defaultNow().notNull(),
+    deletedAt: timestamp('deleted_at'),
+    deletedBy: varchar('deletedBy', { length: 255 }).references(() => usersTable.id),
+    deletionReason: text('deletionReason'),
 });
 
 // Tägliche Aggregation - Wird per Script gefüllt, sobald ein Tag "fertig" ist
