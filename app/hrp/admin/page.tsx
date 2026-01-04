@@ -1,4 +1,4 @@
-import { FileText } from 'lucide-react';
+import { FileText, SquareChartGantt } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
@@ -26,6 +26,12 @@ export default function Page(): ReactElement {
             description: 'Arbeitsverträge verwalten.',
             href: '/hrp/admin/contracts',
             icon: FileText,
+        },
+        {
+            title: 'Stundenzettel & Abrechnung',
+            description: 'Einblick in die Stundenzettel von Mitarbeitenden.',
+            href: '/hrp/admin/overview',
+            icon: SquareChartGantt,
         },
     ];
 

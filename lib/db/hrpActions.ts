@@ -135,7 +135,7 @@ export const getHrpEntriesForDate = async (
     }
 
     if (contractId) {
-        whereConditions.push(eq(hrpEventLogTable.contractId, contractId));
+        whereConditions.push(or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId)));
     }
 
     const [entries, absences] = await Promise.all([
@@ -188,23 +188,28 @@ export const getHrpLogForUser = async (
     userId: string,
     year: number,
     month: number,
+    contractId?: string | null,
 ): Promise<Record<number, Array<Partial<HrpEventLogEntry>>>> => {
     // Effizientes Laden aller Einträge für den Monat in einer Query
     const startOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
     // Wir laden bis zum Ende des Folgetages des Monatsendes, um Sessions über Mitternacht zu erfassen
     const endOfRange = new Date(year, month + 1, 2, 0, 0, 0, 0);
 
+    const whereConditions = [
+        eq(hrpEventLogTable.userId, userId),
+        gte(hrpEventLogTable.loggedTimestamp, startOfMonth),
+        lt(hrpEventLogTable.loggedTimestamp, endOfRange),
+        isNull(hrpEventLogTable.deletedAt),
+    ];
+
+    if (contractId) {
+        whereConditions.push(or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId)));
+    }
+
     const entries = await db
         .select()
         .from(hrpEventLogTable)
-        .where(
-            and(
-                eq(hrpEventLogTable.userId, userId),
-                gte(hrpEventLogTable.loggedTimestamp, startOfMonth),
-                lt(hrpEventLogTable.loggedTimestamp, endOfRange),
-                isNull(hrpEventLogTable.deletedAt),
-            ),
-        )
+        .where(and(...whereConditions))
         .orderBy(hrpEventLogTable.loggedTimestamp);
 
     const groups = groupEntriesByWorkday(entries);
@@ -225,6 +230,7 @@ export const getHrpLogForUser = async (
 export const getHrpLogsForAllUsers = async (
     year: number,
     month: number,
+    contractId?: string | null,
 ): Promise<
     Record<
         string,
@@ -237,6 +243,16 @@ export const getHrpLogsForAllUsers = async (
     const startOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
     const endOfMonth = new Date(year, month + 1, 2, 0, 0, 0, 0); // Puffer
 
+    const whereConditions = [
+        gte(hrpEventLogTable.loggedTimestamp, startOfMonth),
+        lt(hrpEventLogTable.loggedTimestamp, endOfMonth),
+        isNull(hrpEventLogTable.deletedAt),
+    ];
+
+    if (contractId) {
+        whereConditions.push(or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId)));
+    }
+
     // Fetch distinct users with entries in the range
     const rows = await db
         .select({
@@ -246,13 +262,7 @@ export const getHrpLogsForAllUsers = async (
         })
         .from(hrpEventLogTable)
         .leftJoin(usersTable, eq(usersTable.id, hrpEventLogTable.userId))
-        .where(
-            and(
-                gte(hrpEventLogTable.loggedTimestamp, startOfMonth),
-                lt(hrpEventLogTable.loggedTimestamp, endOfMonth),
-                isNull(hrpEventLogTable.deletedAt),
-            ),
-        );
+        .where(and(...whereConditions));
 
     const userMeta = new Map<string, { username: string; displayName: string | null }>();
     for (const r of rows) {
@@ -267,7 +277,7 @@ export const getHrpLogsForAllUsers = async (
 
     const perUser = await Promise.all(
         userIds.map(async (uid) => {
-            const logs = await getHrpLogForUser(uid, year, month);
+            const logs = await getHrpLogForUser(uid, year, month, contractId);
             const meta = userMeta.get(uid)!;
             return [
                 uid,
