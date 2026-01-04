@@ -4,7 +4,7 @@ import { db } from '@/db';
 import { hrpContractsTable, membersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { isGlobalAdmin } from '@/lib/db/groupActions';
-import { nanoid } from 'nanoid';
+import { v4 as uuidv4 } from 'uuid';
 
 // Helper: Darf der User für diese Gruppe einen Vertrag erstellen?
 async function isGroupAdmin(userId: string, groupId: string): Promise<boolean> {
@@ -31,7 +31,7 @@ export async function POST(req: Request): Promise<NextResponse> {
 
     // Vertrag erstellen
     await db.insert(hrpContractsTable).values({
-        id: nanoid(),
+        id: uuidv4(),
         userId: body.userId,
         employerGroupId: body.employerGroupId,
         type: body.type, // 'fixed_salary' | 'hourly'

@@ -10,7 +10,7 @@ import { aggregateDay } from '@/lib/hrp/aggregation';
 import { isValidTimestamp, validateBreaks } from '@/lib/hrp/hrpLogic';
 import { canModifyEntry } from '@/lib/hrp/permissions';
 import { getClientIP } from '@/lib/utils/getClientIP';
-import { nanoid } from 'nanoid';
+import { v4 as uuidv4 } from 'uuid';
 
 const validEvents = ['start', 'pause', 'pause_end', 'stop'];
 
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     try {
         await db.insert(hrpEventLogTable).values({
-            id: nanoid(),
+            id: uuidv4(),
             userId: session.id,
             contractId,
             ipAddress: ipAddress || 'unknown',

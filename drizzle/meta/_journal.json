@@ -64,6 +64,13 @@
       "when": 1765208012412,
       "tag": "0008_key management",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1767554617430,
+      "tag": "0009_hrp table changes",
+      "breakpoints": true
     }
   ]
 }

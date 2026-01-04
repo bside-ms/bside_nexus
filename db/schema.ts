@@ -224,7 +224,7 @@ export const keyAssignmentTable = pgTable(
 // Arbeitszeiterfassung
 // ==========================================
 
-export const hrpContractsTable = pgTable('contracts', {
+export const hrpContractsTable = pgTable('hrp_contracts', {
     id: varchar({ length: 36 }).primaryKey(),
     userId: varchar({ length: 255 })
         .notNull()
@@ -268,7 +268,7 @@ export const hrpEventLogTable = pgTable('hrp_event_log', {
 
 // Jahreskonten (Urlaub & Überstunden-Übertrag)
 export const hrpLeaveAccountsTable = pgTable(
-    'leave_accounts',
+    'hrp_leave_accounts',
     {
         id: varchar({ length: 36 }).primaryKey(),
         contractId: varchar({ length: 36 })
@@ -337,7 +337,7 @@ export const hrpDailyRecordTable = pgTable(
 
 // Für Stundenlöhner (Gastro) - Logik: 23. bis 22.
 export const hrpPayrollHourlyTable = pgTable(
-    'payroll_hourly',
+    'hrp_payroll_hourly',
     {
         id: varchar({ length: 36 }).primaryKey(),
         contractId: varchar({ length: 36 })
@@ -368,7 +368,7 @@ export const hrpPayrollHourlyTable = pgTable(
 
 // Für Festangestellte - Logik: Kalendermonat + Zeitkonto
 export const hrpPayrollFixedTable = pgTable(
-    'payroll_fixed',
+    'hrp_payroll_fixed',
     {
         id: varchar({ length: 36 }).primaryKey(),
         contractId: varchar({ length: 36 })
