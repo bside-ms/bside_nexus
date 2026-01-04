@@ -101,7 +101,7 @@ async function populateUsers(): Promise<void> {
         const userEntry: typeof usersTable.$inferInsert = {
             id: user.id!,
             username: user.username!,
-            displayName: !isEmpty(user.firstName) ? user.firstName : null,
+            displayName: !isEmpty(user.lastName) && user.lastName !== '.' ? `${user.firstName} ${user.lastName}` : user.firstName,
             email: user.email!,
             enabled: user.enabled,
         };
@@ -113,7 +113,7 @@ async function populateUsers(): Promise<void> {
                 target: usersTable.id,
                 set: {
                     username: user.username!,
-                    displayName: !isEmpty(user.firstName) ? user.firstName : null,
+                    displayName: !isEmpty(user.lastName) && user.lastName !== '.' ? `${user.firstName} ${user.lastName}` : user.firstName,
                     email: user.email!,
                     enabled: user.enabled,
                 },
@@ -199,7 +199,7 @@ async function cleanTables(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-    await cleanTables();
+    // await cleanTables();
     await populateGroups();
     await populateUsers();
     await populateMembers();

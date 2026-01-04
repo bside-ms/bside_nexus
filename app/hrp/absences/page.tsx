@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
-import QuickEntry from '@/components/hrp/QuickEntry';
+import AbsenceEntry from '@/components/hrp/AbsenceEntry';
+import AbsenceOverview from '@/components/hrp/AbsenceOverview';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getActiveContractsForUser } from '@/lib/db/contractActions';
@@ -11,14 +12,14 @@ const breadCrumbs = [
         url: '/hrp',
     },
     {
-        title: 'Schnellerfassung',
+        title: 'Abwesenheiten',
         active: true,
     },
 ];
 
 export const metadata: Metadata = {
-    title: 'Schnellerfassung | B-Side Nexus',
-    description: 'Arbeitszeit schnell erfassen',
+    title: 'Abwesenheiten | B-Side Nexus',
+    description: 'Urlaub und Krankheit erfassen',
     robots: 'noindex, nofollow',
 };
 
@@ -29,8 +30,9 @@ export default async function Page(): Promise<ReactElement> {
     return (
         <div className="">
             <NavbarTop items={breadCrumbs} sidebar={true} />
-            <div className="flex flex-1 flex-col gap-4 p-4 max-w-2xl mx-auto">
-                <QuickEntry contracts={contracts} />
+            <div className="flex flex-1 flex-col gap-8 p-4 max-w-2xl mx-auto">
+                <AbsenceEntry contracts={contracts} />
+                <AbsenceOverview />
             </div>
         </div>
     );

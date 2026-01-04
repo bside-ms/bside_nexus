@@ -10,8 +10,18 @@ import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import type { HrpEventLogEntry } from '@/db/schema';
+import type { HrpContract } from '@/lib/db/contractActions';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
+
+async function fetchContracts(): Promise<Array<HrpContract>> {
+    const res = await fetch('/api/hrp/contracts');
+    const resJson = await res.json();
+    if (!resJson.success || !resJson.contracts || !Array.isArray(resJson.contracts)) {
+        return [];
+    }
+    return resJson.contracts;
+}
 
 async function fetchDates(year: number, month: number): Promise<Array<Date>> {
     const res = await fetch('/api/hrp/dates', {
@@ -54,7 +64,19 @@ async function fetchEntries(year: number, month: number, day: number): Promise<A
     return entries;
 }
 
-const parseEntryType = (entryType: string): string => {
+const parseEntryType = (entryType: string, absence?: AbsenceInfo): string => {
+    if (entryType === 'absence' && absence) {
+        switch (absence.type) {
+            case 'vacation':
+                return 'Urlaub';
+            case 'sick':
+                return 'Krankheit';
+            case 'holiday':
+                return 'Feiertag';
+            default:
+                return absence.type;
+        }
+    }
     switch (entryType) {
         case 'start':
             return 'Kommen';
@@ -69,13 +91,19 @@ const parseEntryType = (entryType: string): string => {
     }
 };
 
+interface AbsenceInfo {
+    type: string;
+    contractId: string | null;
+}
+
 export default function Overview(): ReactElement {
     const [isLoading, setIsLoading] = useState(false);
     const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
     const [datesWithHrpEntries, setDatesWithHrpEntries] = useState<Array<Date>>([]);
-    const [hrpEntries, setHrpEntries] = useState<Array<Partial<HrpEventLogEntry>>>([]);
+    const [hrpEntries, setHrpEntries] = useState<Array<Partial<HrpEventLogEntry & { absence?: AbsenceInfo }>>>([]);
+    const [contracts, setContracts] = useState<Array<HrpContract>>([]);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-    const [entryToDelete, setEntryToDelete] = useState<string | null>(null);
+    const [entryToDelete, setEntryToDelete] = useState<{ id: string; type: string } | null>(null);
     const [deleteReason, setDeleteReason] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -88,10 +116,11 @@ export default function Overview(): ReactElement {
         }
         setIsDeleting(true);
         try {
-            const res = await fetch('/api/hrp/delete', {
-                method: 'POST',
+            const endpoint = entryToDelete.type === 'absence' ? '/api/hrp/absences/manage' : '/api/hrp/delete';
+            const res = await fetch(endpoint, {
+                method: endpoint === '/api/hrp/absences/manage' ? 'DELETE' : 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: entryToDelete, reason: deleteReason }),
+                body: JSON.stringify({ id: entryToDelete.id, reason: deleteReason }),
             });
             if (res.ok) {
                 // Refresh entries
@@ -122,9 +151,13 @@ export default function Overview(): ReactElement {
     useEffect(() => {
         async function loadData(): Promise<void> {
             setIsLoading(true);
-            const result = await fetchDates(calendarMonth.getFullYear(), calendarMonth.getMonth());
+            const [dates, userContracts] = await Promise.all([
+                fetchDates(calendarMonth.getFullYear(), calendarMonth.getMonth()),
+                fetchContracts(),
+            ]);
 
-            setDatesWithHrpEntries(result);
+            setDatesWithHrpEntries(dates);
+            setContracts(userContracts);
             setIsLoading(false);
         }
         loadData();
@@ -223,58 +256,90 @@ export default function Overview(): ReactElement {
                                     }
                                     return (a.loggedTimestamp?.getTime() ?? 0) - (b.loggedTimestamp?.getTime() ?? 0);
                                 })
-                                .map((event) => (
-                                    <div
-                                        key={event.id}
-                                        className={`relative rounded-lg p-3 sm:p-4 pl-8 sm:pl-10 text-sm after:absolute after:inset-y-4 after:left-4 after:w-1 after:rounded-full transition-colors ${
-                                            event.deletedAt
-                                                ? 'bg-zinc-50 text-muted-foreground opacity-70 after:bg-zinc-300 italic'
-                                                : 'bg-zinc-100/80 hover:bg-zinc-100 after:bg-green-500/50 border border-transparent'
-                                        }`}
-                                    >
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <div className="font-medium text-base sm:text-sm">
-                                                    {parseEntryType(event.entryType!)}
-                                                    {event.deletedAt && (
-                                                        <span className="ml-2 text-[10px] font-normal text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 uppercase not-italic">
-                                                            Gelöscht
-                                                        </span>
+                                .map((event) => {
+                                    const contractId = event.contractId || event.absence?.contractId;
+                                    const contract = contracts.find((c) => c.contractId === contractId);
+                                    const multipleContracts = contracts.length > 1;
+
+                                    // Farben basierend auf contractId (einfacher Hash oder Index)
+                                    const colors = [
+                                        'after:bg-green-500/50',
+                                        'after:bg-blue-500/50',
+                                        'after:bg-purple-500/50',
+                                        'after:bg-orange-500/50',
+                                        'after:bg-pink-500/50',
+                                        'after:bg-yellow-500/50',
+                                    ];
+                                    const contractIndex = contracts.findIndex((c) => c.contractId === contractId);
+                                    const colorClass = contractIndex >= 0 ? colors[contractIndex % colors.length] : 'after:bg-green-500/50';
+
+                                    return (
+                                        <div
+                                            key={event.id}
+                                            className={`relative rounded-lg p-3 sm:p-4 pl-8 sm:pl-10 text-sm after:absolute after:inset-y-4 after:left-4 after:w-1 after:rounded-full transition-colors ${
+                                                event.deletedAt
+                                                    ? 'bg-zinc-50 text-muted-foreground opacity-70 after:bg-zinc-300 italic'
+                                                    : `bg-zinc-100/80 hover:bg-zinc-100 ${colorClass} border border-transparent`
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="font-medium text-base sm:text-sm">
+                                                        {parseEntryType(event.entryType!, event.absence)}
+                                                        {multipleContracts && contract && (
+                                                            <span className="ml-2 text-[10px] font-normal text-muted-foreground bg-zinc-200/50 px-1.5 py-0.5 rounded border border-zinc-300/50 uppercase">
+                                                                {contract.groupName}
+                                                            </span>
+                                                        )}
+                                                        {event.deletedAt && (
+                                                            <span className="ml-2 text-[10px] font-normal text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-200 uppercase not-italic">
+                                                                Gelöscht
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-muted-foreground text-xs sm:text-sm">
+                                                        {event.entryType === 'absence'
+                                                            ? format(event.loggedTimestamp!, 'PP', { locale: de })
+                                                            : format(event.loggedTimestamp!, 'PP - pp', { locale: de })}
+                                                    </div>
+                                                </div>
+                                                {!event.abgerechnet &&
+                                                    !event.deletedAt &&
+                                                    (event.entryType !== 'absence' || event.absence?.type === 'sick') && (
+                                                        <button
+                                                            onClick={(): void => {
+                                                                setEntryToDelete({
+                                                                    id: event.id!,
+                                                                    type: event.entryType === 'absence' ? 'absence' : 'log',
+                                                                });
+                                                                setDeleteModalOpen(true);
+                                                            }}
+                                                            className="text-red-500 hover:text-red-700 p-2 -mr-2 -mt-1 sm:p-1 sm:mr-0 sm:mt-0 transition-colors"
+                                                            title="Eintrag löschen"
+                                                        >
+                                                            <Trash2 className="h-5 w-5 sm:h-4 sm:w-4" />
+                                                        </button>
                                                     )}
-                                                </div>
-                                                <div className="text-muted-foreground text-xs sm:text-sm">
-                                                    {format(event.loggedTimestamp!, 'PP - pp', { locale: de })}
-                                                </div>
                                             </div>
-                                            {!event.abgerechnet && !event.deletedAt && (
-                                                <button
-                                                    onClick={(): void => {
-                                                        setEntryToDelete(event.id!);
-                                                        setDeleteModalOpen(true);
-                                                    }}
-                                                    className="text-red-500 hover:text-red-700 p-2 -mr-2 -mt-1 sm:p-1 sm:mr-0 sm:mt-0 transition-colors"
-                                                    title="Eintrag löschen"
-                                                >
-                                                    <Trash2 className="h-5 w-5 sm:h-4 sm:w-4" />
-                                                </button>
+                                            {!isEmpty(event.comment) && (
+                                                <div className="text-muted-foreground mt-2 text-xs sm:text-sm bg-white/50 p-2 rounded-md border border-zinc-200/50">
+                                                    <span className="font-semibold text-[10px] uppercase block mb-1 opacity-70">
+                                                        Kommentar
+                                                    </span>
+                                                    {event.comment}
+                                                </div>
+                                            )}
+                                            {event.deletedAt && !isEmpty(event.deletionReason) && (
+                                                <div className="text-red-500/80 mt-2 text-xs bg-red-50/50 p-2 rounded-md border border-red-200/30">
+                                                    <span className="font-semibold text-[10px] uppercase block mb-1 opacity-70">
+                                                        Löschgrund
+                                                    </span>
+                                                    {event.deletionReason}
+                                                </div>
                                             )}
                                         </div>
-                                        {!isEmpty(event.comment) && (
-                                            <div className="text-muted-foreground mt-2 text-xs sm:text-sm bg-white/50 p-2 rounded-md border border-zinc-200/50">
-                                                <span className="font-semibold text-[10px] uppercase block mb-1 opacity-70">Kommentar</span>
-                                                {event.comment}
-                                            </div>
-                                        )}
-                                        {event.deletedAt && !isEmpty(event.deletionReason) && (
-                                            <div className="text-red-500/80 mt-2 text-xs bg-red-50/50 p-2 rounded-md border border-red-200/30">
-                                                <span className="font-semibold text-[10px] uppercase block mb-1 opacity-70">
-                                                    Löschgrund
-                                                </span>
-                                                {event.deletionReason}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                    );
+                                })}
                     </div>
                 </CardContent>
             </Card>

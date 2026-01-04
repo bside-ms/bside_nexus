@@ -1,9 +1,10 @@
-import { Calculator, Clock, FileText, LayoutDashboard } from 'lucide-react';
+import { Calculator, CalendarOff, Clock, FileClock, FileText, LayoutDashboard } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import getUserSession from '@/lib/auth/getUserSession';
 
 const breadCrumbs = [
     {
@@ -18,7 +19,9 @@ export const metadata: Metadata = {
     robots: 'noindex, nofollow',
 };
 
-export default function Page(): ReactElement {
+export default async function Page(): Promise<ReactElement> {
+    const session = await getUserSession();
+
     const navItems = [
         {
             title: 'Schnellerfassung',
@@ -33,6 +36,12 @@ export default function Page(): ReactElement {
             icon: FileText,
         },
         {
+            title: 'Abwesenheiten',
+            description: 'Urlaub und Krankheit eintragen.',
+            href: '/hrp/absences',
+            icon: CalendarOff,
+        },
+        {
             title: 'Überblick',
             description: 'Kalenderansicht deiner erfassten Zeiten.',
             href: '/hrp/calendar',
@@ -45,6 +54,16 @@ export default function Page(): ReactElement {
             icon: Calculator,
         },
     ];
+
+    const isHrpAdmin = session?.roles?.includes('arbeitszeiterfassung-admin') ?? false;
+    if (isHrpAdmin) {
+        navItems.push({
+            title: 'Administration',
+            description: 'Unterseite für die Vertragsverwaltung und Abrechnung.',
+            href: '/hrp/admin',
+            icon: FileClock,
+        });
+    }
 
     return (
         <div className="">

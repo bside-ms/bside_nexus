@@ -5,6 +5,7 @@ import NavbarTop from '@/components/sidebar/NavbarTop';
 import { db } from '@/db';
 import { usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
+import { getActiveContractsForUser } from '@/lib/db/contractActions';
 import { getHrpLogForUser } from '@/lib/db/hrpActions';
 import type { DayEntries } from '@/lib/hrp/hrpLogic';
 import { computeDayStats, toTimeStr } from '@/lib/hrp/hrpLogic';
@@ -37,13 +38,14 @@ const parseFromObject = (searchParams: Record<string, string | Array<string> | u
     const rawMonth = Array.isArray(searchParams?.month) ? searchParams?.month[0] : searchParams?.month;
     const rawYear = Array.isArray(searchParams?.year) ? searchParams?.year[0] : searchParams?.year;
     const rawPeriod = Array.isArray(searchParams?.period) ? searchParams?.period[0] : searchParams?.period;
+    const rawContractId = Array.isArray(searchParams?.contractId) ? searchParams?.contractId[0] : searchParams?.contractId;
 
     const year = Number.isFinite(Number(rawYear)) ? Number(rawYear) : now.getFullYear();
     const mCandidate = Number(rawMonth);
     const month = Number.isFinite(mCandidate) && mCandidate >= 1 && mCandidate <= 12 ? mCandidate - 1 : now.getMonth();
     const period: PeriodMode = rawPeriod === '23-22' ? '23-22' : 'calendar';
 
-    return { year, month, period };
+    return { year, month, period, contractId: rawContractId };
 };
 
 const monthLabel = (year: number, monthZeroBased: number) =>
@@ -85,7 +87,7 @@ export default async function Page({
     searchParams?: Promise<Record<string, string | Array<string> | undefined>>;
 }): Promise<ReactElement> {
     const sp = (await searchParams) ?? {};
-    const { year, month, period } = parseFromObject(sp);
+    const { year, month, period, contractId: initialContractId } = parseFromObject(sp);
 
     // Only use current authenticated user
     const session = await getUserSession();
@@ -101,6 +103,10 @@ export default async function Page({
         );
     }
 
+    const contracts = await getActiveContractsForUser(currentUserId);
+    const selectedContractId =
+        initialContractId && contracts.some((c) => c.contractId === initialContractId) ? initialContractId : contracts[0]?.contractId;
+
     // Fetch current user's name/display label
     const userRow = await db
         .select({ username: usersTable.username, displayName: usersTable.displayName })
@@ -114,13 +120,13 @@ export default async function Page({
     });
 
     // Fetch logs only for the current user
-    const logsCurrent = await getHrpLogForUser(currentUserId, year, month);
+    const logsCurrent = await getHrpLogForUser(currentUserId, year, month, selectedContractId);
 
     // For 23–22 period also load previous month
     const prevEdge = new Date(year, month, 0);
     const prevYear = prevEdge.getFullYear();
     const prevMonth = prevEdge.getMonth();
-    const logsPrev = period === '23-22' ? await getHrpLogForUser(currentUserId, prevYear, prevMonth) : undefined;
+    const logsPrev = period === '23-22' ? await getHrpLogForUser(currentUserId, prevYear, prevMonth, selectedContractId) : undefined;
 
     // Determine day range for the selected view
     interface DayRef {
@@ -201,6 +207,9 @@ export default async function Page({
         return { value: i + 1, label: cap(label) };
     });
 
+    const currentYear = new Date().getFullYear();
+    const yearOptions = Array.from({ length: 2 }, (_, i) => currentYear - i);
+
     // Aggregated info
     const info = {
         daysUnder30: [] as Array<number>,
@@ -259,6 +268,26 @@ export default async function Page({
 
                 {/* Filter: only month and period (no user selection) */}
                 <form className="flex flex-wrap items-center gap-3 print:hidden" method="get">
+                    {contracts.length > 1 && (
+                        <>
+                            <label className="text-sm font-medium" htmlFor="contract-select">
+                                Vertrag:
+                            </label>
+                            <select
+                                id="contract-select"
+                                name="contractId"
+                                defaultValue={selectedContractId ?? ''}
+                                className="min-w-[12rem] rounded border bg-background px-3 py-2 text-sm"
+                            >
+                                {contracts.map((c) => (
+                                    <option key={c.contractId} value={c.contractId}>
+                                        {c.groupName}
+                                    </option>
+                                ))}
+                            </select>
+                        </>
+                    )}
+
                     <label className="text-sm font-medium" htmlFor="month-select">
                         Monat:
                     </label>
@@ -271,6 +300,22 @@ export default async function Page({
                         {monthOptions.map((m) => (
                             <option key={m.value} value={m.value}>
                                 {m.label}
+                            </option>
+                        ))}
+                    </select>
+
+                    <label className="text-sm font-medium" htmlFor="year-select">
+                        Jahr:
+                    </label>
+                    <select
+                        id="year-select"
+                        name="year"
+                        defaultValue={year}
+                        className="min-w-[6rem] rounded border bg-background px-3 py-2 text-sm"
+                    >
+                        {yearOptions.map((y) => (
+                            <option key={y} value={y}>
+                                {y}
                             </option>
                         ))}
                     </select>
@@ -288,7 +333,6 @@ export default async function Page({
                         <option value="23-22">Abrechnungszeitraum</option>
                     </select>
 
-                    <input type="hidden" name="year" value={year} />
                     <button type="submit" className="rounded border px-3 py-2 text-sm hover:bg-muted">
                         Anzeigen
                     </button>

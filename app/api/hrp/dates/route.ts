@@ -13,6 +13,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         });
     }
 
+    const isAllowedRole = session?.roles?.includes('arbeitszeiterfassung') ?? false;
+    if (!isAllowedRole) {
+        return NextResponse.json({
+            success: false,
+            messsage: 'Dir fehlen die notwendigen Berechtigungen.',
+        });
+    }
+
     const result = await getDatesWithHrpEntries(session.id, year, month);
     return NextResponse.json({ success: true, dates: result }, { status: 200 });
 }
