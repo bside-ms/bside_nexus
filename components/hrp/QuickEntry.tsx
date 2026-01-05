@@ -138,7 +138,7 @@ export default function QuickEntry({ contracts }: { contracts: Array<HrpContract
                     Aktueller Zeitstempel: <span className="font-mono font-medium text-foreground">{currentTime}</span>
                 </p>
 
-                <div className="py-2 flex flex-col space-y-2 lg:w-[240px]">
+                <div className="py-2 flex flex-col space-y-2">
                     {EVENTS.map((event) => (
                         <Button
                             key={event.type}
