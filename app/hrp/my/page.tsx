@@ -162,6 +162,9 @@ export default async function Page({
 
         const stats = computeDayStats(entries);
 
+        // Collect absences for hints
+        const absences = entries.filter((e) => e.entryType === 'absence');
+
         // Check if this ref represents "today"
         const refDate = new Date(dYear, dMonth, ref.day);
         const refDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(refDate);
@@ -171,6 +174,7 @@ export default async function Page({
         if (isToday && stats.stops.length === 0) {
             return {
                 ...stats,
+                absences,
                 breakWarning: 'ok' as const,
                 issues: stats.issues.filter(
                     (i) =>
@@ -182,7 +186,7 @@ export default async function Page({
             };
         }
 
-        return stats;
+        return { ...stats, absences };
     });
 
     // Period totals
@@ -232,7 +236,7 @@ export default async function Page({
         if (s.issues.some((x) => x.includes('Unvollständige Pause') || x.includes('Pausen-Reihenfolge'))) {
             info.daysUnmatchedBreaks.push(d);
         }
-        if (s.issues.includes('Keine Buchungen')) {
+        if (s.issues.includes('Keine Buchungen') && s.absences.length === 0) {
             info.daysNoBookings.push(d);
         }
     });
@@ -371,7 +375,7 @@ export default async function Page({
                                         x.includes('Pausen-Reihenfolge'),
                                 );
 
-                                const noBookings = s.totalEntries === 0;
+                                const noBookings = s.totalEntries === 0 && s.absences.length === 0;
 
                                 const rowClass = hasBookingErrors ? 'bg-red-50' : noBookings ? 'bg-zinc-50 text-zinc-400' : '';
 
@@ -386,6 +390,23 @@ export default async function Page({
                                 if (pauseWarnText) {
                                     hints.push({ text: pauseWarnText, className: 'text-red-600' });
                                 }
+
+                                // Add absences to hints
+                                for (const a of s.absences) {
+                                    const typeLabel =
+                                        a.absence?.type === 'vacation'
+                                            ? 'Urlaub'
+                                            : a.absence?.type === 'sick'
+                                              ? 'Krankheit'
+                                              : a.absence?.type === 'holiday'
+                                                ? 'Feiertag'
+                                                : a.absence?.type;
+                                    hints.push({
+                                        text: `${typeLabel} (${a.absence?.hoursValue}h)`,
+                                        className: 'font-semibold text-blue-600',
+                                    });
+                                }
+
                                 for (const issue of s.issues) {
                                     if (issue === 'Keine Buchungen') {
                                         continue;

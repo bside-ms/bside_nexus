@@ -1,10 +1,11 @@
-import type { HrpEventLogEntry } from '@/db/schema';
+import type { HrpAbsenceEntry, HrpEventLogEntry } from '@/db/schema';
 
 export interface Entry {
     id?: string;
-    entryType?: string | null; // 'start' | 'stop' | 'pause' | 'pause_end'
+    entryType?: string | null; // 'start' | 'stop' | 'pause' | 'pause_end' | 'absence'
     loggedTimestamp?: Date | string | null;
     comment?: string | null;
+    absence?: HrpAbsenceEntry;
 }
 
 export type DayEntries = Array<Entry>;
@@ -106,12 +107,17 @@ export const computeDayStats = (entries: DayEntries): DayStats => {
         .filter((e) => e.ts && !isNaN(e.ts.getTime()))
         .sort((a, b) => a.ts!.getTime() - b.ts!.getTime()) as Array<Entry & { ts: Date }>;
 
+    const issues: Array<string> = [];
+
+    // Filter normal events for time calculations
+    const timeEvents = byTime.filter((e) => e.entryType !== 'absence');
+
     const starts: Array<Date> = [];
     const stops: Array<Date> = [];
     const pauseStarts: Array<Date> = [];
     const pauseEnds: Array<Date> = [];
 
-    for (const e of byTime) {
+    for (const e of timeEvents) {
         const t = (e.entryType ?? '').toLowerCase();
         if (t === 'start') {
             starts.push(e.ts);
@@ -124,10 +130,9 @@ export const computeDayStats = (entries: DayEntries): DayStats => {
         }
     }
 
-    const issues: Array<string> = [];
-
     // Sessions
     let sessionMinutes = 0;
+    let sessionMinutesWithoutAbsences = 0;
     const startStopPairs: Array<{ from?: Date; to?: Date }> = [];
     const sessionPairCount = Math.min(starts.length, stops.length);
     for (let i = 0; i < sessionPairCount; i++) {
@@ -135,11 +140,24 @@ export const computeDayStats = (entries: DayEntries): DayStats => {
         const to = stops[i];
         startStopPairs.push({ from, to });
         if (from && to && to > from) {
-            sessionMinutes += minutesBetween(from, to);
+            const mins = minutesBetween(from, to);
+            sessionMinutes += mins;
+            sessionMinutesWithoutAbsences += mins;
         } else {
             issues.push('Start/Stop-Reihenfolge fehlerhaft');
         }
     }
+
+    // Add absence minutes
+    for (const e of byTime) {
+        if (e.entryType === 'absence' && e.absence) {
+            const val = parseFloat(String(e.absence.hoursValue));
+            if (!isNaN(val)) {
+                sessionMinutes += Math.round(val * 60);
+            }
+        }
+    }
+
     if (starts.length !== stops.length) {
         issues.push('Fehlendes Start/Stop');
     }
@@ -163,8 +181,8 @@ export const computeDayStats = (entries: DayEntries): DayStats => {
     }
 
     // Netto-Kandidat, Pflichtpause, Anpassung
-    const netCandidate = Math.max(0, sessionMinutes - actualBreakMinutes);
-    const requiredMinutes = requiredBreakForNet(netCandidate);
+    const timeOnlyNetCandidate = Math.max(0, sessionMinutesWithoutAbsences - actualBreakMinutes);
+    const requiredMinutes = requiredBreakForNet(timeOnlyNetCandidate);
     const adjustedBreakMinutes = Math.max(actualBreakMinutes, requiredMinutes);
     const netMinutes = Math.max(0, sessionMinutes - adjustedBreakMinutes);
 

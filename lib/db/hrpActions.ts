@@ -192,7 +192,7 @@ export const getHrpLogForUser = async (
     year: number,
     month: number,
     contractId?: string | null,
-): Promise<Record<number, Array<Partial<HrpEventLogEntry>>>> => {
+): Promise<Record<number, Array<Partial<HrpEventLogEntry & { absence?: HrpAbsenceEntry }>>>> => {
     // Effizientes Laden aller Einträge für den Monat in einer Query
     const startOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
     // Wir laden bis zum Ende des Folgetages des Monatsendes, um Sessions über Mitternacht zu erfassen
@@ -219,7 +219,7 @@ export const getHrpLogForUser = async (
         .orderBy(hrpEventLogTable.loggedTimestamp);
 
     const groups = groupEntriesByWorkday(entries);
-    const byDay: Record<number, Array<Partial<HrpEventLogEntry>>> = {};
+    const byDay: Record<number, Array<Partial<HrpEventLogEntry & { absence?: HrpAbsenceEntry }>>> = {};
 
     Object.entries(groups).forEach(([dateStr, dayEntries]) => {
         const date = new Date(dateStr);
@@ -229,6 +229,41 @@ export const getHrpLogForUser = async (
             );
         }
     });
+
+    // Abwesenheiten laden
+    const startOfMonthStr = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const endOfMonthStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+    const absenceConditions = [
+        gte(hrpAbsencesTable.date, startOfMonthStr),
+        lte(hrpAbsencesTable.date, endOfMonthStr),
+        isNull(hrpAbsencesTable.deletedAt),
+    ];
+
+    if (contractId) {
+        absenceConditions.push(eq(hrpAbsencesTable.contractId, contractId));
+    } else {
+        absenceConditions.push(sql`${hrpAbsencesTable.contractId} IN (SELECT id FROM hrp_contracts WHERE "userId" = ${userId})`);
+    }
+
+    const absences = await db.query.hrpAbsencesTable.findMany({
+        where: and(...absenceConditions),
+    });
+
+    for (const abs of absences) {
+        const d = new Date(abs.date).getDate();
+        if (!byDay[d]) {
+            byDay[d] = [];
+        }
+        byDay[d].push({
+            id: abs.id,
+            entryType: 'absence' as any,
+            loggedTimestamp: new Date(abs.date),
+            comment: abs.type, // Typ als Kommentar speichern für Anzeige
+            absence: abs,
+        });
+    }
 
     return byDay;
 };
@@ -242,7 +277,7 @@ export const getHrpLogsForAllUsers = async (
         string,
         {
             user: { id: string; username: string; displayName: string | null };
-            logs: Record<number, Array<Partial<HrpEventLogEntry>>>;
+            logs: Record<number, Array<Partial<HrpEventLogEntry & { absence?: HrpAbsenceEntry }>>>;
         }
     >
 > => {

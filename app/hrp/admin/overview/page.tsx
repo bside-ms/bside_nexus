@@ -214,7 +214,11 @@ export default async function Page({
             ref.source === 'prev'
                 ? ((selectedPrev?.logs?.[ref.day] ?? []) as DayEntries)
                 : ((selectedCurrent?.logs?.[ref.day] ?? []) as DayEntries);
-        return computeDayStats(entries);
+        const stats = computeDayStats(entries);
+
+        // Abwesenheiten für Hinweise sammeln
+        const absences = entries.filter((e) => e.entryType === 'absence');
+        return { ...stats, absences };
     });
 
     // Monats-/Perioden-Summen
@@ -271,7 +275,7 @@ export default async function Page({
         if (s.issues.some((x) => x.includes('Unvollständige Pause') || x.includes('Pausen-Reihenfolge'))) {
             info.daysUnmatchedBreaks.push(d);
         }
-        if (s.issues.includes('Keine Buchungen')) {
+        if (s.issues.includes('Keine Buchungen') && s.absences.length === 0) {
             info.daysNoBookings.push(d);
         }
     });
@@ -434,7 +438,7 @@ export default async function Page({
                                             x.includes('Pausen-Reihenfolge'),
                                     );
 
-                                    const noBookings = s.totalEntries === 0;
+                                    const noBookings = s.totalEntries === 0 && s.absences.length === 0;
 
                                     const rowClass = hasBookingErrors ? 'bg-red-50' : noBookings ? 'bg-zinc-50 text-zinc-400' : '';
 
@@ -449,6 +453,23 @@ export default async function Page({
                                     if (pauseWarnText) {
                                         hints.push({ text: pauseWarnText, className: 'text-red-600' });
                                     }
+
+                                    // Abwesenheiten zu Hinweisen hinzufügen
+                                    for (const a of s.absences) {
+                                        const typeLabel =
+                                            a.absence?.type === 'vacation'
+                                                ? 'Urlaub'
+                                                : a.absence?.type === 'sick'
+                                                  ? 'Krankheit'
+                                                  : a.absence?.type === 'holiday'
+                                                    ? 'Feiertag'
+                                                    : a.absence?.type;
+                                        hints.push({
+                                            text: `${typeLabel} (${a.absence?.hoursValue}h)`,
+                                            className: 'font-semibold text-blue-600',
+                                        });
+                                    }
+
                                     for (const issue of s.issues) {
                                         if (issue === 'Keine Buchungen') {
                                             continue;
