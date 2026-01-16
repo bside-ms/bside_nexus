@@ -111,6 +111,8 @@ export default function AdvancedEntry({ contracts }: { contracts: Array<HrpContr
 
             if (!res.ok || data.success === false) {
                 setError(data.message || data.error || 'Es ist ein unbekannter Fehler aufgetreten.');
+                setWarning(null);
+                setPendingValues(null);
                 return;
             }
 
@@ -306,11 +308,22 @@ export default function AdvancedEntry({ contracts }: { contracts: Array<HrpContr
                                             Möchtest du die Buchung trotzdem speichern?
                                         </div>
                                         <div className="flex justify-end gap-2">
-                                            <Button variant="secondary" onClick={closeResultModal}>
+                                            <Button variant="secondary" onClick={closeResultModal} disabled={isLoading}>
                                                 Abbrechen
                                             </Button>
-                                            <Button variant="destructive" onClick={(): Promise<void> => onSubmit(pendingValues!, true)}>
-                                                Trotzdem speichern
+                                            <Button
+                                                variant="destructive"
+                                                onClick={(): Promise<void> => onSubmit(pendingValues!, true)}
+                                                disabled={isLoading}
+                                            >
+                                                {isLoading ? (
+                                                    <div className="flex items-center justify-center space-x-2">
+                                                        <Loader2 className="size-4 animate-spin" />
+                                                        <span>Lädt...</span>
+                                                    </div>
+                                                ) : (
+                                                    'Trotzdem speichern'
+                                                )}
                                             </Button>
                                         </div>
                                     </>

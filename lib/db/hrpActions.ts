@@ -258,7 +258,7 @@ export const getHrpLogForUser = async (
         }
         byDay[d].push({
             id: abs.id,
-            entryType: 'absence' as any,
+            entryType: 'absence' as string,
             loggedTimestamp: new Date(abs.date),
             comment: abs.type, // Typ als Kommentar speichern für Anzeige
             absence: abs,
