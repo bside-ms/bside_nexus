@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     robots: 'noindex, nofollow',
 };
 
-type PeriodMode = 'calendar' | '23-22';
+type PeriodMode = 'calendar' | '23-22' | '15-14';
 
 function getDaysInMonth(year: number, monthZeroBased: number): number {
     return new Date(year, monthZeroBased + 1, 0).getDate();
@@ -46,7 +46,7 @@ const parseFromObject = (searchParams: Record<string, string | Array<string> | u
     const year = Number.isFinite(Number(rawYear)) ? Number(rawYear) : now.getFullYear();
     const mCandidate = Number(rawMonth);
     const month = Number.isFinite(mCandidate) && mCandidate >= 1 && mCandidate <= 12 ? mCandidate - 1 : now.getMonth();
-    const period: PeriodMode = rawPeriod === '23-22' ? '23-22' : 'calendar';
+    const period: PeriodMode = rawPeriod === '15-14' ? '15-14' : rawPeriod === '23-22' ? '23-22' : 'calendar';
 
     return { year, month, period, initialUserId: rawUser, contractId: rawContract };
 };
@@ -60,7 +60,7 @@ const monthLabel = (year: number, monthZeroBased: number) =>
         }),
     );
 
-const altPeriodLabel = (year: number, monthZeroBased: number): string => {
+const altPeriodLabel = (year: number, monthZeroBased: number, period: PeriodMode): string => {
     const prevEdge = new Date(year, monthZeroBased, 0); // letzter Tag Vormonat
     const prevY = prevEdge.getFullYear();
     const prevM = prevEdge.getMonth();
@@ -68,6 +68,9 @@ const altPeriodLabel = (year: number, monthZeroBased: number): string => {
     const currMonthName = cap(
         new Date(year, monthZeroBased, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric', timeZone: 'Europe/Berlin' }),
     );
+    if (period === '15-14') {
+        return `15. ${prevMonthName} – 14. ${currMonthName}`;
+    }
     return `23. ${prevMonthName} – 22. ${currMonthName}`;
 };
 
@@ -177,11 +180,11 @@ export default async function Page({
 
     const logsCurrentByUser = await getHrpLogsForAllUsers(year, month, selectedContractId);
 
-    // Für 23.–22.-Ansicht auch Vormonat laden
+    // Für 23.–22.-Ansicht und 15.-14.-Ansicht auch Vormonat laden
     const prevEdge = new Date(year, month, 0);
     const prevYear = prevEdge.getFullYear();
     const prevMonth = prevEdge.getMonth();
-    const logsPrevByUser = period === '23-22' ? await getHrpLogsForAllUsers(prevYear, prevMonth, selectedContractId) : undefined;
+    const logsPrevByUser = period !== 'calendar' ? await getHrpLogsForAllUsers(prevYear, prevMonth, selectedContractId) : undefined;
 
     const selectedCurrent = selectedUserId ? logsCurrentByUser[selectedUserId] : undefined;
     const selectedPrev = selectedUserId && logsPrevByUser ? logsPrevByUser[selectedUserId] : undefined;
@@ -195,7 +198,7 @@ export default async function Page({
     if (period === 'calendar') {
         const dim = getDaysInMonth(year, month);
         dayRefs = buildDayArray(dim, (i) => ({ source: 'curr', day: i + 1 }));
-    } else {
+    } else if (period === '23-22') {
         const daysInPrev = new Date(year, month, 0).getDate();
         const prevPart: Array<DayRef> = [];
         for (let d = 23; d <= daysInPrev; d++) {
@@ -203,6 +206,17 @@ export default async function Page({
         }
         const currPart: Array<DayRef> = [];
         for (let d = 1; d <= 22; d++) {
+            currPart.push({ source: 'curr', day: d });
+        }
+        dayRefs = [...prevPart, ...currPart];
+    } else if (period === '15-14') {
+        const daysInPrev = new Date(year, month, 0).getDate();
+        const prevPart: Array<DayRef> = [];
+        for (let d = 15; d <= daysInPrev; d++) {
+            prevPart.push({ source: 'prev', day: d });
+        }
+        const currPart: Array<DayRef> = [];
+        for (let d = 1; d <= 14; d++) {
             currPart.push({ source: 'curr', day: d });
         }
         dayRefs = [...prevPart, ...currPart];
@@ -305,7 +319,7 @@ export default async function Page({
                 <div className="flex flex-col">
                     <h1 className="text-3xl font-bold leading-tight">Arbeitszeiterfassung: {selectedUserLabel}</h1>
                     <div className="text-base sm:text-lg text-muted-foreground">
-                        {period === 'calendar' ? monthLabel(year, month) : altPeriodLabel(year, month)}
+                        {period === 'calendar' ? monthLabel(year, month) : altPeriodLabel(year, month, period)}
                     </div>
                 </div>
 
@@ -389,7 +403,8 @@ export default async function Page({
                         className="min-w-[12rem] rounded border bg-background px-3 py-2 text-sm"
                     >
                         <option value="calendar">Kalendermonat</option>
-                        <option value="23-22">Abrechnungszeitraum</option>
+                        <option value="23-22">Abrechnungszeitraum Cafe</option>
+                        <option value="15-14">Abrechnungszeitraum KV</option>
                     </select>
 
                     <button type="submit" className="rounded border px-3 py-2 text-sm hover:bg-muted">
@@ -425,9 +440,17 @@ export default async function Page({
                                         if (period === 'calendar') {
                                             return idx + 1;
                                         }
-                                        // 23..Ende (prev), dann 1..22 (curr)
-                                        const daysInPrev = new Date(year, month, 0).getDate();
-                                        return idx < daysInPrev - 22 ? 23 + idx : idx - (daysInPrev - 22) + 1;
+                                        if (period === '23-22') {
+                                            // 23..Ende (prev), dann 1..22 (curr)
+                                            const daysInPrev = new Date(year, month, 0).getDate();
+                                            return idx < daysInPrev - 22 ? 23 + idx : idx - (daysInPrev - 22) + 1;
+                                        }
+                                        if (period === '15-14') {
+                                            // 15..Ende (prev), dann 1..14 (curr)
+                                            const daysInPrev = new Date(year, month, 0).getDate();
+                                            return idx < daysInPrev - 14 ? 15 + idx : idx - (daysInPrev - 14) + 1;
+                                        }
+                                        return idx + 1;
                                     })();
 
                                     const hasBookingErrors = s.issues.some(
