@@ -6,7 +6,7 @@ export function canModifyEntry(contractType: string, entryDate: Date): { allowed
 
     // Strengere Regel für Festangestellte
     if (contractType === 'fixed_salary') {
-        if (daysDiff > 7) {
+        if (daysDiff > 31) {
             return { allowed: false, error: 'Änderungen nur 7 Tage rückwirkend möglich.' };
         }
         return { allowed: true };
