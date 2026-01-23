@@ -1,14 +1,17 @@
-import { and, eq, gte, lt } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
+import { PayrollHourlyClient } from '@/components/hrp/PayrollHourlyClient';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { db } from '@/db';
+import type { HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
 import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getActiveContractsForUser } from '@/lib/db/contractActions';
 import { getHrpLogsForAllUsers } from '@/lib/db/hrpActions';
-import { getManagedContracts } from '@/lib/db/hrpAdminActions';
+import { getManagedContracts, getPreviousPayrollHourly, getUnbilledLogs } from '@/lib/db/hrpAdminActions';
 import type { DayEntries } from '@/lib/hrp/hrpLogic';
+import { groupEntriesByWorkday } from '@/lib/hrp/hrpLogic';
 import { computeDayStats, toTimeStr } from '@/lib/hrp/hrpLogic';
 
 const breadCrumbs = [
@@ -178,6 +181,52 @@ export default async function Page({
     const selectedContractId =
         rawContractId && contracts.some((c) => c.contractId === rawContractId) ? rawContractId : contracts[0]?.contractId;
 
+    const selectedContract = contracts.find((c) => c.contractId === selectedContractId);
+
+    // Nicht abgerechnete Stunden für Payroll-Vorschau
+    let unbilledLogs: Array<HrpEventLogEntry> = [];
+    let previousPayroll: HrpMonthlyPayrollEntry | null = null;
+    if (selectedUserId && selectedContractId && selectedContract?.type === 'hourly') {
+        const edge = new Date(year, month, 23, 0, 0, 0, 0); // Ende des aktuellen Zeitraums (22. 23:59:59)
+        // Wir laden unbilled logs ohne Zeitbeschränkung nach hinten, um ALLES zu erfassen
+        unbilledLogs = await getUnbilledLogs(selectedUserId, selectedContractId, edge);
+        previousPayroll = await getPreviousPayrollHourly(selectedContractId, year, month);
+    }
+
+    // Für die korrekte Gruppierung brauchen wir auch bereits abgerechnete Logs als Kontext
+    let contextLogs: Array<HrpEventLogEntry> = [];
+    if (selectedUserId && selectedContractId && selectedContract?.type === 'hourly') {
+        // Lade alle Logs der letzten 60 Tage als Kontext (sollte für Schichtübergänge reichen)
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        contextLogs = (await db
+            .select()
+            .from(hrpEventLogTable)
+            .where(
+                and(
+                    eq(hrpEventLogTable.userId, selectedUserId),
+                    eq(hrpEventLogTable.contractId, selectedContractId),
+                    gte(hrpEventLogTable.loggedTimestamp, sixtyDaysAgo),
+                    isNull(hrpEventLogTable.deletedAt),
+                ),
+            )
+            .orderBy(hrpEventLogTable.loggedTimestamp)) as Array<HrpEventLogEntry>;
+    }
+
+    const unbilledByDay =
+        selectedUserId && selectedContractId && selectedContract?.type === 'hourly'
+            ? groupEntriesByWorkday([...contextLogs]) // groupEntriesByWorkday handles duplicates or we just use contextLogs which should include unbilled too
+            : {};
+
+    // Filter unbilledByDay to only include days that actually have unbilled logs
+    const filteredUnbilledByDay: Record<string, Array<HrpEventLogEntry>> = {};
+    const unbilledSet = new Set(unbilledLogs.map((l) => l.id));
+    Object.entries(unbilledByDay).forEach(([dateStr, entries]) => {
+        if (entries.some((e) => unbilledSet.has(e.id))) {
+            filteredUnbilledByDay[dateStr] = entries;
+        }
+    });
+
     const logsCurrentByUser = await getHrpLogsForAllUsers(year, month, selectedContractId);
 
     // Für 23.–22.-Ansicht und 15.-14.-Ansicht auch Vormonat laden
@@ -252,6 +301,19 @@ export default async function Page({
     // Zeit-Token: gleiche Breite, zentriert, auf großen Displays etwas breiter (alle Zeitfenster gleich)
     const timeToken = 'inline-flex font-medium items-center justify-center w-[5ch] sm:w-[5.5ch] lg:w-[6ch]';
 
+    // Aggregierte unbilled days für PayrollHourlyClient
+    const unbilledDayStats = Object.entries(filteredUnbilledByDay)
+        .map(([dateStr, entries]) => {
+            const stats = computeDayStats(entries);
+            return {
+                dateStr,
+                netMinutes: stats.netMinutes,
+                issues: stats.issues.filter((issue) => !issue.includes('vor Mitternacht') && !issue.includes('nach Mitternacht')),
+                entryIds: entries.map((e) => e.id),
+            };
+        })
+        .sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+
     // Header & Auswahllisten
     const selectedUserLabel =
         userOptionsYear.find((u) => u.id === selectedUserId)?.label ??
@@ -283,10 +345,10 @@ export default async function Page({
         if (s.breakWarning === 'under45') {
             info.daysUnder45.push(d);
         }
-        if (s.issues.some((x) => x.includes('Fehlendes Start/Stop') || x.includes('Start/Stop-Reihenfolge'))) {
+        if (s.issues.some((x: string) => x.includes('Fehlendes Start/Stop') || x.includes('Start/Stop-Reihenfolge'))) {
             info.daysUnmatchedSessions.push(d);
         }
-        if (s.issues.some((x) => x.includes('Unvollständige Pause') || x.includes('Pausen-Reihenfolge'))) {
+        if (s.issues.some((x: string) => x.includes('Unvollständige Pause') || x.includes('Pausen-Reihenfolge'))) {
             info.daysUnmatchedBreaks.push(d);
         }
         if (s.issues.includes('Keine Buchungen') && s.absences.length === 0) {
@@ -508,7 +570,7 @@ export default async function Page({
                                             <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
                                                 {s.starts.length > 0 ? (
                                                     <div className="flex flex-col items-center gap-1">
-                                                        {s.starts.map((t, i2) => (
+                                                        {s.starts.map((t: Date, i2: number) => (
                                                             <span key={i2} className={timeToken}>
                                                                 {toTimeStr(t)}
                                                             </span>
@@ -536,7 +598,7 @@ export default async function Page({
                                             <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
                                                 {s.stops.length > 0 ? (
                                                     <div className="flex flex-col items-center gap-1">
-                                                        {s.stops.map((t, i4) => (
+                                                        {s.stops.map((t: Date, i4: number) => (
                                                             <span key={i4} className={timeToken}>
                                                                 {toTimeStr(t)}
                                                             </span>
@@ -583,7 +645,7 @@ export default async function Page({
                                             <td className="border-l px-2 py-1.5 sm:px-3 sm:py-2 text-left max-w-96">
                                                 {hints.length > 0 ? (
                                                     <div className="flex flex-col gap-1">
-                                                        {hints.map((h, i5) => (
+                                                        {hints.map((h: { text: string; className: string }, i5: number) => (
                                                             <span key={i5} className={`text-xs ${h.className}`}>
                                                                 {h.text}
                                                             </span>
@@ -620,7 +682,7 @@ export default async function Page({
                                     <td colSpan={8} className="border-t px-3 py-3 text-sm">
                                         {infoBits.length > 0 ? (
                                             <ul className="list-disc space-y-1 pl-5">
-                                                {infoBits.map((t, i) => (
+                                                {infoBits.map((t: string, i: number) => (
                                                     <li key={i}>{t}</li>
                                                 ))}
                                             </ul>
@@ -634,6 +696,18 @@ export default async function Page({
                             </tfoot>
                         </table>
                     </div>
+                )}
+
+                {selectedUserId && selectedContractId && (
+                    <PayrollHourlyClient
+                        contractId={selectedContractId}
+                        year={year}
+                        month={month}
+                        unbilledLogs={unbilledLogs}
+                        unbilledDayStats={unbilledDayStats}
+                        previousPayroll={previousPayroll}
+                        periodMode={period}
+                    />
                 )}
             </div>
         </div>

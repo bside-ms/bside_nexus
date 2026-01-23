@@ -1,7 +1,18 @@
-import { and, eq, inArray } from 'drizzle-orm';
+'use server';
+
+import { and, desc, eq, inArray, lt } from 'drizzle-orm';
 import { db } from '@/db';
-import type { HrpContractEntry, HrpYearlyEntry } from '@/db/schema';
-import { groupsTable, hrpContractsTable, hrpLeaveAccountsTable, membersTable, usersTable } from '@/db/schema';
+import type { HrpContractEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry, HrpYearlyEntry } from '@/db/schema';
+import {
+    groupsTable,
+    hrpContractsTable,
+    hrpEventLogTable,
+    hrpLeaveAccountsTable,
+    hrpPayrollHourlyTable,
+    membersTable,
+    usersTable,
+} from '@/db/schema';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  *  Hole alle Gruppen-IDs, die ein User verwalten darf
@@ -100,7 +111,7 @@ export async function getLeaveAccounts(contractId: string): Promise<Array<HrpYea
     // eslint-disable-next-line no-return-await
     return await db.query.hrpLeaveAccountsTable.findMany({
         where: eq(hrpLeaveAccountsTable.contractId, contractId),
-        orderBy: (table, { desc }) => [desc(table.year)],
+        orderBy: (table, { desc: orderDesc }) => [orderDesc(table.year)],
     });
 }
 
@@ -118,7 +129,6 @@ export async function upsertLeaveAccount(data: {
         // eslint-disable-next-line no-return-await
         return await db.update(hrpLeaveAccountsTable).set(values).where(eq(hrpLeaveAccountsTable.id, id)).returning();
     } else {
-        const { v4: uuidv4 } = await import('uuid');
         // eslint-disable-next-line no-return-await
         return await db
             .insert(hrpLeaveAccountsTable)
@@ -150,8 +160,6 @@ export async function updateContract(
     },
     changeDate: Date,
 ): Promise<string> {
-    const { v4: uuidv4 } = await import('uuid');
-
     // 1. Alten Vertrag holen
     const oldContract = await db.query.hrpContractsTable.findFirst({
         where: eq(hrpContractsTable.id, oldContractId),
@@ -182,6 +190,82 @@ export async function updateContract(
     });
 
     return newId;
+}
+
+export async function createPayrollHourly(data: {
+    contractId: string;
+    year: number;
+    month: number;
+    recordedHours: string;
+    forecastedHours: string;
+    correctionFromPrevMonth: string;
+    finalPayoutHours: string;
+    eventLogIds: Array<string>;
+}): Promise<string> {
+    // eslint-disable-next-line no-return-await
+    return await db.transaction(async (tx) => {
+        const id = uuidv4();
+
+        // 1. Payroll Eintrag erstellen
+        await tx.insert(hrpPayrollHourlyTable).values({
+            id,
+            contractId: data.contractId,
+            year: data.year,
+            month: data.month,
+            recordedHours: data.recordedHours,
+            forecastedHoursLateMonth: data.forecastedHours,
+            correctionFromPrevMonth: data.correctionFromPrevMonth,
+            finalPayoutHours: data.finalPayoutHours,
+            status: 'finalized',
+            finalizedAt: new Date(),
+        });
+
+        // 2. Event Logs als abgerechnet markieren
+        if (data.eventLogIds.length > 0) {
+            await tx.update(hrpEventLogTable).set({ abgerechnet: true }).where(inArray(hrpEventLogTable.id, data.eventLogIds));
+        }
+
+        return id;
+    });
+}
+
+export async function getPreviousPayrollHourly(contractId: string, year: number, month: number): Promise<HrpMonthlyPayrollEntry | null> {
+    let prevYear = year;
+    let prevMonth = month - 1;
+    if (prevMonth < 0) {
+        prevMonth = 11;
+        prevYear -= 1;
+    }
+
+    const result = await db
+        .select()
+        .from(hrpPayrollHourlyTable)
+        .where(
+            and(
+                eq(hrpPayrollHourlyTable.contractId, contractId),
+                eq(hrpPayrollHourlyTable.year, prevYear),
+                eq(hrpPayrollHourlyTable.month, prevMonth),
+            ),
+        )
+        .limit(1);
+
+    return result[0] ?? null;
+}
+
+export async function getUnbilledLogs(userId: string, contractId: string, upToDate: Date): Promise<Array<HrpEventLogEntry>> {
+    // eslint-disable-next-line no-return-await
+    return await db
+        .select()
+        .from(hrpEventLogTable)
+        .where(
+            and(
+                eq(hrpEventLogTable.userId, userId),
+                eq(hrpEventLogTable.contractId, contractId),
+                eq(hrpEventLogTable.abgerechnet, false),
+                lt(hrpEventLogTable.loggedTimestamp, upToDate),
+            ),
+        )
+        .orderBy(desc(hrpEventLogTable.loggedTimestamp));
 }
 
 /**
