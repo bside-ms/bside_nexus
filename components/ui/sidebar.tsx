@@ -92,8 +92,6 @@ const SidebarProvider = React.forwardRef<
         return (): void => window.removeEventListener('keydown', handleKeyDown);
     }, [toggleSidebar]);
 
-    // We add a state so that we can do data-state="expanded" or "collapsed".
-    // This makes it easier to style the sidebar with Tailwind classes.
     const state = open ? 'expanded' : 'collapsed';
 
     const contextValue = React.useMemo<SidebarContext>(
@@ -177,7 +175,7 @@ const Sidebar = React.forwardRef<
     return (
         <div
             ref={ref}
-            className="group peer hidden text-sidebar-foreground md:block"
+            className={cn('group peer hidden text-sidebar-foreground md:block print:hidden', className)}
             data-state={state}
             data-collapsible={state === 'collapsed' ? collapsible : ''}
             data-variant={variant}
@@ -277,7 +275,7 @@ const SidebarInset = React.forwardRef<HTMLDivElement, React.ComponentProps<'main
         <main
             ref={ref}
             className={cn(
-                'relative flex min-h-svh flex-1 flex-col bg-white dark:bg-zinc-950',
+                'relative flex min-h-svh flex-1 flex-col bg-white dark:bg-zinc-950 print:m-0 print:min-h-0 print:rounded-none print:shadow-none',
                 'peer-data-[variant=inset]:min-h-[calc(100svh-(--spacing(4)))] md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm',
                 className,
             )}

@@ -2,14 +2,16 @@ import { and, eq, gte, isNull, lt } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
 import { PayrollHourlyClient } from '@/components/hrp/PayrollHourlyClient';
+import { PrintButton } from '@/components/hrp/PrintButton';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { db } from '@/db';
 import type { HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
 import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getActiveContractsForUser } from '@/lib/db/contractActions';
+import { getUpcomingVacations } from '@/lib/db/hrpAbsenceActions';
 import { getHrpLogsForAllUsers } from '@/lib/db/hrpActions';
-import { getManagedContracts, getPreviousPayrollHourly, getUnbilledLogs } from '@/lib/db/hrpAdminActions';
+import { getLeaveAccounts, getManagedContracts, getPreviousPayrollHourly, getUnbilledLogs } from '@/lib/db/hrpAdminActions';
 import type { DayEntries } from '@/lib/hrp/hrpLogic';
 import { groupEntriesByWorkday } from '@/lib/hrp/hrpLogic';
 import { computeDayStats, toTimeStr } from '@/lib/hrp/hrpLogic';
@@ -77,10 +79,16 @@ const altPeriodLabel = (year: number, monthZeroBased: number, period: PeriodMode
     return `23. ${prevMonthName} – 22. ${currMonthName}`;
 };
 
-const sumToHHMM = (totalMinutes: number): string => {
-    const h = Math.floor(totalMinutes / 60);
-    const m = totalMinutes % 60;
+const toHHMM = (totalMinutes: number): string => {
+    const absMinutes = Math.abs(totalMinutes);
+    const h = Math.floor(absMinutes / 60);
+    const m = absMinutes % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+};
+
+const sumToHHMM = (totalMinutes: number): string => {
+    const sign = totalMinutes < 0 ? '-' : totalMinutes > 0 ? '+' : '';
+    return `${sign}${toHHMM(totalMinutes)}`;
 };
 
 function buildDayArray<T>(count: number, map: (indexZero: number) => T): Array<T> {
@@ -271,13 +279,37 @@ export default async function Page({
         dayRefs = [...prevPart, ...currPart];
     }
 
+    // Calculate daily stats
+    const now = new Date();
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(now);
+    const currentHourBerlin = parseInt(
+        new Intl.DateTimeFormat('de-DE', { hour: 'numeric', hour12: false, timeZone: 'Europe/Berlin' }).format(now),
+        10,
+    );
+
     // Tageswerte berechnen
     const dayStats = dayRefs.map((ref) => {
+        const dYear = ref.source === 'curr' ? year : prevYear;
+        const dMonth = ref.source === 'curr' ? month : prevMonth;
+        const refDate = new Date(dYear, dMonth, ref.day);
+
         const entries =
             ref.source === 'prev'
                 ? ((selectedPrev?.logs?.[ref.day] ?? []) as DayEntries)
                 : ((selectedCurrent?.logs?.[ref.day] ?? []) as DayEntries);
-        const stats = computeDayStats(entries);
+        const stats = computeDayStats(
+            entries,
+            selectedContract
+                ? {
+                      weeklyHours: selectedContract.weeklyHours,
+                      workingDays: selectedContract.workingDays,
+                      type: selectedContract.type,
+                  }
+                : undefined,
+            refDate,
+            todayStr,
+            currentHourBerlin,
+        );
 
         // Abwesenheiten für Hinweise sammeln
         const absences = entries.filter((e) => e.entryType === 'absence');
@@ -291,13 +323,37 @@ export default async function Page({
             acc.breakActual += s.actualBreakMinutes;
             acc.breakAdjusted += s.adjustedBreakMinutes;
             acc.net += s.netMinutes;
+            acc.target += s.targetMinutes;
+            acc.balance += s.balanceMinutes;
             return acc;
         },
-        { gross: 0, breakActual: 0, breakAdjusted: 0, net: 0 },
+        { gross: 0, breakActual: 0, breakAdjusted: 0, net: 0, target: 0, balance: 0 },
     );
 
-    // Spalten: nicht breiter als nötig; max 6rem
-    const colMax = 'max-w-48';
+    // Fetch leave accounts for summary (overtime and vacation)
+    const leaveAccounts = selectedContractId ? await getLeaveAccounts(selectedContractId) : [];
+    const currentLeaveAccount = leaveAccounts.find((a) => a.year === year);
+
+    const overtimeCarryover = parseFloat(currentLeaveAccount?.overtimeCarryoverHours?.toString() || '0');
+    const monthlyBalanceHours = totals.balance / 60;
+    const totalOvertimeUncapped = overtimeCarryover + monthlyBalanceHours;
+
+    // TODO: Gekappte GLZ logic if applicable
+    const cappedOvertime = 0;
+    const totalOvertimeCapped = totalOvertimeUncapped - cappedOvertime;
+
+    // Vacation summary logic
+    const usedVacationDays = dayStats.reduce((acc, s) => {
+        return acc + s.absences.filter((a) => a.absence?.type === 'vacation').length;
+    }, 0);
+
+    const plannedVacationDaysRow = selectedUserId ? await getUpcomingVacations(selectedUserId, year) : [];
+    const plannedVacationDays = plannedVacationDaysRow.length;
+
+    const vacationEntitlement = currentLeaveAccount?.totalVacationDays || selectedContract?.vacationDaysPerYear || 0;
+    const carryoverDays = currentLeaveAccount?.remainingDaysFromLastYear || 0;
+    const totalVacationAvailable = vacationEntitlement + carryoverDays;
+
     // Zeit-Token: gleiche Breite, zentriert, auf großen Displays etwas breiter (alle Zeitfenster gleich)
     const timeToken = 'inline-flex font-medium items-center justify-center w-[5ch] sm:w-[5.5ch] lg:w-[6ch]';
 
@@ -373,341 +429,601 @@ export default async function Page({
         infoBits.push(`Keine Buchungen: ${info.daysNoBookings.length} Tage`);
     }
 
-    return (
-        <div>
-            <NavbarTop items={breadCrumbs} sidebar={true} />
+    // Fetch current user (admin) label for print info
+    const adminUserRow = await db
+        .select({ username: usersTable.username, displayName: usersTable.displayName })
+        .from(usersTable)
+        .where(eq(usersTable.id, session.id))
+        .limit(1);
 
-            <div className="space-y-4 p-4 sm:p-6">
-                <div className="flex flex-col">
-                    <h1 className="text-3xl font-bold leading-tight">Arbeitszeiterfassung: {selectedUserLabel}</h1>
-                    <div className="text-base sm:text-lg text-muted-foreground">
-                        {period === 'calendar' ? monthLabel(year, month) : altPeriodLabel(year, month, period)}
+    const adminLabel = getUserLabel({
+        username: adminUserRow[0]?.username ?? 'Admin',
+        displayName: adminUserRow[0]?.displayName ?? null,
+    });
+
+    const formattedDate = new Intl.DateTimeFormat('de-DE', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+    }).format(now);
+
+    const pdfFilename = `Arbeitszeit_Admin_${selectedUserLabel}_${now.toISOString().split('T')[0]}`;
+
+    return (
+        <div className="w-full overflow-x-hidden">
+            <NavbarTop items={breadCrumbs} sidebar={true} className="print:hidden" />
+
+            <div className="max-w-7xl p-4 sm:p-6 print:p-8 w-full space-y-4">
+                {/* Print Info: Hidden on screen, shown in print */}
+                <div className="hidden print:block text-[11pt] text-muted-foreground border-b-2 pb-2 mb-8">
+                    <div className="flex justify-between">
+                        <span>Erstellt am: {formattedDate}</span>
+                        <span>
+                            Erstellt von: {adminLabel} (Admin) für {selectedUserLabel}
+                        </span>
                     </div>
                 </div>
 
-                {/* Filter */}
-                <form className="flex flex-wrap items-center gap-3 print:hidden" method="get">
-                    <label className="text-sm font-medium" htmlFor="user-select">
-                        Mitarbeitende:
-                    </label>
-                    <select
-                        id="user-select"
-                        name="user"
-                        defaultValue={selectedUserId ?? ''}
-                        className="min-w-[12rem] rounded border bg-background px-3 py-2 text-sm"
-                    >
-                        {userOptionsYear.map((u) => (
-                            <option key={u.id} value={u.id}>
-                                {u.label}
-                            </option>
-                        ))}
-                    </select>
+                {/* Header & Filter Wrapper */}
+                <div className="space-y-4 break-after-avoid">
+                    <div className="flex flex-col break-words">
+                        <h1 className="text-2xl sm:text-3xl font-bold leading-tight print:text-[18pt]">
+                            Arbeitszeiterfassung: {selectedUserLabel}
+                        </h1>
+                        <div className="text-sm sm:text-base md:text-lg text-muted-foreground print:text-[14pt] print:text-foreground">
+                            {period === 'calendar' ? monthLabel(year, month) : altPeriodLabel(year, month, period)}
+                        </div>
+                    </div>
 
-                    {contracts.length > 1 && (
-                        <>
-                            <label className="text-sm font-medium" htmlFor="contract-select">
-                                Vertrag:
+                    {/* Summary Wrapper (Only shown BEFORE table in print, hidden BEFORE table on web) */}
+                    <div className="hidden print:grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 w-full print:mb-8">
+                        {selectedContract?.type === 'fixed_salary' && (
+                            <div className="rounded border bg-card p-6 text-card-foreground shadow-sm break-inside-avoid w-full">
+                                <h2 className="text-[14pt] font-semibold mb-4 border-b-2 pb-2">Arbeitszeit & Saldo</h2>
+                                <div className="space-y-3 text-[11pt] break-inside-avoid">
+                                    <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
+                                        <span>Wöchentliche Arbeitszeit:</span>
+                                        <span className="font-medium text-foreground">{selectedContract.weeklyHours?.toFixed(2)} h</span>
+                                    </div>
+                                    <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
+                                        <span>GLZ-Übertrag aus Vormonat:</span>
+                                        <span className="font-medium text-foreground">{overtimeCarryover.toFixed(2)} h</span>
+                                    </div>
+                                    <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
+                                        <span>GLZ-Saldo aktueller Zeitraum:</span>
+                                        <span className="font-medium text-foreground">
+                                            {monthlyBalanceHours >= 0 ? '+' : ''}
+                                            {monthlyBalanceHours.toFixed(2)} h
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
+                                        <span>GLZ-Saldo ungekappt:</span>
+                                        <span className="font-medium text-foreground">{totalOvertimeUncapped.toFixed(2)} h</span>
+                                    </div>
+                                    <div className="flex justify-between pt-1 font-bold text-[12pt] border-t-2 border-zinc-300 mt-1">
+                                        <span>GLZ-Saldo (Summe):</span>
+                                        <span>{totalOvertimeCapped.toFixed(2)} h</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="rounded border bg-card p-6 text-card-foreground shadow-sm break-inside-avoid w-full">
+                            <h2 className="text-[14pt] font-semibold mb-4 border-b-2 pb-2">Urlaubskonto {year}</h2>
+                            <div className="space-y-3 text-[11pt] break-inside-avoid">
+                                <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
+                                    <span>Jahresanspruch:</span>
+                                    <span className="font-medium text-foreground">{vacationEntitlement} Tage</span>
+                                </div>
+                                <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
+                                    <span>Resturlaub Vorjahr:</span>
+                                    <span className="font-medium text-foreground">{carryoverDays} Tage</span>
+                                </div>
+                                <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
+                                    <span>Genommen im Zeitraum:</span>
+                                    <span className="font-medium text-foreground">{usedVacationDays} Tage</span>
+                                </div>
+                                <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
+                                    <span>Geplant (Zukunft):</span>
+                                    <span className="font-medium text-foreground">{plannedVacationDays} Tage</span>
+                                </div>
+                                <div className="flex justify-between pt-1 font-bold text-[12pt] border-t-2 border-zinc-300 mt-1">
+                                    <span>Verbleibend (Gesamtjahr):</span>
+                                    <span>{totalVacationAvailable - usedVacationDays - plannedVacationDays} Tage</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Filter */}
+                    <form className="flex flex-wrap items-end gap-3 print:hidden" method="get">
+                        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-0">
+                            <label className="text-xs font-medium text-muted-foreground" htmlFor="user-select">
+                                Mitarbeiter
                             </label>
                             <select
-                                id="contract-select"
-                                name="contractId"
-                                defaultValue={selectedContractId ?? ''}
-                                className="min-w-[12rem] rounded border bg-background px-3 py-2 text-sm"
+                                id="user-select"
+                                name="user"
+                                defaultValue={selectedUserId ?? ''}
+                                className="w-full sm:min-w-[12rem] rounded border bg-background px-3 py-2 text-sm appearance-none"
                             >
-                                {contracts.map((c) => (
-                                    <option key={c.contractId} value={c.contractId}>
-                                        {c.groupName}
+                                {userOptionsYear.map((u) => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.label}
                                     </option>
                                 ))}
                             </select>
-                        </>
+                        </div>
+
+                        {contracts.length > 1 && (
+                            <div className="flex flex-col gap-1 w-full sm:w-auto min-w-0">
+                                <label className="text-xs font-medium text-muted-foreground" htmlFor="contract-select">
+                                    Vertrag
+                                </label>
+                                <select
+                                    id="contract-select"
+                                    name="contractId"
+                                    defaultValue={selectedContractId ?? ''}
+                                    className="w-full sm:min-w-[12rem] rounded border bg-background px-3 py-2 text-sm appearance-none"
+                                >
+                                    {contracts.map((c) => (
+                                        <option key={c.contractId} value={c.contractId}>
+                                            {c.groupName}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-0">
+                            <label className="text-xs font-medium text-muted-foreground" htmlFor="month-select">
+                                Monat
+                            </label>
+                            <select
+                                id="month-select"
+                                name="month"
+                                defaultValue={month + 1}
+                                className="w-full sm:min-w-[10rem] rounded border bg-background px-3 py-2 text-sm appearance-none"
+                            >
+                                {monthOptions.map((m) => (
+                                    <option key={m.value} value={m.value}>
+                                        {m.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-0">
+                            <label className="text-xs font-medium text-muted-foreground" htmlFor="year-select">
+                                Jahr
+                            </label>
+                            <select
+                                id="year-select"
+                                name="year"
+                                defaultValue={year}
+                                className="w-full sm:min-w-[6rem] rounded border bg-background px-3 py-2 text-sm appearance-none"
+                            >
+                                {yearOptions.map((y) => (
+                                    <option key={y} value={y}>
+                                        {y}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex flex-col gap-1 w-full sm:w-auto min-w-0">
+                            <label className="text-xs font-medium text-muted-foreground" htmlFor="period-select">
+                                Ansicht
+                            </label>
+                            <select
+                                id="period-select"
+                                name="period"
+                                defaultValue={period}
+                                className="w-full sm:min-w-[12rem] rounded border bg-background px-3 py-2 text-sm appearance-none"
+                            >
+                                <option value="calendar">Kalendermonat</option>
+                                <option value="23-22">Abrechnungszeitraum Cafe</option>
+                                <option value="15-14">Abrechnungszeitraum KV</option>
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0">
+                            <button
+                                type="submit"
+                                className="flex-1 sm:flex-none rounded border bg-secondary px-4 py-2 text-sm font-medium hover:bg-secondary/80"
+                            >
+                                Anzeigen
+                            </button>
+                            <PrintButton filename={pdfFilename} />
+                        </div>
+                    </form>
+                </div>
+
+                {/* Table Wrapper (Scrollable) - Hidden on mobile, visible on lg screens and in print */}
+                <div
+                    className="hidden lg:block print:block w-full overflow-x-auto border rounded-md shadow-sm bg-card print:shadow-none print:border-none print:pt-12"
+                    style={{ breakBefore: 'page' }}
+                >
+                    <style>{`@media print { @page { size: portrait; margin: 1cm; } .print-break-before { break-before: page; } }`}</style>
+                    {/* Print Header for Second Page (Table Page) */}
+                    <div className="hidden print:block text-[11pt] text-muted-foreground border-b-2 pb-2 mb-8">
+                        <div className="flex justify-between font-bold">
+                            <span>
+                                Arbeitszeitnachweis: {selectedUserLabel} (
+                                {period === 'calendar' ? monthLabel(year, month) : altPeriodLabel(year, month, period)})
+                            </span>
+                        </div>
+                        <div className="flex justify-between mt-1">
+                            <span>Erstellt am: {formattedDate}</span>
+                            <span>
+                                Erstellt von: {adminLabel} (Admin) für {selectedUserLabel}
+                            </span>
+                        </div>
+                    </div>
+                    <table className="w-full table-fixed border-collapse text-[10px] sm:text-xs lg:text-sm min-w-[800px] lg:min-w-full print:min-w-full print:text-[10pt]">
+                        <thead>
+                            <tr className="bg-muted/50">
+                                <th className="border px-1 py-1.5 text-center font-semibold w-[80px] sm:w-[10%] print:py-2 print:border-b-2 print:bg-zinc-100">
+                                    Tag
+                                </th>
+                                <th className="border px-1 py-1.5 text-center font-semibold w-[70px] sm:w-[12%] print:py-2 print:border-b-2 print:bg-zinc-100">
+                                    Start
+                                </th>
+                                <th className="border px-1 py-1.5 text-center font-semibold w-[110px] sm:w-[15%] print:py-2 print:border-b-2 print:bg-zinc-100">
+                                    Pausen
+                                </th>
+                                <th className="border px-1 py-1.5 text-center font-semibold w-[70px] sm:w-[12%] print:py-2 print:border-b-2 print:bg-zinc-100">
+                                    Stop
+                                </th>
+                                <th className="border px-1 py-1.5 text-center font-semibold w-[60px] sm:w-[8%] print:py-2 print:border-b-2 print:bg-zinc-100">
+                                    Dauer
+                                </th>
+                                <th className="border px-1 py-1.5 text-center font-semibold w-[70px] sm:w-[12%] print:py-2 print:border-b-2 print:bg-zinc-100">
+                                    Pausen Σ
+                                </th>
+                                <th className="border px-1 py-1.5 text-center font-semibold w-[60px] sm:w-[8%] print:py-2 print:border-b-2 print:bg-zinc-100">
+                                    Netto
+                                </th>
+                                {selectedContract?.type === 'fixed_salary' && (
+                                    <>
+                                        <th className="border px-1 py-1.5 text-center font-semibold w-[60px] sm:w-[8%] print:py-2 print:border-b-2 print:bg-zinc-100">
+                                            Soll
+                                        </th>
+                                        <th className="border px-1 py-1.5 text-center font-semibold w-[60px] sm:w-[8%] print:py-2 print:border-b-2 print:bg-zinc-100">
+                                            Saldo
+                                        </th>
+                                    </>
+                                )}
+                                <th className="border px-1 py-1.5 text-left font-semibold w-[150px] sm:w-[20%] print:py-2 print:border-b-2 print:bg-zinc-100">
+                                    Hinweise
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {dayStats.map((s, idx) => {
+                                const dayNumber = ((): number => {
+                                    if (period === 'calendar') {
+                                        return idx + 1;
+                                    }
+                                    if (period === '23-22') {
+                                        // 23..Ende (prev), dann 1..22 (curr)
+                                        const daysInPrev = new Date(year, month, 0).getDate();
+                                        return idx < daysInPrev - 22 ? 23 + idx : idx - (daysInPrev - 22) + 1;
+                                    }
+                                    if (period === '15-14') {
+                                        // 15..Ende (prev), dann 1..14 (curr)
+                                        const daysInPrev = new Date(year, month, 0).getDate();
+                                        return idx < daysInPrev - 14 ? 15 + idx : idx - (daysInPrev - 14) + 1;
+                                    }
+                                    return idx + 1;
+                                })();
+
+                                const hasBookingErrors = s.issues.some(
+                                    (x) =>
+                                        x.includes('Fehlendes Start/Stop') ||
+                                        x.includes('Start/Stop-Reihenfolge') ||
+                                        x.includes('Unvollständige Pause') ||
+                                        x.includes('Pausen-Reihenfolge'),
+                                );
+
+                                const noBookings = s.totalEntries === 0 && s.absences.length === 0;
+
+                                const rowClass = hasBookingErrors ? 'bg-red-50' : noBookings ? 'bg-zinc-50 text-zinc-400' : '';
+
+                                const pauseWarnText =
+                                    s.breakWarning === 'under45'
+                                        ? '< 45 Min (>9h)'
+                                        : s.breakWarning === 'under30'
+                                          ? '< 30 Min (>6h)'
+                                          : null;
+
+                                const hints: Array<{ text: string; className: string }> = [];
+                                if (pauseWarnText) {
+                                    hints.push({ text: pauseWarnText, className: 'text-red-600' });
+                                }
+
+                                // Abwesenheiten zu Hinweisen hinzufügen
+                                for (const a of s.absences) {
+                                    const typeLabel =
+                                        a.absence?.type === 'vacation'
+                                            ? 'Urlaub'
+                                            : a.absence?.type === 'sick'
+                                              ? 'Krankheit'
+                                              : a.absence?.type === 'holiday'
+                                                ? 'Feiertag'
+                                                : a.absence?.type;
+                                    hints.push({
+                                        text: `${typeLabel} (${a.absence?.hoursValue}h)`,
+                                        className: 'font-semibold text-blue-600',
+                                    });
+                                }
+
+                                for (const issue of s.issues) {
+                                    if (issue === 'Keine Buchungen') {
+                                        continue;
+                                    }
+                                    hints.push({ text: issue, className: '' });
+                                }
+
+                                const ref = dayRefs[idx];
+                                if (!ref) {
+                                    // idx is out of range;
+                                    return null;
+                                }
+
+                                const dYear = ref.source === 'curr' ? year : prevYear;
+                                const dMonth = ref.source === 'curr' ? month : prevMonth;
+
+                                const weekday = new Date(dYear, dMonth, dayNumber).toLocaleDateString('de-DE', {
+                                    weekday: 'short',
+                                    timeZone: 'Europe/Berlin',
+                                });
+
+                                return (
+                                    <tr key={idx} className={`${rowClass} print:bg-transparent print:border-b`}>
+                                        <td className="border px-2 py-1 text-center whitespace-nowrap print:py-2">
+                                            {weekday} {dayNumber}
+                                        </td>
+
+                                        {/* Startzeiten */}
+                                        <td className="border px-2 py-1 text-center print:py-2">
+                                            {s.starts.length > 0 ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    {s.starts.map((t: Date, i2: number) => (
+                                                        <span key={i2} className={timeToken}>
+                                                            {toTimeStr(t)}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                        </td>
+
+                                        {/* Pausen (keine Hintergründe) */}
+                                        <td className="border px-2 py-1 text-center print:py-2">
+                                            {s.breakPairs.length > 0 ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    {s.breakPairs.map((p, i3) => (
+                                                        <span
+                                                            key={`bp-${i3}`}
+                                                            className="inline-flex items-center gap-1 text-[10px] sm:text-xs print:text-[10pt]"
+                                                        >
+                                                            <span className={timeToken}>{toTimeStr(p.from)}</span>
+                                                            <span>–</span>
+                                                            <span className={timeToken}>{toTimeStr(p.to)}</span>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                        </td>
+
+                                        {/* Stopzeiten */}
+                                        <td className="border px-2 py-1 text-center print:py-2">
+                                            {s.stops.length > 0 ? (
+                                                <div className="flex flex-col items-center gap-1">
+                                                    {s.stops.map((t: Date, i4: number) => (
+                                                        <span key={i4} className={timeToken}>
+                                                            {toTimeStr(t)}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                        </td>
+
+                                        {/* Dauer (Brutto) */}
+                                        <td className="border px-2 py-1 text-center print:py-2">
+                                            {s.sessionMinutes > 0 ? <span className="font-medium">{toHHMM(s.sessionMinutes)}</span> : null}
+                                        </td>
+
+                                        {/* Pausen Σ */}
+                                        <td className="border px-2 py-1 text-center print:py-2">
+                                            {s.adjustedBreakMinutes > 0 || s.actualBreakMinutes > 0 ? (
+                                                <span
+                                                    className="font-medium"
+                                                    title={
+                                                        s.requiredBreakMinutes > s.actualBreakMinutes
+                                                            ? 'Gesetzliche Mindestpause angewendet'
+                                                            : 'Gebuchte Pause = angerechnete Pause'
+                                                    }
+                                                >
+                                                    {toHHMM(s.adjustedBreakMinutes)}
+                                                    {s.actualBreakMinutes !== s.adjustedBreakMinutes && (
+                                                        <span className="text-muted-foreground text-[10px] block print:text-[9pt] print:text-foreground">
+                                                            ({toHHMM(s.actualBreakMinutes)})
+                                                        </span>
+                                                    )}
+                                                </span>
+                                            ) : null}
+                                        </td>
+
+                                        {/* Arbeitszeit (Netto) */}
+                                        <td className="border px-2 py-1 text-center print:py-2">
+                                            {s.netMinutes > 0 ? <span className="font-medium">{toHHMM(s.netMinutes)}</span> : null}
+                                        </td>
+
+                                        {selectedContract?.type === 'fixed_salary' && (
+                                            <>
+                                                {/* Soll */}
+                                                <td className="border px-2 py-1 text-center print:py-2">
+                                                    {s.targetMinutes > 0 ? (
+                                                        <span className="text-muted-foreground print:text-foreground">
+                                                            {toHHMM(s.targetMinutes)}
+                                                        </span>
+                                                    ) : null}
+                                                </td>
+
+                                                {/* Saldo */}
+                                                <td className="border px-2 py-1 text-center print:py-2">
+                                                    {s.balanceMinutes !== 0 ? (
+                                                        <span className="font-medium">{sumToHHMM(s.balanceMinutes)}</span>
+                                                    ) : null}
+                                                </td>
+                                            </>
+                                        )}
+
+                                        {/* Hinweise (links) */}
+                                        <td className="border px-2 py-1 text-left overflow-hidden text-ellipsis print:py-2">
+                                            {hints.length > 0 ? (
+                                                <div className="flex flex-col gap-0.5">
+                                                    {hints.map((h: { text: string; className: string }, i5: number) => (
+                                                        <span
+                                                            key={i5}
+                                                            className={`text-[10px] leading-tight print:text-[9pt] ${h.className}`}
+                                                        >
+                                                            {h.text}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : null}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                        <tfoot>
+                            <tr className="font-bold bg-muted/30 print:bg-zinc-100 print:border-t-2">
+                                <td className="border px-1 py-1.5 text-center print:py-3">Summe</td>
+                                <td className="border px-1 py-1.5 print:py-3" />
+                                <td className="border px-1 py-1.5 print:py-3" />
+                                <td className="border px-1 py-1.5 print:py-3" />
+                                <td className="border px-1 py-1.5 text-center print:py-3">{toHHMM(totals.gross)}</td>
+                                <td className="border px-1 py-1.5 text-center print:py-3">
+                                    {toHHMM(totals.breakAdjusted)}
+                                    {totals.breakActual !== totals.breakAdjusted && (
+                                        <span className="text-muted-foreground text-[10px] block font-normal print:text-[9pt] print:text-foreground">
+                                            ({toHHMM(totals.breakActual)})
+                                        </span>
+                                    )}
+                                </td>
+                                <td className="border px-1 py-1.5 text-center print:py-3">{toHHMM(totals.net)}</td>
+                                {selectedContract?.type === 'fixed_salary' && (
+                                    <>
+                                        <td className="border px-1 py-1.5 text-center print:py-3">{toHHMM(totals.target)}</td>
+                                        <td className="border px-1 py-1.5 text-center print:py-3">
+                                            <span>{sumToHHMM(totals.balance)}</span>
+                                        </td>
+                                    </>
+                                )}
+                                <td className="border px-1 py-1.5 print:py-3" />
+                            </tr>
+                            <tr className="print:hidden">
+                                <td colSpan={selectedContract?.type === 'fixed_salary' ? 10 : 8} className="border-t px-3 py-3 text-sm">
+                                    {infoBits.length > 0 ? (
+                                        <ul className="list-disc space-y-1 pl-5">
+                                            {infoBits.map((t: string, i: number) => (
+                                                <li key={i}>{t}</li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <span className="text-muted-foreground text-xs italic">
+                                            Hinweis: Schichten, die vor Mitternacht beginnen, werden dem Start-Tag zugeordnet.
+                                        </span>
+                                    )}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                {/* Mobile Info View */}
+                <div className="lg:hidden print:hidden bg-blue-50 border-l-4 border-blue-400 p-4 rounded text-blue-700 space-y-2">
+                    <p className="font-medium">Die tabellarische Monatsübersicht ist auf Mobilgeräten deaktiviert.</p>
+                    <p className="text-sm">Bitte nutze den PDF-Export, um die vollständige Übersicht für diesen Zeitraum zu sehen.</p>
+                </div>
+
+                {/* Summary Wrapper */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-8 w-full print:hidden">
+                    {selectedContract?.type === 'fixed_salary' && (
+                        <div className="rounded border bg-card p-3 text-card-foreground shadow-sm break-inside-avoid w-full">
+                            <h2 className="text-sm font-semibold mb-2 border-b pb-1">Arbeitszeit & Saldo</h2>
+                            <div className="space-y-1 text-xs">
+                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
+                                    <span>Wöchentliche Arbeitszeit:</span>
+                                    <span className="font-medium text-foreground">{selectedContract.weeklyHours?.toFixed(2)} h</span>
+                                </div>
+                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
+                                    <span>GLZ-Übertrag aus Vormonat:</span>
+                                    <span className="font-medium text-foreground">{overtimeCarryover.toFixed(2)} h</span>
+                                </div>
+                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
+                                    <span>GLZ-Saldo aktueller Zeitraum:</span>
+                                    <span className="font-medium text-foreground">
+                                        {monthlyBalanceHours >= 0 ? '+' : ''}
+                                        {monthlyBalanceHours.toFixed(2)} h
+                                    </span>
+                                </div>
+                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
+                                    <span>GLZ-Saldo ungekappt:</span>
+                                    <span className="font-medium text-foreground">{totalOvertimeUncapped.toFixed(2)} h</span>
+                                </div>
+                                <div className="flex justify-between pt-0.5 font-bold">
+                                    <span>GLZ-Saldo (Summe):</span>
+                                    <span>{totalOvertimeCapped.toFixed(2)} h</span>
+                                </div>
+                            </div>
+                        </div>
                     )}
 
-                    <label className="text-sm font-medium" htmlFor="month-select">
-                        Monat:
-                    </label>
-                    <select
-                        id="month-select"
-                        name="month"
-                        defaultValue={month + 1}
-                        className="min-w-[10rem] rounded border bg-background px-3 py-2 text-sm"
-                    >
-                        {monthOptions.map((m) => (
-                            <option key={m.value} value={m.value}>
-                                {m.label}
-                            </option>
-                        ))}
-                    </select>
+                    {selectedContract?.type === 'fixed_salary' && (
+                        <div className="rounded border bg-card p-3 text-card-foreground shadow-sm break-inside-avoid w-full">
+                            <h2 className="text-sm font-semibold mb-2 border-b pb-1">Urlaubskonto {year}</h2>
+                            <div className="space-y-1 text-xs">
+                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
+                                    <span>Jahresanspruch:</span>
+                                    <span className="font-medium text-foreground">{vacationEntitlement} Tage</span>
+                                </div>
+                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
+                                    <span>Resturlaub Vorjahr:</span>
+                                    <span className="font-medium text-foreground">{carryoverDays} Tage</span>
+                                </div>
+                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
+                                    <span>Genommen im Zeitraum:</span>
+                                    <span className="font-medium text-foreground">{usedVacationDays} Tage</span>
+                                </div>
+                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
+                                    <span>Geplant (Zukunft):</span>
+                                    <span className="font-medium text-foreground">{plannedVacationDays} Tage</span>
+                                </div>
+                                <div className="flex justify-between pt-0.5 font-bold">
+                                    <span>Verbleibend (Gesamtjahr):</span>
+                                    <span>{totalVacationAvailable - usedVacationDays - plannedVacationDays} Tage</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
 
-                    <label className="text-sm font-medium" htmlFor="year-select">
-                        Jahr:
-                    </label>
-                    <select
-                        id="year-select"
-                        name="year"
-                        defaultValue={year}
-                        className="min-w-[6rem] rounded border bg-background px-3 py-2 text-sm"
-                    >
-                        {yearOptions.map((y) => (
-                            <option key={y} value={y}>
-                                {y}
-                            </option>
-                        ))}
-                    </select>
-
-                    <label className="text-sm font-medium" htmlFor="period-select">
-                        Ansicht:
-                    </label>
-                    <select
-                        id="period-select"
-                        name="period"
-                        defaultValue={period}
-                        className="min-w-[12rem] rounded border bg-background px-3 py-2 text-sm"
-                    >
-                        <option value="calendar">Kalendermonat</option>
-                        <option value="23-22">Abrechnungszeitraum Cafe</option>
-                        <option value="15-14">Abrechnungszeitraum KV</option>
-                    </select>
-
-                    <button type="submit" className="rounded border px-3 py-2 text-sm hover:bg-muted">
-                        Anzeigen
-                    </button>
-                </form>
-
-                {!selectedUserId && (
-                    <div className="rounded border p-6 text-center text-muted-foreground">Keine Einträge oder kein Nutzer ausgewählt.</div>
-                )}
-
-                {selectedUserId && (
-                    <div className="max-w-full overflow-x-auto">
-                        {/* Links bündig, w-auto damit nicht die ganze Breite eingenommen wird */}
-                        <table className="w-auto table-auto border-collapse text-xs sm:text-sm print:w-full">
-                            <thead>
-                                <tr>
-                                    <th className={`px-2 py-1.5 sm:px-3 sm:py-2 text-center font-semibold ${colMax}`}>Tag</th>
-                                    <th className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center font-semibold ${colMax}`}>Start</th>
-                                    <th className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center font-semibold ${colMax}`}>Pausen</th>
-                                    <th className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center font-semibold ${colMax}`}>Stop</th>
-                                    <th className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center font-semibold ${colMax}`}>Dauer</th>
-                                    <th className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center font-semibold ${colMax}`}>Pausen Σ</th>
-                                    <th className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center font-semibold ${colMax}`}>
-                                        Arbeitszeit
-                                    </th>
-                                    <th className="border-l px-2 py-1.5 sm:px-3 sm:py-2 text-left font-semibold max-w-96">Hinweise</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {dayStats.map((s, idx) => {
-                                    const dayNumber = ((): number => {
-                                        if (period === 'calendar') {
-                                            return idx + 1;
-                                        }
-                                        if (period === '23-22') {
-                                            // 23..Ende (prev), dann 1..22 (curr)
-                                            const daysInPrev = new Date(year, month, 0).getDate();
-                                            return idx < daysInPrev - 22 ? 23 + idx : idx - (daysInPrev - 22) + 1;
-                                        }
-                                        if (period === '15-14') {
-                                            // 15..Ende (prev), dann 1..14 (curr)
-                                            const daysInPrev = new Date(year, month, 0).getDate();
-                                            return idx < daysInPrev - 14 ? 15 + idx : idx - (daysInPrev - 14) + 1;
-                                        }
-                                        return idx + 1;
-                                    })();
-
-                                    const hasBookingErrors = s.issues.some(
-                                        (x) =>
-                                            x.includes('Fehlendes Start/Stop') ||
-                                            x.includes('Start/Stop-Reihenfolge') ||
-                                            x.includes('Unvollständige Pause') ||
-                                            x.includes('Pausen-Reihenfolge'),
-                                    );
-
-                                    const noBookings = s.totalEntries === 0 && s.absences.length === 0;
-
-                                    const rowClass = hasBookingErrors ? 'bg-red-50' : noBookings ? 'bg-zinc-50 text-zinc-400' : '';
-
-                                    const pauseWarnText =
-                                        s.breakWarning === 'under45'
-                                            ? '< 45 Min (>9h)'
-                                            : s.breakWarning === 'under30'
-                                              ? '< 30 Min (>6h)'
-                                              : null;
-
-                                    const hints: Array<{ text: string; className: string }> = [];
-                                    if (pauseWarnText) {
-                                        hints.push({ text: pauseWarnText, className: 'text-red-600' });
-                                    }
-
-                                    // Abwesenheiten zu Hinweisen hinzufügen
-                                    for (const a of s.absences) {
-                                        const typeLabel =
-                                            a.absence?.type === 'vacation'
-                                                ? 'Urlaub'
-                                                : a.absence?.type === 'sick'
-                                                  ? 'Krankheit'
-                                                  : a.absence?.type === 'holiday'
-                                                    ? 'Feiertag'
-                                                    : a.absence?.type;
-                                        hints.push({
-                                            text: `${typeLabel} (${a.absence?.hoursValue}h)`,
-                                            className: 'font-semibold text-blue-600',
-                                        });
-                                    }
-
-                                    for (const issue of s.issues) {
-                                        if (issue === 'Keine Buchungen') {
-                                            continue;
-                                        }
-                                        hints.push({ text: issue, className: '' });
-                                    }
-
-                                    return (
-                                        <tr key={idx} className={rowClass}>
-                                            <td className={`px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>{dayNumber}</td>
-
-                                            {/* Startzeiten */}
-                                            <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
-                                                {s.starts.length > 0 ? (
-                                                    <div className="flex flex-col items-center gap-1">
-                                                        {s.starts.map((t: Date, i2: number) => (
-                                                            <span key={i2} className={timeToken}>
-                                                                {toTimeStr(t)}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : null}
-                                            </td>
-
-                                            {/* Pausen (keine Hintergründe) */}
-                                            <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
-                                                {s.breakPairs.length > 0 ? (
-                                                    <div className="flex flex-col items-center gap-1">
-                                                        {s.breakPairs.map((p, i3) => (
-                                                            <span key={`bp-${i3}`} className="inline-flex items-center gap-1">
-                                                                <span className={timeToken}>{toTimeStr(p.from)}</span>
-                                                                <span>–</span>
-                                                                <span className={timeToken}>{toTimeStr(p.to)}</span>
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : null}
-                                            </td>
-
-                                            {/* Stopzeiten */}
-                                            <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
-                                                {s.stops.length > 0 ? (
-                                                    <div className="flex flex-col items-center gap-1">
-                                                        {s.stops.map((t: Date, i4: number) => (
-                                                            <span key={i4} className={timeToken}>
-                                                                {toTimeStr(t)}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : null}
-                                            </td>
-
-                                            {/* Dauer (Brutto) */}
-                                            <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
-                                                {s.sessionMinutes > 0 ? (
-                                                    <span className="font-medium">{sumToHHMM(s.sessionMinutes)}</span>
-                                                ) : null}
-                                            </td>
-
-                                            {/* Pausen Σ: gesetzliches Minimum; gebuchte Zeit in Klammern klar benennen */}
-                                            <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
-                                                {s.adjustedBreakMinutes > 0 || s.actualBreakMinutes > 0 ? (
-                                                    <span
-                                                        className="font-medium"
-                                                        title={
-                                                            s.requiredBreakMinutes > s.actualBreakMinutes
-                                                                ? 'Gesetzliche Mindestpause angewendet'
-                                                                : 'Gebuchte Pause = angerechnete Pause'
-                                                        }
-                                                    >
-                                                        {sumToHHMM(s.adjustedBreakMinutes)}
-                                                        {s.actualBreakMinutes !== s.adjustedBreakMinutes && (
-                                                            <span className="text-muted-foreground">
-                                                                {' '}
-                                                                (gebucht: {sumToHHMM(s.actualBreakMinutes)})
-                                                            </span>
-                                                        )}
-                                                    </span>
-                                                ) : null}
-                                            </td>
-
-                                            {/* Arbeitszeit (Netto) */}
-                                            <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
-                                                {s.netMinutes > 0 ? <span className="font-medium">{sumToHHMM(s.netMinutes)}</span> : null}
-                                            </td>
-
-                                            {/* Hinweise (links) */}
-                                            <td className="border-l px-2 py-1.5 sm:px-3 sm:py-2 text-left max-w-96">
-                                                {hints.length > 0 ? (
-                                                    <div className="flex flex-col gap-1">
-                                                        {hints.map((h: { text: string; className: string }, i5: number) => (
-                                                            <span key={i5} className={`text-xs ${h.className}`}>
-                                                                {h.text}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                ) : null}
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                            <tfoot>
-                                <tr className="font-medium">
-                                    <td className={`px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>Summe</td>
-                                    <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`} />
-                                    <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`} />
-                                    <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`} />
-                                    <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
-                                        {sumToHHMM(totals.gross)}
-                                    </td>
-                                    <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
-                                        {sumToHHMM(totals.breakAdjusted)}
-                                        {totals.breakActual !== totals.breakAdjusted && (
-                                            <span className="text-muted-foreground"> (gebucht: {sumToHHMM(totals.breakActual)})</span>
-                                        )}
-                                    </td>
-                                    <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-center ${colMax}`}>
-                                        {sumToHHMM(totals.net)}
-                                    </td>
-                                    <td className={`border-l px-2 py-1.5 sm:px-3 sm:py-2 text-left ${colMax}`} />
-                                </tr>
-                                {/* Info-Zeile */}
-                                <tr className="print:hidden">
-                                    <td colSpan={8} className="border-t px-3 py-3 text-sm">
-                                        {infoBits.length > 0 ? (
-                                            <ul className="list-disc space-y-1 pl-5">
-                                                {infoBits.map((t: string, i: number) => (
-                                                    <li key={i}>{t}</li>
-                                                ))}
-                                            </ul>
-                                        ) : (
-                                            <span className="text-muted-foreground">
-                                                Hinweis: Schichten, die vor Mitternacht beginnen, werden dem Start-Tag zugeordnet.
-                                            </span>
-                                        )}
-                                    </td>
-                                </tr>
-                            </tfoot>
-                        </table>
+                {selectedUserId && selectedContractId && selectedContract?.type === 'hourly' && (
+                    <div className="print:hidden">
+                        <PayrollHourlyClient
+                            contractId={selectedContractId}
+                            year={year}
+                            month={month}
+                            unbilledLogs={unbilledLogs}
+                            unbilledDayStats={unbilledDayStats}
+                            previousPayroll={previousPayroll}
+                            periodMode={period}
+                        />
                     </div>
-                )}
-
-                {selectedUserId && selectedContractId && (
-                    <PayrollHourlyClient
-                        contractId={selectedContractId}
-                        year={year}
-                        month={month}
-                        unbilledLogs={unbilledLogs}
-                        unbilledDayStats={unbilledDayStats}
-                        previousPayroll={previousPayroll}
-                        periodMode={period}
-                    />
                 )}
             </div>
         </div>

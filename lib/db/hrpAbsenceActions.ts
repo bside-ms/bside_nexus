@@ -52,9 +52,11 @@ export async function createAbsence(
         const currentDate = new Date(start);
         currentDate.setDate(start.getDate() + i);
         const dateStr = format(currentDate, 'yyyy-MM-dd');
+        const dayOfWeek = currentDate.getDay(); // 0 = So, 1 = Mo, ..., 6 = Sa
+        const mappedDay = dayOfWeek === 0 ? 7 : dayOfWeek;
 
-        // Überspringe, wenn es ein Feiertag ist
-        if (holidayDates.has(dateStr)) {
+        // Überspringe, wenn es ein Feiertag ist oder kein Arbeitstag
+        if (holidayDates.has(dateStr) || !contract.workingDays?.includes(mappedDay)) {
             continue;
         }
 
@@ -136,8 +138,10 @@ export async function getAbsences(contractId: string, startDate: string, endDate
     });
 }
 
-export async function getUpcomingVacations(userId: string): Promise<Array<HrpAbsenceEntry>> {
+export async function getUpcomingVacations(userId: string, year?: number): Promise<Array<HrpAbsenceEntry>> {
     const today = format(new Date(), 'yyyy-MM-dd');
+    const startOfYear = year ? `${year}-01-01` : format(new Date(), 'yyyy-01-01');
+    const endOfYear = year ? `${year}-12-31` : format(new Date(), 'yyyy-12-31');
 
     const contracts = await db.query.hrpContractsTable.findMany({
         where: eq(hrpContractsTable.userId, userId),
@@ -149,11 +153,14 @@ export async function getUpcomingVacations(userId: string): Promise<Array<HrpAbs
         return [];
     }
 
+    const lowerBound = today > startOfYear ? today : startOfYear;
+
     return db.query.hrpAbsencesTable.findMany({
         where: and(
             sql`${hrpAbsencesTable.contractId} IN ${contractIds}`,
             eq(hrpAbsencesTable.type, 'vacation'),
-            gte(hrpAbsencesTable.date, today),
+            gte(hrpAbsencesTable.date, lowerBound),
+            lte(hrpAbsencesTable.date, endOfYear),
             isNull(hrpAbsencesTable.deletedAt),
         ),
         orderBy: [desc(hrpAbsencesTable.date)],

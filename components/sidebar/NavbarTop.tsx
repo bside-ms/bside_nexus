@@ -21,13 +21,14 @@ interface BreadcrumbItemProps {
         active?: boolean;
     }>;
     sidebar?: boolean;
+    className?: string;
 }
 
 export default function NavbarTop(props: BreadcrumbItemProps): ReactElement {
     const breadcrumbLength = props.items?.length ?? 0;
 
     return (
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <header className={`flex h-16 shrink-0 items-center gap-2 border-b px-4 ${props.className ?? ''}`}>
             {props.sidebar !== false && <SidebarTrigger className="-ml-1" />}
             {props.sidebar === false && (
                 <Button variant="outline">

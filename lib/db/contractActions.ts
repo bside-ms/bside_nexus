@@ -4,9 +4,12 @@ import { groupsTable, hrpContractsTable } from '@/db/schema';
 
 export interface HrpContract {
     contractId: string;
+    userId: string;
     type: string; // 'fixed_salary' | 'hourly'
     groupName: string;
     weeklyHours: number | null;
+    workingDays: Array<number> | null;
+    vacationDaysPerYear: number | null;
 }
 
 export async function getActiveContractsForUser(userId: string): Promise<Array<HrpContract>> {
@@ -15,9 +18,12 @@ export async function getActiveContractsForUser(userId: string): Promise<Array<H
     return db
         .select({
             contractId: hrpContractsTable.id,
+            userId: hrpContractsTable.userId,
             type: hrpContractsTable.type,
             groupName: sql<string>`REPLACE(${groupsTable.displayName}, ' - Mitarbeitende', '')`,
             weeklyHours: hrpContractsTable.weeklyHours,
+            workingDays: hrpContractsTable.workingDays,
+            vacationDaysPerYear: hrpContractsTable.vacationDaysPerYear,
         })
         .from(hrpContractsTable)
         .innerJoin(groupsTable, eq(hrpContractsTable.employerGroupId, groupsTable.id))

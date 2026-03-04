@@ -24,6 +24,8 @@ export interface DayStats {
     startCount: number;
     stopCount: number;
     breakWarning: 'ok' | 'under30' | 'under45';
+    targetMinutes: number;
+    balanceMinutes: number;
     issues: Array<string>;
 }
 
@@ -91,13 +93,60 @@ export const emptyStats = (): DayStats => {
         startCount: 0,
         stopCount: 0,
         breakWarning: 'ok',
+        targetMinutes: 0,
+        balanceMinutes: 0,
         issues: [],
     };
 };
 
-export const computeDayStats = (entries: DayEntries): DayStats => {
+export const computeDayStats = (
+    entries: DayEntries,
+    contract?: { weeklyHours: number | null; workingDays: Array<number> | null; type?: string },
+    date?: Date,
+    todayStr?: string,
+    currentHourBerlin?: number,
+): DayStats => {
+    const internalTodayStr = todayStr || new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
+    const refDateStr = date ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(date) : null;
+    const isFuture = refDateStr && refDateStr > internalTodayStr;
+    const isToday = refDateStr && refDateStr === internalTodayStr;
+
+    // Spezielle Logik für "heute" und "vorheriger Tag vor 8 Uhr morgens"
+    let isSkippedDueToTime = false;
+    if (isToday) {
+        isSkippedDueToTime = true;
+    } else if (refDateStr && refDateStr < internalTodayStr) {
+        // Prüfen, ob es genau der Tag vor internalTodayStr ist
+        const refDateObj = new Date(refDateStr);
+        const todayDateObj = new Date(internalTodayStr);
+        const diffDays = Math.round((todayDateObj.getTime() - refDateObj.getTime()) / (1000 * 60 * 60 * 24));
+
+        if (diffDays === 1) {
+            const hour =
+                currentHourBerlin ??
+                parseInt(
+                    new Intl.DateTimeFormat('de-DE', { hour: 'numeric', hour12: false, timeZone: 'Europe/Berlin' }).format(new Date()),
+                    10,
+                );
+            if (hour < 8) {
+                isSkippedDueToTime = true;
+            }
+        }
+    }
+
+    const shouldSkipBalance = isFuture || isSkippedDueToTime || contract?.type === 'hourly';
+
     if (!entries || entries.length === 0) {
         const es = emptyStats();
+        if (contract && date && !shouldSkipBalance) {
+            const dayOfWeek = date.getDay(); // 0 = So, 1 = Mo, ..., 6 = Sa
+            const mappedDay = dayOfWeek === 0 ? 7 : dayOfWeek;
+            if (contract.workingDays?.includes(mappedDay)) {
+                const hoursPerDay = contract.weeklyHours ? contract.weeklyHours / (contract.workingDays.length || 5) : 0;
+                es.targetMinutes = Math.round(hoursPerDay * 60);
+                es.balanceMinutes = -es.targetMinutes;
+            }
+        }
         es.issues.push('Keine Buchungen');
         return es;
     }
@@ -194,6 +243,20 @@ export const computeDayStats = (entries: DayEntries): DayStats => {
         breakWarning = 'under30';
     }
 
+    // Target and Balance
+    let targetMinutes = 0;
+    if (!shouldSkipBalance && contract && (date || (timeEvents.length > 0 && timeEvents[0]?.ts))) {
+        const targetDate = date || timeEvents[0]?.ts;
+        const dayOfWeek = targetDate!.getDay();
+        const mappedDay = dayOfWeek === 0 ? 7 : dayOfWeek;
+        if (contract.workingDays?.includes(mappedDay)) {
+            const hoursPerDay = contract.weeklyHours ? contract.weeklyHours / (contract.workingDays.length || 5) : 0;
+            targetMinutes = Math.round(hoursPerDay * 60);
+        }
+    }
+
+    const balanceMinutes = netMinutes - targetMinutes;
+
     return {
         starts,
         stops,
@@ -208,6 +271,8 @@ export const computeDayStats = (entries: DayEntries): DayStats => {
         startCount: starts.length,
         stopCount: stops.length,
         breakWarning,
+        targetMinutes,
+        balanceMinutes,
         issues,
     };
 };
