@@ -1,18 +1,29 @@
 import { and, eq, gte, isNull, lt } from 'drizzle-orm';
+import { AlertCircle, FileCheck } from 'lucide-react';
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { PayrollHourlyClient } from '@/components/hrp/PayrollHourlyClient';
 import { PrintButton } from '@/components/hrp/PrintButton';
 import NavbarTop from '@/components/sidebar/NavbarTop';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import { db } from '@/db';
-import type { HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
+import type { HrpAbsenceEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
 import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getActiveContractsForUser } from '@/lib/db/contractActions';
 import { getUpcomingVacations } from '@/lib/db/hrpAbsenceActions';
 import { getHrpLogsForAllUsers } from '@/lib/db/hrpActions';
-import { getLeaveAccounts, getManagedContracts, getPreviousPayrollHourly, getUnbilledLogs } from '@/lib/db/hrpAdminActions';
-import type { DayEntries } from '@/lib/hrp/hrpLogic';
+import {
+    getCurrentPayrollHourly,
+    getLeaveAccounts,
+    getManagedContracts,
+    getPreviousPayrollHourly,
+    getUnbilledAbsences,
+    getUnbilledLogs,
+} from '@/lib/db/hrpAdminActions';
+import type { DayEntries, Entry } from '@/lib/hrp/hrpLogic';
 import { groupEntriesByWorkday } from '@/lib/hrp/hrpLogic';
 import { computeDayStats, toTimeStr } from '@/lib/hrp/hrpLogic';
 
@@ -193,12 +204,16 @@ export default async function Page({
 
     // Nicht abgerechnete Stunden für Payroll-Vorschau
     let unbilledLogs: Array<HrpEventLogEntry> = [];
+    let unbilledAbsences: Array<HrpAbsenceEntry> = [];
     let previousPayroll: HrpMonthlyPayrollEntry | null = null;
+    let currentPayroll: HrpMonthlyPayrollEntry | null = null;
     if (selectedUserId && selectedContractId && selectedContract?.type === 'hourly') {
         const edge = new Date(year, month, 23, 0, 0, 0, 0); // Ende des aktuellen Zeitraums (22. 23:59:59)
         // Wir laden unbilled logs ohne Zeitbeschränkung nach hinten, um ALLES zu erfassen
         unbilledLogs = await getUnbilledLogs(selectedUserId, selectedContractId, edge);
+        unbilledAbsences = await getUnbilledAbsences(selectedContractId, edge);
         previousPayroll = await getPreviousPayrollHourly(selectedContractId, year, month);
+        currentPayroll = await getCurrentPayrollHourly(selectedContractId, year, month);
     }
 
     // Für die korrekte Gruppierung brauchen wir auch bereits abgerechnete Logs als Kontext
@@ -223,14 +238,25 @@ export default async function Page({
 
     const unbilledByDay =
         selectedUserId && selectedContractId && selectedContract?.type === 'hourly'
-            ? groupEntriesByWorkday([...contextLogs]) // groupEntriesByWorkday handles duplicates or we just use contextLogs which should include unbilled too
+            ? groupEntriesByWorkday([
+                  ...contextLogs,
+                  ...unbilledAbsences.map((a) => ({ entryType: 'absence', loggedTimestamp: a.date, absence: a }) as Entry),
+              ])
             : {};
 
     // Filter unbilledByDay to only include days that actually have unbilled logs
-    const filteredUnbilledByDay: Record<string, Array<HrpEventLogEntry>> = {};
+    const filteredUnbilledByDay: Record<string, Array<Entry>> = {};
     const unbilledSet = new Set(unbilledLogs.map((l) => l.id));
+    const unbilledAbsenceSet = new Set(unbilledAbsences.map((a) => a.id));
     Object.entries(unbilledByDay).forEach(([dateStr, entries]) => {
-        if (entries.some((e) => unbilledSet.has(e.id))) {
+        if (
+            entries.some((e: Entry) => {
+                const id = (e as HrpEventLogEntry).id || e.id;
+                const isUnbilledLog = id && unbilledSet.has(id);
+                const isUnbilledAbsence = e.entryType === 'absence' && e.absence && unbilledAbsenceSet.has(e.absence.id);
+                return isUnbilledLog || isUnbilledAbsence;
+            })
+        ) {
             filteredUnbilledByDay[dateStr] = entries;
         }
     });
@@ -365,7 +391,8 @@ export default async function Page({
                 dateStr,
                 netMinutes: stats.netMinutes,
                 issues: stats.issues.filter((issue) => !issue.includes('vor Mitternacht') && !issue.includes('nach Mitternacht')),
-                entryIds: entries.map((e) => e.id),
+                entryIds: entries.filter((e) => e.entryType !== 'absence').map((e) => e.id!),
+                absenceIds: entries.filter((e) => e.entryType === 'absence' && e.absence).map((e) => e.absence!.id),
             };
         })
         .sort((a, b) => a.dateStr.localeCompare(b.dateStr));
@@ -637,6 +664,27 @@ export default async function Page({
                             <PrintButton filename={pdfFilename} />
                         </div>
                     </form>
+
+                    {currentPayroll && (
+                        <div className="mt-4 print:hidden">
+                            <Alert variant="default" className="bg-amber-50 border-amber-200">
+                                <AlertCircle className="h-4 w-4 text-amber-600" />
+                                <AlertTitle className="text-amber-800 font-semibold">Monat bereits abgerechnet</AlertTitle>
+                                <AlertDescription className="text-amber-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <span>
+                                        Für diesen Mitarbeiter wurde im gewählten Monat bereits eine Abrechnung am{' '}
+                                        {currentPayroll.finalizedAt?.toLocaleDateString('de-DE')} durchgeführt.
+                                    </span>
+                                    <Button asChild variant="outline" size="sm" className="bg-white border-amber-300 hover:bg-amber-100">
+                                        <Link href="/hrp/admin/payroll" className="flex items-center gap-2">
+                                            <FileCheck className="h-4 w-4" />
+                                            Zu den Abrechnungen
+                                        </Link>
+                                    </Button>
+                                </AlertDescription>
+                            </Alert>
+                        </div>
+                    )}
                 </div>
 
                 {/* Table Wrapper (Scrollable) - Hidden on mobile, visible on lg screens and in print */}
@@ -1016,12 +1064,16 @@ export default async function Page({
                     <div className="print:hidden">
                         <PayrollHourlyClient
                             contractId={selectedContractId}
+                            contract={selectedContract}
                             year={year}
                             month={month}
                             unbilledLogs={unbilledLogs}
+                            unbilledAbsences={unbilledAbsences}
                             unbilledDayStats={unbilledDayStats}
                             previousPayroll={previousPayroll}
+                            currentPayrollHourly={currentPayroll}
                             periodMode={period}
+                            isAlreadyFinalized={!!currentPayroll}
                         />
                     </div>
                 )}

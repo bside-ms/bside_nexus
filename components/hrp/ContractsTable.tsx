@@ -17,7 +17,7 @@ export function ContractsTable({ data }: { data: Array<ManagedContract> }): Reac
                         <th className="p-3">Mitarbeiter*in</th>
                         <th className="p-3">Arbeitgeber (Gruppe)</th>
                         <th className="p-3">Typ</th>
-                        <th className="p-3">Wochenstunden</th>
+                        <th className="p-3">Wochenstunden / Lohn</th>
                         <th className="p-3">Laufzeit</th>
                         <th className="p-3 text-right">Aktion</th>
                     </tr>
@@ -30,7 +30,16 @@ export function ContractsTable({ data }: { data: Array<ManagedContract> }): Reac
                             <td className="p-3">
                                 {c.type === 'hourly' ? <Badge variant="secondary">Stundenbasis</Badge> : <Badge>Festanstellung</Badge>}
                             </td>
-                            <td className="p-3">{c.weeklyHours} h</td>
+                            <td className="p-3">
+                                {c.type === 'hourly' ? (
+                                    <div className="flex flex-col">
+                                        <span>{c.weeklyHours} h</span>
+                                        <span className="text-xs text-muted-foreground">{c.hourlyRate} €/h</span>
+                                    </div>
+                                ) : (
+                                    <span>{c.weeklyHours} h</span>
+                                )}
+                            </td>
                             <td className="p-3">
                                 {new Date(c.validFrom).toLocaleDateString('de-DE')}
                                 {c.validTo ? ` – ${new Date(c.validTo).toLocaleDateString('de-DE')}` : ' – unbefristet'}

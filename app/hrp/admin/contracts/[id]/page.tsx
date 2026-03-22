@@ -41,6 +41,7 @@ export default function ContractDetailPage(): ReactElement {
     const [contractFormData, setContractFormData] = useState({
         type: '',
         weeklyHours: 0,
+        hourlyRate: '0.00',
         vacationDaysPerYear: 0,
         changeDate: '',
     });
@@ -58,6 +59,7 @@ export default function ContractDetailPage(): ReactElement {
                 setContractFormData({
                     type: result.data.contract.type,
                     weeklyHours: result.data.contract.weeklyHours,
+                    hourlyRate: result.data.contract.hourlyRate || '0.00',
                     vacationDaysPerYear: result.data.contract.vacationDaysPerYear,
                     changeDate: getEndOfMonth(0), // Default: Ende diesen Monats
                 });
@@ -233,6 +235,12 @@ export default function ContractDetailPage(): ReactElement {
                             <p className="text-xs text-zinc-500 uppercase">Wochenstunden</p>
                             <p className="font-medium">{contract.weeklyHours} h</p>
                         </div>
+                        {contract.type === 'hourly' && (
+                            <div>
+                                <p className="text-xs text-zinc-500 uppercase">Stundenlohn</p>
+                                <p className="font-medium">{contract.hourlyRate} €</p>
+                            </div>
+                        )}
                         <div>
                             <p className="text-xs text-zinc-500 uppercase">Urlaub/Jahr</p>
                             <p className="font-medium">{contract.vacationDaysPerYear} Tage</p>
@@ -401,6 +409,19 @@ export default function ContractDetailPage(): ReactElement {
                                 />
                             </div>
                         </div>
+                        {contractFormData.type === 'hourly' && (
+                            <div className="space-y-2">
+                                <Label htmlFor="hourly-rate">Stundenlohn (€)</Label>
+                                <Input
+                                    id="hourly-rate"
+                                    type="number"
+                                    step="0.01"
+                                    value={contractFormData.hourlyRate}
+                                    onChange={(e) => setContractFormData({ ...contractFormData, hourlyRate: e.target.value })}
+                                    required
+                                />
+                            </div>
+                        )}
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label htmlFor="vacation-days">Urlaubstage / Jahr</Label>

@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { groupsTable, hrpContractsTable } from '@/db/schema';
 
@@ -10,6 +10,7 @@ export interface HrpContract {
     weeklyHours: number | null;
     workingDays: Array<number> | null;
     vacationDaysPerYear: number | null;
+    hourlyRate: string | null;
 }
 
 export async function getActiveContractsForUser(userId: string): Promise<Array<HrpContract>> {
@@ -24,6 +25,7 @@ export async function getActiveContractsForUser(userId: string): Promise<Array<H
             weeklyHours: hrpContractsTable.weeklyHours,
             workingDays: hrpContractsTable.workingDays,
             vacationDaysPerYear: hrpContractsTable.vacationDaysPerYear,
+            hourlyRate: hrpContractsTable.hourlyRate,
         })
         .from(hrpContractsTable)
         .innerJoin(groupsTable, eq(hrpContractsTable.employerGroupId, groupsTable.id))
@@ -33,5 +35,6 @@ export async function getActiveContractsForUser(userId: string): Promise<Array<H
                 lte(hrpContractsTable.validFrom, now),
                 or(isNull(hrpContractsTable.validTo), gte(hrpContractsTable.validTo, now)),
             ),
-        );
+        )
+        .orderBy(desc(hrpContractsTable.validFrom));
 }

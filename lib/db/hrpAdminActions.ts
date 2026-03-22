@@ -1,10 +1,11 @@
 'use server';
 
-import { and, desc, eq, inArray, lt } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, lt, lte } from 'drizzle-orm';
 import { db } from '@/db';
-import type { HrpContractEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry, HrpYearlyEntry } from '@/db/schema';
+import type { HrpAbsenceEntry, HrpContractEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry, HrpYearlyEntry } from '@/db/schema';
 import {
     groupsTable,
+    hrpAbsencesTable,
     hrpContractsTable,
     hrpEventLogTable,
     hrpLeaveAccountsTable,
@@ -12,6 +13,7 @@ import {
     membersTable,
     usersTable,
 } from '@/db/schema';
+import { format } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -33,6 +35,7 @@ export interface ManagedContract {
     groupName: string;
     type: string;
     weeklyHours: number | null;
+    hourlyRate: string | null;
     validFrom: Date;
     validTo: Date | null;
 }
@@ -55,6 +58,7 @@ export async function getManagedContracts(adminUserId: string): Promise<Array<Ma
             groupName: groupsTable.displayName,
             type: hrpContractsTable.type,
             weeklyHours: hrpContractsTable.weeklyHours,
+            hourlyRate: hrpContractsTable.hourlyRate,
             validFrom: hrpContractsTable.validFrom,
             validTo: hrpContractsTable.validTo,
         })
@@ -62,7 +66,7 @@ export async function getManagedContracts(adminUserId: string): Promise<Array<Ma
         .innerJoin(usersTable, eq(hrpContractsTable.userId, usersTable.id))
         .innerJoin(groupsTable, eq(hrpContractsTable.employerGroupId, groupsTable.id))
         .where(inArray(hrpContractsTable.employerGroupId, managedGroupIds))
-        .orderBy(groupsTable.displayName, usersTable.displayName);
+        .orderBy(desc(hrpContractsTable.validFrom), groupsTable.displayName, usersTable.displayName);
 
     return contracts;
 }
@@ -76,6 +80,7 @@ export interface ContractDetails {
     employerGroupId: string;
     type: string;
     weeklyHours: number | null;
+    hourlyRate: string | null;
     vacationDaysPerYear: number | null;
     workingDays: Array<number> | null;
     validFrom: Date;
@@ -93,6 +98,7 @@ export async function getContractById(contractId: string): Promise<ContractDetai
             employerGroupId: hrpContractsTable.employerGroupId,
             type: hrpContractsTable.type,
             weeklyHours: hrpContractsTable.weeklyHours,
+            hourlyRate: hrpContractsTable.hourlyRate,
             vacationDaysPerYear: hrpContractsTable.vacationDaysPerYear,
             workingDays: hrpContractsTable.workingDays,
             validFrom: hrpContractsTable.validFrom,
@@ -155,6 +161,7 @@ export async function updateContract(
     newValues: {
         type: string;
         weeklyHours: number;
+        hourlyRate: string;
         vacationDaysPerYear: number;
         workingDays: Array<number>;
     },
@@ -183,6 +190,7 @@ export async function updateContract(
         employerGroupId: oldContract.employerGroupId,
         type: newValues.type,
         weeklyHours: newValues.weeklyHours,
+        hourlyRate: newValues.hourlyRate,
         vacationDaysPerYear: newValues.vacationDaysPerYear,
         workingDays: newValues.workingDays,
         validFrom,
@@ -201,10 +209,12 @@ export async function createPayrollHourly(data: {
     correctionFromPrevMonth: string;
     finalPayoutHours: string;
     eventLogIds: Array<string>;
+    absenceIds?: Array<string>;
 }): Promise<string> {
     // eslint-disable-next-line no-return-await
     return await db.transaction(async (tx) => {
         const id = uuidv4();
+        const now = new Date();
 
         // 1. Payroll Eintrag erstellen
         await tx.insert(hrpPayrollHourlyTable).values({
@@ -217,12 +227,28 @@ export async function createPayrollHourly(data: {
             correctionFromPrevMonth: data.correctionFromPrevMonth,
             finalPayoutHours: data.finalPayoutHours,
             status: 'finalized',
-            finalizedAt: new Date(),
+            finalizedAt: now,
         });
 
         // 2. Event Logs als abgerechnet markieren
         if (data.eventLogIds.length > 0) {
-            await tx.update(hrpEventLogTable).set({ abgerechnet: true }).where(inArray(hrpEventLogTable.id, data.eventLogIds));
+            await tx
+                .update(hrpEventLogTable)
+                .set({
+                    abgerechnet: true,
+                    abgerechnet_date: now,
+                })
+                .where(inArray(hrpEventLogTable.id, data.eventLogIds));
+        }
+
+        // 3. Abwesenheiten als abgerechnet markieren
+        if (data.absenceIds && data.absenceIds.length > 0) {
+            await tx
+                .update(hrpAbsencesTable)
+                .set({
+                    abgerechnet_date: now,
+                })
+                .where(inArray(hrpAbsencesTable.id, data.absenceIds));
         }
 
         return id;
@@ -252,6 +278,55 @@ export async function getPreviousPayrollHourly(contractId: string, year: number,
     return result[0] ?? null;
 }
 
+export async function getCurrentPayrollHourly(contractId: string, year: number, month: number): Promise<HrpMonthlyPayrollEntry | null> {
+    const result = await db
+        .select()
+        .from(hrpPayrollHourlyTable)
+        .where(
+            and(
+                eq(hrpPayrollHourlyTable.contractId, contractId),
+                eq(hrpPayrollHourlyTable.year, year),
+                eq(hrpPayrollHourlyTable.month, month),
+            ),
+        )
+        .limit(1);
+
+    return result[0] ?? null;
+}
+
+export async function getAllPayrollHourly(): Promise<Array<HrpMonthlyPayrollEntry & { userName: string | null }>> {
+    const results = await db
+        .select({
+            payroll: hrpPayrollHourlyTable,
+            userName: usersTable.displayName,
+        })
+        .from(hrpPayrollHourlyTable)
+        .innerJoin(hrpContractsTable, eq(hrpPayrollHourlyTable.contractId, hrpContractsTable.id))
+        .innerJoin(usersTable, eq(hrpContractsTable.userId, usersTable.id))
+        .orderBy(desc(hrpPayrollHourlyTable.year), desc(hrpPayrollHourlyTable.month), desc(hrpPayrollHourlyTable.finalizedAt));
+
+    return results.map((r) => ({
+        ...r.payroll,
+        userName: r.userName,
+    }));
+}
+
+export async function getUnbilledAbsences(contractId: string, upToDate: Date): Promise<Array<HrpAbsenceEntry>> {
+    // eslint-disable-next-line no-return-await
+    return await db
+        .select()
+        .from(hrpAbsencesTable)
+        .where(
+            and(
+                eq(hrpAbsencesTable.contractId, contractId),
+                isNull(hrpAbsencesTable.abgerechnet_date),
+                isNull(hrpAbsencesTable.deletedAt),
+                lte(hrpAbsencesTable.date, format(upToDate, 'yyyy-MM-dd')),
+            ),
+        )
+        .orderBy(desc(hrpAbsencesTable.date));
+}
+
 export async function getUnbilledLogs(userId: string, contractId: string, upToDate: Date): Promise<Array<HrpEventLogEntry>> {
     // eslint-disable-next-line no-return-await
     return await db
@@ -262,6 +337,8 @@ export async function getUnbilledLogs(userId: string, contractId: string, upToDa
                 eq(hrpEventLogTable.userId, userId),
                 eq(hrpEventLogTable.contractId, contractId),
                 eq(hrpEventLogTable.abgerechnet, false),
+                isNull(hrpEventLogTable.abgerechnet_date),
+                isNull(hrpEventLogTable.deletedAt),
                 lt(hrpEventLogTable.loggedTimestamp, upToDate),
             ),
         )

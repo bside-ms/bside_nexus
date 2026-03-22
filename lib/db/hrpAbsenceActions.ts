@@ -10,7 +10,7 @@ export async function createAbsence(
     userId: string,
     data: {
         contractId: string;
-        type: 'vacation' | 'sick';
+        type: 'vacation' | 'sick' | 'sick_with';
         startDate: string;
         endDate: string;
     },
@@ -40,6 +40,7 @@ export async function createAbsence(
             eq(hrpAbsencesTable.type, 'holiday'),
             gte(hrpAbsencesTable.date, startDate),
             lte(hrpAbsencesTable.date, endDate),
+            isNull(hrpAbsencesTable.deletedAt),
         ),
     });
 
@@ -99,8 +100,9 @@ export async function createAbsence(
                     eq(hrpAbsencesTable.contractId, contractId),
                     gte(hrpAbsencesTable.date, startDate),
                     lte(hrpAbsencesTable.date, endDate),
-                    sql`${hrpAbsencesTable.type} IN ('vacation', 'sick')`,
+                    sql`${hrpAbsencesTable.type} IN ('vacation', 'sick', 'sick_with')`,
                     isNull(hrpAbsencesTable.deletedAt),
+                    isNull(hrpAbsencesTable.abgerechnet_date),
                 ),
             );
 
@@ -175,6 +177,10 @@ export async function deleteAbsence(userId: string, absenceId: string, reason: s
         throw new Error('Die Abwesenheit wurde nicht gefunden.');
     }
 
+    if (absence.abgerechnet_date) {
+        throw new Error('Abgerechnete Abwesenheiten können nicht gelöscht werden.');
+    }
+
     const contract = await db.query.hrpContractsTable.findFirst({
         where: and(eq(hrpContractsTable.id, absence.contractId), eq(hrpContractsTable.userId, userId)),
     });
@@ -207,6 +213,10 @@ export async function deleteAbsenceGroup(userId: string, absenceIds: Array<strin
     const absences = await db.query.hrpAbsencesTable.findMany({
         where: sql`${hrpAbsencesTable.id} IN ${absenceIds}`,
     });
+
+    if (absences.some((a) => a.abgerechnet_date)) {
+        throw new Error('Einige Abwesenheiten sind bereits abgerechnet und können nicht gelöscht werden.');
+    }
 
     // Prüfung der Berechtigung für alle
     const contractIds = [...new Set(absences.map((a) => a.contractId))];

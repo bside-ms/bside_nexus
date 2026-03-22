@@ -1,4 +1,4 @@
-import { FileText, SquareChartGantt } from 'lucide-react';
+import { FileCheck, FileText, SquareChartGantt } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
@@ -32,6 +32,12 @@ export default function Page(): ReactElement {
             description: 'Einblick in die Stundenzettel von Mitarbeitenden.',
             href: '/hrp/admin/overview',
             icon: SquareChartGantt,
+        },
+        {
+            title: 'Abgeschlossene Abrechnungen',
+            description: 'Übersicht über alle bereits durchgeführten Abrechnungen.',
+            href: '/hrp/admin/payroll',
+            icon: FileCheck,
         },
     ];
 

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
-import type { HrpEventLogEntry } from '@/db/schema';
+import type { HrpAbsenceEntry, HrpEventLogEntry } from '@/db/schema';
 import type { HrpContract } from '@/lib/db/contractActions';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
@@ -64,13 +64,15 @@ async function fetchEntries(year: number, month: number, day: number): Promise<A
     return entries;
 }
 
-const parseEntryType = (entryType: string, absence?: AbsenceInfo): string => {
+const parseEntryType = (entryType: string, absence?: HrpAbsenceEntry): string => {
     if (entryType === 'absence' && absence) {
         switch (absence.type) {
             case 'vacation':
                 return 'Urlaub';
             case 'sick':
-                return 'Krankheit';
+                return 'Krankheit (ohne Attest)';
+            case 'sick_with':
+                return 'Krankheit (mit Attest)';
             case 'holiday':
                 return 'Feiertag';
             default:
@@ -91,16 +93,11 @@ const parseEntryType = (entryType: string, absence?: AbsenceInfo): string => {
     }
 };
 
-interface AbsenceInfo {
-    type: string;
-    contractId: string | null;
-}
-
 export default function Overview(): ReactElement {
     const [isLoading, setIsLoading] = useState(false);
     const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
     const [datesWithHrpEntries, setDatesWithHrpEntries] = useState<Array<Date>>([]);
-    const [hrpEntries, setHrpEntries] = useState<Array<Partial<HrpEventLogEntry & { absence?: AbsenceInfo }>>>([]);
+    const [hrpEntries, setHrpEntries] = useState<Array<Partial<HrpEventLogEntry & { absence?: HrpAbsenceEntry }>>>([]);
     const [contracts, setContracts] = useState<Array<HrpContract>>([]);
     const [deleteModalOpen, setDeleteModalOpen] = useState(false);
     const [entryToDelete, setEntryToDelete] = useState<{ id: string; type: string } | null>(null);
@@ -304,8 +301,11 @@ export default function Overview(): ReactElement {
                                                     </div>
                                                 </div>
                                                 {!event.abgerechnet &&
+                                                    !event.absence?.abgerechnet_date &&
                                                     !event.deletedAt &&
-                                                    (event.entryType !== 'absence' || event.absence?.type === 'sick') && (
+                                                    (event.entryType !== 'absence' ||
+                                                        event.absence?.type === 'sick' ||
+                                                        event.absence?.type === 'sick_with') && (
                                                         <button
                                                             onClick={(): void => {
                                                                 setEntryToDelete({

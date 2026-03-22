@@ -42,13 +42,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     try {
         const body = await req.json();
-        const { type, weeklyHours, vacationDaysPerYear, workingDays, changeDate } = body;
+        const { type, weeklyHours, hourlyRate, vacationDaysPerYear, workingDays, changeDate } = body;
 
         const newId = await updateContract(
             id,
             {
                 type,
                 weeklyHours,
+                hourlyRate,
                 vacationDaysPerYear,
                 workingDays,
             },

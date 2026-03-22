@@ -65,6 +65,7 @@ export async function POST(req: Request): Promise<NextResponse> {
         employerGroupId: body.employerGroupId,
         type: body.type, // 'fixed_salary' | 'hourly'
         weeklyHours: body.weeklyHours || 0,
+        hourlyRate: body.hourlyRate || '0.00',
         vacationDaysPerYear: body.vacationDaysPerYear || 0,
         workingDays: body.workingDays || [1, 2, 3, 4, 5], // Default Mo-Fr
         validFrom: new Date(body.validFrom),

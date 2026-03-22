@@ -237,6 +237,7 @@ export const hrpContractsTable = pgTable('hrp_contracts', {
 
     weeklyHours: real().default(0),
     vacationDaysPerYear: integer().default(0),
+    hourlyRate: decimal('hourly_rate', { precision: 10, scale: 2 }).default('0.00'),
 
     workingDays: json('working_days').$type<Array<number>>().default([1, 2, 3, 4, 5]), // [1, 2, 3, 4, 5] für Mo-Fr.
 
@@ -262,6 +263,7 @@ export const hrpEventLogTable = pgTable('hrp_event_log', {
     approvedAt: timestamp('approved_at'),
     deletedAt: timestamp('deleted_at'),
     abgerechnet: boolean().default(false).notNull(),
+    abgerechnet_date: timestamp('abgerechnet_date'),
     deletedBy: varchar('deletedBy', { length: 255 }).references(() => usersTable.id),
     deletionReason: text('deletionReason'),
 });
@@ -295,11 +297,12 @@ export const hrpAbsencesTable = pgTable('hrp_absences', {
         .notNull()
         .references(() => hrpContractsTable.id),
 
-    type: varchar({ length: 50 }).notNull(), // 'vacation', 'sick', 'holiday'
+    type: varchar({ length: 50 }).notNull(), // 'vacation', 'sick', 'sick_with', 'holiday'
     date: date('date').notNull(), // YYYY-MM-DD
 
     hoursValue: decimal('hours_value', { precision: 10, scale: 2 }).notNull().default('0.00'),
     status: varchar({ length: 50 }).default('approved'), // 'approved', 'declined'
+    abgerechnet_date: timestamp('abgerechnet_date'),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     deletedAt: timestamp('deleted_at'),
     deletedBy: varchar('deletedBy', { length: 255 }).references(() => usersTable.id),

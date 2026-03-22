@@ -7,7 +7,8 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import type { HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
+import type { HrpAbsenceEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
+import type { HrpContract } from '@/lib/db/contractActions';
 import { createPayrollHourly } from '@/lib/db/hrpAdminActions';
 
 interface UnbilledDayStat {
@@ -15,31 +16,48 @@ interface UnbilledDayStat {
     netMinutes: number;
     issues: Array<string>;
     entryIds: Array<string>;
+    absenceIds?: Array<string>;
 }
 
 interface PayrollHourlyClientProps {
     contractId: string;
+    contract: HrpContract;
     year: number;
     month: number;
     unbilledLogs: Array<HrpEventLogEntry>;
+    unbilledAbsences: Array<HrpAbsenceEntry>;
     unbilledDayStats: Array<UnbilledDayStat>;
     previousPayroll: HrpMonthlyPayrollEntry | null;
+    currentPayrollHourly?: HrpMonthlyPayrollEntry | null;
     periodMode?: 'calendar' | '23-22' | '15-14';
+    isAlreadyFinalized?: boolean;
 }
 
 export function PayrollHourlyClient({
     contractId,
+    contract,
     year,
     month,
     unbilledLogs,
+    unbilledAbsences,
     unbilledDayStats,
     previousPayroll,
+    currentPayrollHourly,
     periodMode = '23-22',
+    isAlreadyFinalized = false,
 }: PayrollHourlyClientProps): ReactElement {
     const router = useRouter();
     const [forecastedHours, setForecastedHours] = useState<string>('0');
-    const [threshold, setThreshold] = useState<string>('538');
+
+    const hourlyRate = parseFloat(contract.hourlyRate || '0');
+
+    // Threshold logic: > 12h/week -> 2000€, <= 12h/week -> 603€
+    const weeklyHours = contract.weeklyHours || 0;
+    const initialThreshold = weeklyHours > 12 ? '2000' : '603';
+    const [threshold, setThreshold] = useState<string>(initialThreshold);
+
     const [excludedLogIds, setExcludedLogIds] = useState<Set<string>>(new Set());
+    const [excludedAbsenceIds, setExcludedAbsenceIds] = useState<Set<string>>(new Set());
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Zeitraum des aktuellen Monats/Zeitraums basierend auf periodMode
@@ -73,7 +91,13 @@ export function PayrollHourlyClient({
             const [y, m, d] = s.dateStr.split('-').map(Number);
             const date = new Date(y!, m! - 1, d, 0, 0, 0, 0);
 
-            const allExcluded = s.entryIds.every((id) => excludedLogIds.has(id));
+            const allLogsExcluded = s.entryIds.length > 0 && s.entryIds.every((id) => excludedLogIds.has(id));
+            const allAbsencesExcluded = s.absenceIds && s.absenceIds.length > 0 && s.absenceIds.every((id) => excludedAbsenceIds.has(id));
+
+            // Wenn es sowohl Logs als auch Abwesenheiten gibt, müssen beide ausgeschlossen sein, damit der Tag als "ausgeschlossen" gilt
+            const allExcluded =
+                (s.entryIds.length === 0 || allLogsExcluded) && (!s.absenceIds || s.absenceIds.length === 0 || allAbsencesExcluded);
+
             const isCurrentMonth = date >= currentPeriodRange.start;
 
             return {
@@ -83,7 +107,7 @@ export function PayrollHourlyClient({
                 isCurrentMonth,
             };
         });
-    }, [unbilledDayStats, excludedLogIds, currentPeriodRange]);
+    }, [unbilledDayStats, excludedLogIds, excludedAbsenceIds, currentPeriodRange]);
 
     const recordedMinutesCurrent = useMemo(() => {
         return processedDays.filter((d) => d.isCurrentMonth && !d.allExcluded).reduce((acc, d) => acc + d.netMinutes, 0);
@@ -108,24 +132,34 @@ export function PayrollHourlyClient({
     const totalHours = totalMinutes / 60;
 
     const handleToggleDay = (dateStr: string, excluded: boolean) => {
-        const newExcluded = new Set(excludedLogIds);
+        const newExcludedLogs = new Set(excludedLogIds);
+        const newExcludedAbsences = new Set(excludedAbsenceIds);
         const day = processedDays.find((d) => d.dateStr === dateStr);
         if (day) {
             day.entryIds.forEach((id) => {
                 if (excluded) {
-                    newExcluded.add(id);
+                    newExcludedLogs.add(id);
                 } else {
-                    newExcluded.delete(id);
+                    newExcludedLogs.delete(id);
+                }
+            });
+            day.absenceIds?.forEach((id) => {
+                if (excluded) {
+                    newExcludedAbsences.add(id);
+                } else {
+                    newExcludedAbsences.delete(id);
                 }
             });
         }
-        setExcludedLogIds(newExcluded);
+        setExcludedLogIds(newExcludedLogs);
+        setExcludedAbsenceIds(newExcludedAbsences);
     };
 
     const handleSave = async () => {
         setIsSubmitting(true);
         try {
             const eventLogIds = unbilledLogs.map((l) => l.id).filter((id) => !excludedLogIds.has(id));
+            const absenceIds = unbilledAbsences.map((a) => a.id).filter((id) => !excludedAbsenceIds.has(id));
 
             await createPayrollHourly({
                 contractId,
@@ -136,6 +170,7 @@ export function PayrollHourlyClient({
                 correctionFromPrevMonth: (correctionMinutes / 60).toFixed(2),
                 finalPayoutHours: totalHours.toFixed(2),
                 eventLogIds,
+                absenceIds,
             });
 
             toast.success('Abrechnung erfolgreich erstellt');
@@ -185,14 +220,19 @@ export function PayrollHourlyClient({
                                 id="forecast"
                                 type="number"
                                 step="0.5"
-                                value={forecastedHours}
+                                value={
+                                    isAlreadyFinalized
+                                        ? parseFloat(currentPayrollHourly?.forecastedHoursLateMonth || '0').toString()
+                                        : forecastedHours
+                                }
                                 onChange={(e) => setForecastedHours(e.target.value)}
                                 className="w-24 text-right"
+                                disabled={isAlreadyFinalized}
                             />
                         </div>
                         <div className="flex justify-between items-center border-b pb-2">
                             <label htmlFor="threshold" className="flex-1">
-                                Geringfügigkeitsgrenze (€):
+                                Mini- / Midijobgrenze (€):
                             </label>
                             <Input
                                 id="threshold"
@@ -201,24 +241,42 @@ export function PayrollHourlyClient({
                                 value={threshold}
                                 onChange={(e) => setThreshold(e.target.value)}
                                 className="w-24 text-right"
+                                disabled
                             />
+                        </div>
+                        <div className="flex justify-between items-center border-b pb-2">
+                            <span>Stundenlohn:</span>
+                            <span className="font-mono">{hourlyRate.toFixed(2)} €/h</span>
                         </div>
                         <div className="flex justify-between items-center pt-4 text-xl font-bold">
                             <span>Gesamtauszahlung:</span>
-                            <span>
-                                {formatMinutes(totalMinutes)} ({totalHours.toFixed(2)} h)
-                            </span>
+                            <div className="flex flex-col items-end">
+                                <span>
+                                    {formatMinutes(totalMinutes)} ({totalHours.toFixed(2)} h)
+                                </span>
+                                <span className="text-sm font-normal text-muted-foreground">
+                                    {(totalHours * hourlyRate).toFixed(2)} € Brutto
+                                </span>
+                            </div>
                         </div>
 
-                        {totalHours * 15 > (parseFloat(threshold) || 538) && (
+                        {totalHours * hourlyRate > (parseFloat(threshold) || 603) && (
                             <div className="p-3 bg-amber-100 text-amber-800 rounded-md text-sm">
-                                Achtung: Der Betrag überschreitet evtl. die Geringfügigkeitsgrenze (ca. {threshold}€ bei 15€/h). Prüfe, ob
-                                Tage in den nächsten Monat verschoben werden sollen.
+                                Achtung: Der Betrag überschreitet die Geringfügigkeitsgrenze von {threshold}€. Prüfe, ob Tage in den
+                                nächsten Monat verschoben werden sollen.
                             </div>
                         )}
 
-                        <Button onClick={handleSave} disabled={isSubmitting || totalHours < 0} className="w-full mt-4">
-                            {isSubmitting ? 'Wird gespeichert...' : 'Abrechnung jetzt durchführen'}
+                        <Button
+                            onClick={handleSave}
+                            disabled={isSubmitting || totalHours < 0 || isAlreadyFinalized}
+                            className="w-full mt-4"
+                        >
+                            {isSubmitting
+                                ? 'Wird gespeichert...'
+                                : isAlreadyFinalized
+                                  ? 'Bereits abgerechnet'
+                                  : 'Abrechnung jetzt durchführen'}
                         </Button>
                     </div>
 

@@ -30,6 +30,7 @@ export default function NewContractPage(): ReactElement {
         employerGroupId: '',
         type: 'fixed_salary',
         weeklyHours: 40,
+        hourlyRate: '0.00',
         vacationDaysPerYear: 30,
         validFrom: '',
     });
@@ -164,6 +165,22 @@ export default function NewContractPage(): ReactElement {
                                 />
                             </div>
                         </div>
+
+                        {formData.type === 'hourly' && (
+                            <div className="space-y-2">
+                                <label htmlFor="hourly-rate" className="text-sm font-medium">
+                                    Stundenlohn (€)
+                                </label>
+                                <Input
+                                    id="hourly-rate"
+                                    type="number"
+                                    step="0.01"
+                                    value={formData.hourlyRate}
+                                    onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                                    required
+                                />
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <label htmlFor="date-from" className="text-sm font-medium">
