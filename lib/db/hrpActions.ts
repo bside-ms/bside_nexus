@@ -193,14 +193,12 @@ export const getHrpLogForUser = async (
     month: number,
     contractId?: string | null,
 ): Promise<Record<number, Array<Partial<HrpEventLogEntry & { absence?: HrpAbsenceEntry }>>>> => {
-    // Effizientes Laden aller Einträge für den Monat in einer Query
-    const startOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
-    // Wir laden bis zum Ende des Folgetages des Monatsendes, um Sessions über Mitternacht zu erfassen
+    const startOfRange = new Date(year, month - 1, 28, 0, 0, 0, 0);
     const endOfRange = new Date(year, month + 1, 2, 0, 0, 0, 0);
 
     const whereConditions = [
         eq(hrpEventLogTable.userId, userId),
-        gte(hrpEventLogTable.loggedTimestamp, startOfMonth),
+        gte(hrpEventLogTable.loggedTimestamp, startOfRange),
         lt(hrpEventLogTable.loggedTimestamp, endOfRange),
         isNull(hrpEventLogTable.deletedAt),
     ];
@@ -281,12 +279,13 @@ export const getHrpLogsForAllUsers = async (
         }
     >
 > => {
-    const startOfMonth = new Date(year, month, 1, 0, 0, 0, 0);
-    const endOfMonth = new Date(year, month + 1, 2, 0, 0, 0, 0); // Puffer
+    // Sicherer Puffer, um Schichten über Mitternacht am Monatsanfang korrekt zu gruppieren
+    const startOfRange = new Date(year, month - 1, 28, 0, 0, 0, 0);
+    const endOfRange = new Date(year, month + 1, 2, 0, 0, 0, 0); // Puffer
 
     const whereConditions = [
-        gte(hrpEventLogTable.loggedTimestamp, startOfMonth),
-        lt(hrpEventLogTable.loggedTimestamp, endOfMonth),
+        gte(hrpEventLogTable.loggedTimestamp, startOfRange),
+        lt(hrpEventLogTable.loggedTimestamp, endOfRange),
         isNull(hrpEventLogTable.deletedAt),
     ];
 
