@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ username:
 
             return new Response(response.data, {
                 headers: {
-                    'Content-Type': response.headers['content-type'],
+                    'Content-Type': String(response.headers['content-type'] ?? 'image/png'),
                     'Cache-Control': 'public, max-age=2592000, immutable', // cache for 30 days
                 },
                 status: 200,
