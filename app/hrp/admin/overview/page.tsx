@@ -12,7 +12,7 @@ import { db } from '@/db';
 import type { HrpAbsenceEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
 import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
-import { getActiveContractsForUser } from '@/lib/db/contractActions';
+import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions';
 import { getUpcomingVacations } from '@/lib/db/hrpAbsenceActions';
 import { getHrpLogsForAllUsers } from '@/lib/db/hrpActions';
 import {
@@ -192,13 +192,38 @@ export default async function Page({
     const selectedUserId = initialUserId && userOptionsYear.some((u) => u.id === initialUserId) ? initialUserId : userOptionsYear[0]?.id;
 
     // Verträge für den gewählten Nutzer laden
-    const allContracts = selectedUserId ? await getActiveContractsForUser(selectedUserId) : [];
+    const allContracts = selectedUserId ? await getContractsForUser(selectedUserId) : [];
     // Nur Verträge anzeigen, die der Admin tatsächlich verwalten darf
     const managedContractIdsForSelectedUser = new Set(managedContracts.filter((c) => c.userId === selectedUserId).map((c) => c.id));
     const contracts = allContracts.filter((c) => managedContractIdsForSelectedUser.has(c.contractId));
 
-    const selectedContractId =
-        rawContractId && contracts.some((c) => c.contractId === rawContractId) ? rawContractId : contracts[0]?.contractId;
+    let defaultContractId = contracts[0]?.contractId;
+    if (selectedUserId) {
+        const startOfMonth = new Date(year, month, 1);
+        const activeContract = await getContractAtDate(selectedUserId, startOfMonth);
+        if (activeContract && contracts.some((c) => c.contractId === activeContract.contractId)) {
+            defaultContractId = activeContract.contractId;
+        }
+    }
+
+    let selectedContractId = defaultContractId;
+    if (rawContractId && rawContractId !== defaultContractId) {
+        const contractInUrl = contracts.find((c) => c.contractId === rawContractId);
+        if (contractInUrl) {
+            const firstDayOfMonth = new Date(year, month, 1);
+            const lastDayOfMonth = new Date(year, month + 1, 0);
+
+            // ValidFrom <= lastDay && (ValidTo >= firstDay || ValidTo is null)
+            const contractValidFrom = new Date(contractInUrl.validFrom);
+            const contractValidTo = contractInUrl.validTo ? new Date(contractInUrl.validTo) : null;
+
+            if (contractValidFrom <= lastDayOfMonth && (!contractValidTo || contractValidTo >= firstDayOfMonth)) {
+                selectedContractId = rawContractId;
+            } else {
+                selectedContractId = defaultContractId;
+            }
+        }
+    }
 
     const selectedContract = contracts.find((c) => c.contractId === selectedContractId);
 
@@ -222,7 +247,7 @@ export default async function Page({
         // Lade alle Logs der letzten 60 Tage als Kontext (sollte für Schichtübergänge reichen)
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-        contextLogs = (await db
+        contextLogs = await db
             .select()
             .from(hrpEventLogTable)
             .where(
@@ -233,14 +258,14 @@ export default async function Page({
                     isNull(hrpEventLogTable.deletedAt),
                 ),
             )
-            .orderBy(hrpEventLogTable.loggedTimestamp)) as Array<HrpEventLogEntry>;
+            .orderBy(hrpEventLogTable.loggedTimestamp);
     }
 
     const unbilledByDay =
         selectedUserId && selectedContractId && selectedContract?.type === 'hourly'
             ? groupEntriesByWorkday([
                   ...contextLogs,
-                  ...unbilledAbsences.map((a) => ({ entryType: 'absence', loggedTimestamp: a.date, absence: a }) as Entry),
+                  ...unbilledAbsences.map((a) => ({ entryType: 'absence', loggedTimestamp: a.date, absence: a })),
               ])
             : {};
 
@@ -314,33 +339,37 @@ export default async function Page({
     );
 
     // Tageswerte berechnen
-    const dayStats = dayRefs.map((ref) => {
-        const dYear = ref.source === 'curr' ? year : prevYear;
-        const dMonth = ref.source === 'curr' ? month : prevMonth;
-        const refDate = new Date(dYear, dMonth, ref.day);
+    const dayStats = await Promise.all(
+        dayRefs.map(async (ref) => {
+            const dYear = ref.source === 'curr' ? year : prevYear;
+            const dMonth = ref.source === 'curr' ? month : prevMonth;
+            const refDate = new Date(dYear, dMonth, ref.day);
 
-        const entries =
-            ref.source === 'prev'
-                ? ((selectedPrev?.logs?.[ref.day] ?? []) as DayEntries)
-                : ((selectedCurrent?.logs?.[ref.day] ?? []) as DayEntries);
-        const stats = computeDayStats(
-            entries,
-            selectedContract
-                ? {
-                      weeklyHours: selectedContract.weeklyHours,
-                      workingDays: selectedContract.workingDays,
-                      type: selectedContract.type,
-                  }
-                : undefined,
-            refDate,
-            todayStr,
-            currentHourBerlin,
-        );
+            const contractAtDate = await getContractAtDate(selectedUserId!, refDate);
 
-        // Abwesenheiten für Hinweise sammeln
-        const absences = entries.filter((e) => e.entryType === 'absence');
-        return { ...stats, absences };
-    });
+            const entries =
+                ref.source === 'prev'
+                    ? ((selectedPrev?.logs?.[ref.day] ?? []) as DayEntries)
+                    : ((selectedCurrent?.logs?.[ref.day] ?? []) as DayEntries);
+            const stats = computeDayStats(
+                entries,
+                contractAtDate
+                    ? {
+                          weeklyHours: contractAtDate.weeklyHours,
+                          workingDays: contractAtDate.workingDays,
+                          type: contractAtDate.type,
+                      }
+                    : undefined,
+                refDate,
+                todayStr,
+                currentHourBerlin,
+            );
+
+            // Abwesenheiten für Hinweise sammeln
+            const absences = entries.filter((e) => e.entryType === 'absence');
+            return { ...stats, absences };
+        }),
+    );
 
     // Monats-/Perioden-Summen
     const totals = dayStats.reduce(

@@ -6,7 +6,7 @@ import NavbarTop from '@/components/sidebar/NavbarTop';
 import { db } from '@/db';
 import { usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
-import { getActiveContractsForUser } from '@/lib/db/contractActions';
+import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions';
 import { getUpcomingVacations } from '@/lib/db/hrpAbsenceActions';
 import { getHrpLogForUser } from '@/lib/db/hrpActions';
 import { getLeaveAccounts } from '@/lib/db/hrpAdminActions';
@@ -115,9 +115,35 @@ export default async function Page({
         );
     }
 
-    const contracts = await getActiveContractsForUser(currentUserId);
-    const selectedContractId =
-        initialContractId && contracts.some((c) => c.contractId === initialContractId) ? initialContractId : contracts[0]?.contractId;
+    const contracts = await getContractsForUser(currentUserId);
+
+    let defaultContractId = contracts[0]?.contractId;
+    {
+        const startOfMonth = new Date(year, month, 1);
+        const activeContract = await getContractAtDate(currentUserId, startOfMonth);
+        if (activeContract && contracts.some((c) => c.contractId === activeContract.contractId)) {
+            defaultContractId = activeContract.contractId;
+        }
+    }
+
+    let selectedContractId = defaultContractId;
+    if (initialContractId && initialContractId !== defaultContractId) {
+        const contractInUrl = contracts.find((c) => c.contractId === initialContractId);
+        if (contractInUrl) {
+            const firstDayOfMonth = new Date(year, month, 1);
+            const lastDayOfMonth = new Date(year, month + 1, 0);
+
+            // ValidFrom <= lastDay && (ValidTo >= firstDay || ValidTo is null)
+            const contractValidFrom = new Date(contractInUrl.validFrom);
+            const contractValidTo = contractInUrl.validTo ? new Date(contractInUrl.validTo) : null;
+
+            if (contractValidFrom <= lastDayOfMonth && (!contractValidTo || contractValidTo >= firstDayOfMonth)) {
+                selectedContractId = initialContractId;
+            } else {
+                selectedContractId = defaultContractId;
+            }
+        }
+    }
 
     const selectedContract = contracts.find((c) => c.contractId === selectedContractId);
 
@@ -188,54 +214,58 @@ export default async function Page({
         10,
     );
 
-    const dayStats = dayRefs.map((ref) => {
-        const dYear = ref.source === 'curr' ? year : prevYear;
-        const dMonth = ref.source === 'curr' ? month : prevMonth;
-        const entries =
-            ref.source === 'prev' ? ((logsPrev?.[ref.day] ?? []) as DayEntries) : ((logsCurrent?.[ref.day] ?? []) as DayEntries);
+    // Tageswerte berechnen
+    const dayStats = await Promise.all(
+        dayRefs.map(async (ref) => {
+            const dYear = ref.source === 'curr' ? year : prevYear;
+            const dMonth = ref.source === 'curr' ? month : prevMonth;
+            const refDate = new Date(dYear, dMonth, ref.day);
 
-        // Check if this ref represents "today"
-        const refDate = new Date(dYear, dMonth, ref.day);
+            const contractAtDate = await getContractAtDate(currentUserId, refDate);
 
-        const stats = computeDayStats(
-            entries,
-            selectedContract
-                ? {
-                      weeklyHours: selectedContract.weeklyHours,
-                      workingDays: selectedContract.workingDays,
-                      type: selectedContract.type,
-                  }
-                : undefined,
-            refDate,
-            todayStr,
-            currentHourBerlin,
-        );
+            const entries =
+                ref.source === 'prev' ? ((logsPrev?.[ref.day] ?? []) as DayEntries) : ((logsCurrent?.[ref.day] ?? []) as DayEntries);
 
-        // Collect absences for hints
-        const absences = entries.filter((e) => e.entryType === 'absence');
+            const stats = computeDayStats(
+                entries,
+                contractAtDate
+                    ? {
+                          weeklyHours: contractAtDate.weeklyHours,
+                          workingDays: contractAtDate.workingDays,
+                          type: contractAtDate.type,
+                      }
+                    : undefined,
+                refDate,
+                todayStr,
+                currentHourBerlin,
+            );
 
-        // Check if this ref represents "today"
-        const refDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(refDate);
-        const isToday = refDateStr === todayStr;
+            // Collect absences for hints
+            const absences = entries.filter((e) => e.entryType === 'absence');
 
-        // If today and no stop event yet, suppress warnings/issues
-        if (isToday && stats.stops.length === 0) {
-            return {
-                ...stats,
-                absences,
-                breakWarning: 'ok' as const,
-                issues: stats.issues.filter(
-                    (i) =>
-                        !i.includes('Fehlendes Start/Stop') &&
-                        !i.includes('Pausen-Reihenfolge') &&
-                        !i.includes('Unvollständige Pause') &&
-                        !i.includes('Start/Stop-Reihenfolge'),
-                ),
-            };
-        }
+            // Check if this ref represents "today"
+            const refDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(refDate);
+            const isToday = refDateStr === todayStr;
 
-        return { ...stats, absences };
-    });
+            // If today and no stop event yet, suppress warnings/issues
+            if (isToday && stats.stops.length === 0) {
+                return {
+                    ...stats,
+                    absences,
+                    breakWarning: 'ok' as const,
+                    issues: stats.issues.filter(
+                        (i) =>
+                            !i.includes('Fehlendes Start/Stop') &&
+                            !i.includes('Pausen-Reihenfolge') &&
+                            !i.includes('Unvollständige Pause') &&
+                            !i.includes('Start/Stop-Reihenfolge'),
+                    ),
+                };
+            }
+
+            return { ...stats, absences };
+        }),
+    );
 
     // Period totals
     const totals = dayStats.reduce(
