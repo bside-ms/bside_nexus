@@ -22,7 +22,7 @@ import { de } from 'date-fns/locale';
 
 const formSchema = z.object({
     contractId: z.string({ required_error: 'Bitte wähle einen Bereich aus.' }).min(1),
-    type: z.enum(['vacation', 'sick', 'sick_with'], {
+    type: z.enum(['vacation', 'sick', 'sick_with', 'compensatory_day'], {
         errorMap: () => ({ message: 'Bitte wähle einen Typ aus.' }),
     }),
     dateRange: z.object(
@@ -116,6 +116,7 @@ export default function AbsenceEntry({ contracts }: { contracts: Array<HrpContra
                                             <SelectItem value="vacation">Urlaub</SelectItem>
                                             <SelectItem value="sick">Krankheit (ohne Attest)</SelectItem>
                                             <SelectItem value="sick_with">Krankheit (mit Attest)</SelectItem>
+                                            <SelectItem value="compensatory_day">Ausgleichstag</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <FormMessage />

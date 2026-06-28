@@ -19,13 +19,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             );
         }
 
-        if (!['vacation', 'sick', 'sick_with'].includes(type)) {
+        if (!['vacation', 'sick', 'sick_with', 'compensatory_day'].includes(type)) {
             return NextResponse.json({ success: false, message: 'Dieser Abwesenheitstyp ist nicht erlaubt.' }, { status: 400 });
         }
 
         const result = await createAbsence(session.id, {
             contractId,
-            type: type as 'vacation' | 'sick' | 'sick_with',
+            type: type as 'vacation' | 'sick' | 'sick_with' | 'compensatory_day',
             startDate,
             endDate,
         });

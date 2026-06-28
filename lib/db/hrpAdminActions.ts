@@ -11,6 +11,7 @@ import type {
     HrpMonthlyFixedEntry,
     HrpMonthlyPayrollEntry,
     HrpPayrollHourlyForecastEntry,
+    HrpPublicHolidayEntry,
     HrpYearlyEntry,
 } from '@/db/schema';
 import {
@@ -23,6 +24,7 @@ import {
     hrpPayrollFixedTable,
     hrpPayrollHourlyForecastsTable,
     hrpPayrollHourlyTable,
+    hrpPublicHolidaysTable,
     membersTable,
     usersTable,
 } from '@/db/schema';
@@ -169,6 +171,7 @@ export async function deleteLeaveAccount(id: string): Promise<Array<HrpYearlyEnt
 /**
  * Berechnet Soll-Stunden für einen Monat basierend auf Arbeitstagen
  */
+// eslint-disable-next-line @typescript-eslint/require-await
 export async function calculateTargetHoursForMonth(
     contract: { weeklyHours: number | null; workingDays: Array<number> | null },
     year: number,
@@ -206,44 +209,77 @@ export async function calculateTargetHoursForMonth(
     return workDaysInMonth * hoursPerDay;
 }
 
-// ==========================================
-// Holiday Configs
-// ==========================================
-export async function getHolidayConfigs(contractId: string, year: number): Promise<Array<HrpHolidayConfigEntry>> {
+export async function getHolidayConfigs(contractIds: Array<string>, year: number): Promise<Array<HrpHolidayConfigEntry>> {
     return db
         .select()
         .from(hrpHolidayConfigsTable)
-        .where(and(eq(hrpHolidayConfigsTable.contractId, contractId), sql`EXTRACT(YEAR FROM ${hrpHolidayConfigsTable.date}) = ${year}`));
+        .where(
+            and(inArray(hrpHolidayConfigsTable.contractId, contractIds), sql`EXTRACT(YEAR FROM ${hrpHolidayConfigsTable.date}) = ${year}`),
+        );
+}
+
+export async function getHolidaysWithConfigs(
+    contractIds: Array<string>,
+    year: number,
+): Promise<Array<HrpPublicHolidayEntry & { config?: HrpHolidayConfigEntry }>> {
+    // 1. Get global holidays (from hrpPublicHolidaysTable)
+    const globalHolidays = await db.query.hrpPublicHolidaysTable.findMany({
+        where: eq(hrpPublicHolidaysTable.year, year),
+    });
+
+    // 2. Get existing configs
+    const configs = await getHolidayConfigs(contractIds, year);
+    const configMap = new Map(configs.map((c) => [c.date, c]));
+
+    // 3. Merge
+    return globalHolidays.map((h) => ({
+        ...h,
+        config: configMap.get(h.date),
+    }));
 }
 
 export async function upsertHolidayConfig(data: {
     id?: string;
     contractId: string;
     date: string;
-    strategy: 'off' | 'work_required';
+    strategy: 'off' | 'work_required' | 'credited';
+    status?: 'open' | 'taken' | 'expired' | 'none';
+    compensatoryAbsenceId?: string | null;
     comment?: string;
-}): Promise<HrpHolidayConfigEntry> {
+}): Promise<{ success: boolean; data?: HrpHolidayConfigEntry; error?: string }> {
+    if (!data.contractId) {
+        return { success: false, error: 'Contract ID is required' };
+    }
     const { id, ...values } = data;
-    if (id) {
-        const result = (await db.update(hrpHolidayConfigsTable).set(values).where(eq(hrpHolidayConfigsTable.id, id)).returning())[0];
-        if (!result) {
-            throw new Error('Holiday config not found');
+    if (values.strategy === 'off') {
+        values.status = 'none';
+    }
+    try {
+        if (id) {
+            const result = (await db.update(hrpHolidayConfigsTable).set(values).where(eq(hrpHolidayConfigsTable.id, id)).returning())[0];
+            if (!result) {
+                return { success: false, error: 'Holiday config not found' };
+            }
+            return { success: true, data: result };
+        } else {
+            const result = (
+                await db
+                    .insert(hrpHolidayConfigsTable)
+                    .values({
+                        id: uuidv4(),
+                        ...values,
+                    })
+                    .returning()
+            )[0];
+            if (!result) {
+                return { success: false, error: 'Holiday config could not be created' };
+            }
+            return { success: true, data: result };
         }
-        return result;
-    } else {
-        const result = (
-            await db
-                .insert(hrpHolidayConfigsTable)
-                .values({
-                    id: uuidv4(),
-                    ...values,
-                })
-                .returning()
-        )[0];
-        if (!result) {
-            throw new Error('Holiday config could not be created');
-        }
-        return result;
+    } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Error in upsertHolidayConfig:', e);
+        return { success: false, error: 'Database error' };
     }
 }
 
@@ -659,4 +695,111 @@ export async function recalculatePayrollFixedForUserAtDate(userId: string, year:
         throw new Error('Kein gültiger Vertrag für diesen Monat gefunden');
     }
     await recalculatePayrollFixed(contractForMonth.contractId, year, month);
+}
+
+export async function updateAllHolidayStatuses(): Promise<void> {
+    // 1. Identify all past holidays that haven't been processed
+    const pastHolidays = await db
+        .select()
+        .from(hrpHolidayConfigsTable)
+        .where(and(lt(hrpHolidayConfigsTable.date, new Date().toISOString().split('T')[0]!), eq(hrpHolidayConfigsTable.status, 'none')));
+
+    for (const holiday of pastHolidays) {
+        // Check if an absence exists for this holiday
+        const existingAbsence = await db
+            .select()
+            .from(hrpAbsencesTable)
+            .where(
+                and(
+                    eq(hrpAbsencesTable.date, holiday.date),
+                    eq(hrpAbsencesTable.contractId, holiday.contractId),
+                    eq(hrpAbsencesTable.type, 'compensatory_day'),
+                ),
+            )
+            .limit(1);
+
+        if (existingAbsence.length > 0) {
+            await db
+                .update(hrpHolidayConfigsTable)
+                .set({ status: 'taken', compensatoryAbsenceId: existingAbsence[0]!.id })
+                .where(eq(hrpHolidayConfigsTable.id, holiday.id));
+        } else if (holiday.strategy === 'off') {
+            await db.update(hrpHolidayConfigsTable).set({ status: 'none' }).where(eq(hrpHolidayConfigsTable.id, holiday.id));
+        } else if (holiday.strategy === 'work_required') {
+            // Check if an absence exists for this holiday
+            const innerExistingAbsence = await db
+                .select()
+                .from(hrpAbsencesTable)
+                .where(
+                    and(
+                        eq(hrpAbsencesTable.date, holiday.date),
+                        eq(hrpAbsencesTable.contractId, holiday.contractId),
+                        eq(hrpAbsencesTable.type, 'compensatory_day'),
+                    ),
+                )
+                .limit(1);
+
+            if (innerExistingAbsence.length > 0) {
+                await db
+                    .update(hrpHolidayConfigsTable)
+                    .set({ status: 'taken', compensatoryAbsenceId: innerExistingAbsence[0]!.id })
+                    .where(eq(hrpHolidayConfigsTable.id, holiday.id));
+            } else {
+                // If it's been more than 7 days, it's expired.
+                const sevenDaysAgo = new Date();
+                sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                if (new Date(holiday.date) < sevenDaysAgo) {
+                    await db.update(hrpHolidayConfigsTable).set({ status: 'expired' }).where(eq(hrpHolidayConfigsTable.id, holiday.id));
+                } else {
+                    await db.update(hrpHolidayConfigsTable).set({ status: 'none' }).where(eq(hrpHolidayConfigsTable.id, holiday.id));
+                }
+            }
+        } else if (holiday.strategy === 'credited') {
+            // Check if an absence exists for this holiday
+            const innerExistingAbsence = await db
+                .select()
+                .from(hrpAbsencesTable)
+                .where(
+                    and(
+                        eq(hrpAbsencesTable.date, holiday.date),
+                        eq(hrpAbsencesTable.contractId, holiday.contractId),
+                        eq(hrpAbsencesTable.type, 'holiday'),
+                    ),
+                )
+                .limit(1);
+
+            if (innerExistingAbsence.length > 0) {
+                await db
+                    .update(hrpHolidayConfigsTable)
+                    .set({ status: 'taken', compensatoryAbsenceId: innerExistingAbsence[0]!.id })
+                    .where(eq(hrpHolidayConfigsTable.id, holiday.id));
+            } else {
+                await db.update(hrpHolidayConfigsTable).set({ status: 'none' }).where(eq(hrpHolidayConfigsTable.id, holiday.id));
+            }
+        } else {
+            // Default: consider them taken if they are in the past
+            await db.update(hrpHolidayConfigsTable).set({ status: 'taken' }).where(eq(hrpHolidayConfigsTable.id, holiday.id));
+        }
+    }
+}
+
+export async function bookHoliday(holidayId: string, userId: string, contractId: string, date: string): Promise<void> {
+    // 1. Create Absence entry
+    const absenceId = uuidv4();
+    await db.insert(hrpAbsencesTable).values({
+        id: absenceId,
+        contractId,
+        date,
+        type: 'holiday',
+    });
+
+    // 2. Recalculate
+    const d = new Date(date);
+    await recalculatePayrollFixedForUserAtDate(userId, d.getFullYear(), d.getMonth() + 1);
+
+    // 3. Update status
+    await db
+        .update(hrpHolidayConfigsTable)
+        .set({ status: 'taken', compensatoryAbsenceId: absenceId })
+        .where(eq(hrpHolidayConfigsTable.id, holidayId));
 }

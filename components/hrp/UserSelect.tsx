@@ -18,7 +18,7 @@ export const UserSelect = ({
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    const options = useMemo(() => users, [users]);
+    const options = useMemo(() => [...users].sort((a, b) => a.label.localeCompare(b.label)), [users]);
 
     function onChange(e: React.ChangeEvent<HTMLSelectElement>): void {
         const user = e.target.value;

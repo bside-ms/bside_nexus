@@ -5,6 +5,7 @@ import type { Metadata } from 'next';
 import type { ReactElement, ReactNode } from 'react';
 import { BreakpointContextProvider } from '@/components/common/BreakpointContext';
 import ThemeProvider from '@/components/theming/ThemeProvider';
+import { Toaster } from '@/components/ui/sonner';
 
 export const metadata: Metadata = {
     title: 'B-Side Intern',
@@ -16,6 +17,7 @@ const RootLayout = ({ children }: Readonly<{ children: ReactNode }>): ReactEleme
             <body className={GeistSans.className}>
                 <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
                     <BreakpointContextProvider>{children}</BreakpointContextProvider>
+                    <Toaster position="top-right" />
                 </ThemeProvider>
             </body>
         </html>

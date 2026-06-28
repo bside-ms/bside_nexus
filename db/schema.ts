@@ -29,6 +29,7 @@ export type HrpAbsenceEntry = typeof hrpAbsencesTable.$inferSelect;
 export type HrpDailyEntry = typeof hrpDailyRecordTable.$inferSelect;
 export type HrpMonthlyPayrollEntry = typeof hrpPayrollHourlyTable.$inferSelect;
 export type HrpMonthlyFixedEntry = typeof hrpPayrollFixedTable.$inferSelect;
+export type HrpPublicHolidayEntry = typeof hrpPublicHolidaysTable.$inferSelect;
 export type HrpHolidayConfigEntry = typeof hrpHolidayConfigsTable.$inferSelect;
 export type HrpPayrollHourlyForecastEntry = typeof hrpPayrollHourlyForecastsTable.$inferSelect;
 
@@ -401,6 +402,19 @@ export const hrpPayrollFixedTable = pgTable(
     }),
 );
 
+export const hrpPublicHolidaysTable = pgTable(
+    'hrp_public_holidays',
+    {
+        id: varchar({ length: 36 }).primaryKey(),
+        date: date('date').notNull(),
+        name: varchar({ length: 255 }).notNull(),
+        year: integer().notNull(),
+    },
+    (table) => ({
+        yearIdx: index('holiday_year_idx').on(table.year),
+    }),
+);
+
 export const hrpHolidayConfigsTable = pgTable(
     'hrp_holiday_configs',
     {
@@ -409,8 +423,11 @@ export const hrpHolidayConfigsTable = pgTable(
             .notNull()
             .references(() => hrpContractsTable.id),
         date: date('date').notNull(),
-        // Strategie: 'off' (frei) oder 'work_required' (arbeit angeordnet)
+        // Strategie: 'off' (frei), 'credited' (gutgeschrieben), 'work_required' (arbeit angeordnet)
         strategy: varchar({ length: 50 }).notNull().default('off'),
+        // Status: 'open', 'taken', 'expired', 'none'
+        status: varchar({ length: 50 }).notNull().default('none'),
+        compensatoryAbsenceId: varchar({ length: 36 }).references(() => hrpAbsencesTable.id),
         comment: text('comment'),
         createdAt: timestamp('created_at').defaultNow().notNull(),
     },

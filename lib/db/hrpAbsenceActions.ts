@@ -1,7 +1,7 @@
-import { and, desc, eq, gte, isNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNull, lt, lte, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import type { HrpAbsenceEntry } from '@/db/schema';
-import { hrpAbsencesTable, hrpContractsTable, hrpDailyRecordTable } from '@/db/schema';
+import { hrpAbsencesTable, hrpContractsTable, hrpDailyRecordTable, hrpHolidayConfigsTable } from '@/db/schema';
 import { aggregateDay } from '@/lib/hrp/aggregation';
 import { differenceInDays, format, parseISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
@@ -10,7 +10,7 @@ export async function createAbsence(
     userId: string,
     data: {
         contractId: string;
-        type: 'vacation' | 'sick' | 'sick_with';
+        type: 'vacation' | 'sick' | 'sick_with' | 'compensatory_day';
         startDate: string;
         endDate: string;
     },
@@ -31,6 +31,27 @@ export async function createAbsence(
 
     if (daysCount <= 0) {
         throw new Error('Invalid date range');
+    }
+
+    if (type === 'compensatory_day') {
+        // Prüfe auf work_required Feiertag in den letzten 7 Tagen
+        const sevenDaysAgo = new Date(start);
+        sevenDaysAgo.setDate(start.getDate() - 7);
+        const sevenDaysAgoStr = format(sevenDaysAgo, 'yyyy-MM-dd');
+
+        const validHoliday = await db.query.hrpHolidayConfigsTable.findFirst({
+            where: and(
+                eq(hrpHolidayConfigsTable.contractId, contractId),
+                eq(hrpHolidayConfigsTable.strategy, 'work_required'),
+                gte(hrpHolidayConfigsTable.date, sevenDaysAgoStr),
+                lt(hrpHolidayConfigsTable.date, startDate),
+                eq(hrpHolidayConfigsTable.status, 'none'),
+            ),
+        });
+
+        if (!validHoliday) {
+            throw new Error('Kein anrechenbarer Feiertag in den letzten 7 Tagen gefunden.');
+        }
     }
 
     // Hole Feiertage (contractId IS NULL) im Zeitraum
@@ -57,7 +78,7 @@ export async function createAbsence(
         const mappedDay = dayOfWeek === 0 ? 7 : dayOfWeek;
 
         // Überspringe, wenn es ein Feiertag ist oder kein Arbeitstag
-        if (holidayDates.has(dateStr) || !contract.workingDays?.includes(mappedDay)) {
+        if (holidayDates.has(dateStr) || (!contract.workingDays?.includes(mappedDay) && type !== 'compensatory_day')) {
             continue;
         }
 
@@ -108,6 +129,33 @@ export async function createAbsence(
 
         if (absences.length > 0) {
             await tx.insert(hrpAbsencesTable).values(absences);
+
+            if (type === 'compensatory_day') {
+                // Update den Status des gefundenen Feiertags auf 'taken'
+                const sevenDaysAgo = new Date(start);
+                sevenDaysAgo.setDate(start.getDate() - 7);
+                const sevenDaysAgoStr = format(sevenDaysAgo, 'yyyy-MM-dd');
+
+                const validHoliday = await tx.query.hrpHolidayConfigsTable.findFirst({
+                    where: and(
+                        eq(hrpHolidayConfigsTable.contractId, contractId),
+                        eq(hrpHolidayConfigsTable.strategy, 'work_required'),
+                        gte(hrpHolidayConfigsTable.date, sevenDaysAgoStr),
+                        lt(hrpHolidayConfigsTable.date, startDate),
+                        eq(hrpHolidayConfigsTable.status, 'none'),
+                    ),
+                });
+
+                if (validHoliday) {
+                    await tx
+                        .update(hrpHolidayConfigsTable)
+                        .set({
+                            status: 'taken',
+                            compensatoryAbsenceId: absences[0]!.id,
+                        })
+                        .where(eq(hrpHolidayConfigsTable.id, validHoliday.id));
+                }
+            }
 
             for (const record of dailyRecords) {
                 await tx

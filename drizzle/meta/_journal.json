@@ -99,6 +99,13 @@
       "when": 1782675247623,
       "tag": "0013_hrp decimal places for hour-aggregation",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1782684834372,
+      "tag": "0014_add hrp public holiday table",
+      "breakpoints": true
     }
   ]
 }
