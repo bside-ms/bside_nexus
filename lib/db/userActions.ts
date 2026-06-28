@@ -6,7 +6,7 @@ import { getGroupMembers } from '@/lib/db/groupActions';
 
 export const getAllUsers = async (): Promise<Array<User>> => {
     const users = await db.select().from(usersTable).where(eq(usersTable.enabled, true));
-    return (users as Array<User>) ?? [];
+    return users ?? [];
 };
 
 export const getPossibleGroupMembers = async (groupId: string): Promise<Array<User>> => {

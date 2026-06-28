@@ -85,6 +85,20 @@
       "when": 1774217334709,
       "tag": "0011_hrp contract details and vacations",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1782674080902,
+      "tag": "0012_hrp config tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1782675247623,
+      "tag": "0013_hrp decimal places for hour-aggregation",
+      "breakpoints": true
     }
   ]
 }

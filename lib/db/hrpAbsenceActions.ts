@@ -62,7 +62,7 @@ export async function createAbsence(
         }
 
         const workingDaysCount = contract.workingDays?.length || 5;
-        const hoursPerDay = contract.weeklyHours ? (contract.weeklyHours / workingDaysCount).toFixed(2) : '0.00';
+        const hoursPerDay = contract.weeklyHours ? (contract.weeklyHours / workingDaysCount).toFixed(6) : '0.00';
 
         absences.push({
             id: uuidv4(),

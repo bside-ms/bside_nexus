@@ -191,7 +191,7 @@ export const getHrpLogForUser = async (
     userId: string,
     year: number,
     month: number,
-    contractId?: string | null,
+    _contractId?: string | null,
 ): Promise<Record<number, Array<Partial<HrpEventLogEntry & { absence?: HrpAbsenceEntry }>>>> => {
     const startOfRange = new Date(year, month - 1, 28, 0, 0, 0, 0);
     const endOfRange = new Date(year, month + 1, 2, 0, 0, 0, 0);
@@ -232,12 +232,12 @@ export const getHrpLogForUser = async (
         isNull(hrpAbsencesTable.deletedAt),
     ];
 
-    absenceConditions.push(
-        or(
-            sql`${hrpAbsencesTable.contractId} IN (SELECT id FROM hrp_contracts WHERE "userId" = ${userId})`,
-            isNull(hrpAbsencesTable.contractId),
-        ),
-    );
+    const contractCondition = sql`${hrpAbsencesTable.contractId} IN (SELECT id FROM hrp_contracts WHERE "userId" = ${userId})`;
+    const nullCondition = isNull(hrpAbsencesTable.contractId);
+    const combinedCondition = or(contractCondition, nullCondition);
+    if (combinedCondition) {
+        absenceConditions.push(combinedCondition);
+    }
 
     const absences = await db.query.hrpAbsencesTable.findMany({
         where: and(...absenceConditions),

@@ -66,7 +66,7 @@ export async function getContractsForUser(userId: string): Promise<Array<HrpCont
 
 export async function getContractAtDate(userId: string, date: Date): Promise<HrpContract | null> {
     const dateString = format(date, 'yyyy-MM-dd');
-    const contracts = await db
+    const contracts: Array<HrpContract> = await db
         .select({
             contractId: hrpContractsTable.id,
             userId: hrpContractsTable.userId,
@@ -90,5 +90,5 @@ export async function getContractAtDate(userId: string, date: Date): Promise<Hrp
         )
         .limit(1);
 
-    return contracts.length > 0 ? contracts[0] : null;
+    return contracts.length > 0 ? contracts[0]! : null;
 }

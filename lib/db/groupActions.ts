@@ -17,12 +17,12 @@ export const getUserGroups = async (): Promise<Array<Group>> => {
     const groupIds = memberships.map((membership) => membership.groupId);
 
     const groups = await db.select().from(groupsTable).where(inArray(groupsTable.id, groupIds));
-    return (groups as Array<Group>) ?? [];
+    return groups ?? [];
 };
 
 export const getAllGroups = async (): Promise<Array<Group>> => {
     const groups = await db.select().from(groupsTable).where(isNull(groupsTable.parentGroup));
-    return (groups as Array<Group>) ?? [];
+    return groups ?? [];
 };
 
 /*
@@ -119,7 +119,7 @@ export const isSubGroupMember = async (userId: string, groupId: string): Promise
 
 export const getSubgroups = async (groupId: string): Promise<Array<Group>> => {
     const subgroups = await db.select().from(groupsTable).where(eq(groupsTable.parentGroup, groupId));
-    return (subgroups as Array<Group>) ?? [];
+    return subgroups ?? [];
 };
 
 export const isGroupAdmin = async (userId: string, groupId: string, global: boolean = false): Promise<boolean> => {

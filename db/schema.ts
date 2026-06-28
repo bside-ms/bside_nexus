@@ -29,6 +29,8 @@ export type HrpAbsenceEntry = typeof hrpAbsencesTable.$inferSelect;
 export type HrpDailyEntry = typeof hrpDailyRecordTable.$inferSelect;
 export type HrpMonthlyPayrollEntry = typeof hrpPayrollHourlyTable.$inferSelect;
 export type HrpMonthlyFixedEntry = typeof hrpPayrollFixedTable.$inferSelect;
+export type HrpHolidayConfigEntry = typeof hrpHolidayConfigsTable.$inferSelect;
+export type HrpPayrollHourlyForecastEntry = typeof hrpPayrollHourlyForecastsTable.$inferSelect;
 
 // Schlüsselverwaltung
 export type UserProfileEntry = typeof userProfilesTable.$inferSelect;
@@ -323,8 +325,8 @@ export const hrpDailyRecordTable = pgTable(
 
         dayType: varchar({ length: 50 }).default('work'), // 'work', 'sick', 'vacation'
 
-        totalWorkHours: decimal('total_work_hours', { precision: 10, scale: 2 }).default('0.00'),
-        totalBreakHours: decimal('total_break_hours', { precision: 10, scale: 2 }).default('0.00'),
+        totalWorkHours: decimal('total_work_hours', { precision: 10, scale: 6 }).default('0.00'),
+        totalBreakHours: decimal('total_break_hours', { precision: 10, scale: 6 }).default('0.00'),
 
         hasErrors: boolean().default(false),
         errorDetails: text(),
@@ -396,5 +398,39 @@ export const hrpPayrollFixedTable = pgTable(
     },
     (table) => ({
         uniqueIdx: uniqueIndex('payroll_fixed_idx').on(table.contractId, table.year, table.month),
+    }),
+);
+
+export const hrpHolidayConfigsTable = pgTable(
+    'hrp_holiday_configs',
+    {
+        id: varchar({ length: 36 }).primaryKey(),
+        contractId: varchar({ length: 36 })
+            .notNull()
+            .references(() => hrpContractsTable.id),
+        date: date('date').notNull(),
+        // Strategie: 'off' (frei) oder 'work_required' (arbeit angeordnet)
+        strategy: varchar({ length: 50 }).notNull().default('off'),
+        comment: text('comment'),
+        createdAt: timestamp('created_at').defaultNow().notNull(),
+    },
+    (table) => ({
+        uniqueDateContract: uniqueIndex('holiday_config_idx').on(table.contractId, table.date),
+    }),
+);
+
+export const hrpPayrollHourlyForecastsTable = pgTable(
+    'hrp_payroll_hourly_forecasts',
+    {
+        id: varchar({ length: 36 }).primaryKey(),
+        contractId: varchar({ length: 36 })
+            .notNull()
+            .references(() => hrpContractsTable.id),
+        year: integer().notNull(),
+        month: integer().notNull(),
+        forecastedHours: decimal('forecasted_hours', { precision: 10, scale: 2 }).default('0.00'),
+    },
+    (table) => ({
+        uniqueIdx: uniqueIndex('payroll_hourly_forecast_idx').on(table.contractId, table.year, table.month),
     }),
 );

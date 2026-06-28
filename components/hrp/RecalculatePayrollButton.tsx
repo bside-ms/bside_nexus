@@ -2,10 +2,19 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import type { ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
 import { recalculatePayrollFixedForUserAtDate } from '@/lib/db/hrpAdminActions';
 
-export function RecalculatePayrollButton({ selectedUserId, year, month }: { selectedUserId: string; year: number; month: number }) {
+export function RecalculatePayrollButton({
+    selectedUserId,
+    year,
+    month,
+}: {
+    selectedUserId: string;
+    year: number;
+    month: number;
+}): ReactElement {
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 

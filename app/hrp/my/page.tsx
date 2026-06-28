@@ -9,7 +9,7 @@ import getUserSession from '@/lib/auth/getUserSession';
 import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions';
 import { getUpcomingVacations } from '@/lib/db/hrpAbsenceActions';
 import { getHrpLogForUser } from '@/lib/db/hrpActions';
-import { getLeaveAccounts, getPayrollFixedEntriesForUser } from '@/lib/db/hrpAdminActions';
+import { calculateTargetHoursForMonth, getLeaveAccounts, getPayrollFixedEntriesForUser } from '@/lib/db/hrpAdminActions';
 import type { DayEntries } from '@/lib/hrp/hrpLogic';
 import { computeDayStats, toTimeStr } from '@/lib/hrp/hrpLogic';
 
@@ -74,7 +74,8 @@ const altPeriodLabel = (year: number, monthZeroBased: number, period: PeriodMode
 };
 
 const toHHMM = (totalMinutes: number): string => {
-    const absMinutes = Math.abs(totalMinutes);
+    const roundedMinutes = Math.round(totalMinutes);
+    const absMinutes = Math.abs(roundedMinutes);
     const h = Math.floor(absMinutes / 60);
     const m = absMinutes % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -281,6 +282,18 @@ export default async function Page({
         },
         { gross: 0, breakActual: 0, breakAdjusted: 0, net: 0, target: 0, balance: 0 },
     );
+
+    const currentPayrollFixed = payrollEntries.find((e) => e.month === month);
+    if (currentPayrollFixed) {
+        // Use the precise hours from DB converted to minutes, no rounding
+        totals.target = parseFloat((currentPayrollFixed.targetHours ?? 0).toString()) * 60;
+        totals.balance = totals.net - totals.target;
+    } else if (selectedContract) {
+        // Fallback to calculateTargetHoursForMonth if no payroll entry exists
+        const targetHours = await calculateTargetHoursForMonth(selectedContract, year, month);
+        totals.target = targetHours * 60;
+        totals.balance = totals.net - totals.target;
+    }
 
     // Style helpers
     const timeToken = 'inline-flex font-medium items-center justify-center w-[5ch] sm:w-[5.5ch] lg:w-[6ch]';

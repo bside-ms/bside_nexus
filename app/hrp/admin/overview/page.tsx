@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lt } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNull, lt } from 'drizzle-orm';
 import { AlertCircle, FileCheck } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -17,7 +17,9 @@ import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions
 import { getUpcomingVacations } from '@/lib/db/hrpAbsenceActions';
 import { getHrpLogsForAllUsers } from '@/lib/db/hrpActions';
 import {
+    calculateTargetHoursForMonth,
     getCurrentPayrollHourly,
+    getForecastForContract,
     getLeaveAccounts,
     getManagedContracts,
     getPayrollFixedEntriesForUser,
@@ -94,7 +96,8 @@ const altPeriodLabel = (year: number, monthZeroBased: number, period: PeriodMode
 };
 
 const toHHMM = (totalMinutes: number): string => {
-    const absMinutes = Math.abs(totalMinutes);
+    const roundedMinutes = Math.round(totalMinutes);
+    const absMinutes = Math.abs(roundedMinutes);
     const h = Math.floor(absMinutes / 60);
     const m = absMinutes % 60;
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
@@ -185,14 +188,51 @@ export default async function Page({
         );
     }
 
-    const managedUserIds = new Set(managedContracts.map((c) => c.userId));
+    // Alle verwalteten Nutzer zusammenstellen
+    const managedUserIdsSet = new Set(managedContracts.map((c) => c.userId));
 
-    // Nutzerliste (Kalenderjahr) und Monatslogs holen
+    // Bestehende Nutzerliste (Kalenderjahr-Einträge)
     const allUserOptions = await getUsersWithEntriesForYear(year);
-    // Nur Nutzer anzeigen, für die der Admin mindestens einen Vertrag verwalten darf
-    const userOptionsYear = allUserOptions.filter((u) => managedUserIds.has(u.id));
+    const _userIdsWithEntries = new Set(allUserOptions.map((u) => u.id));
 
-    const selectedUserId = initialUserId && userOptionsYear.some((u) => u.id === initialUserId) ? initialUserId : userOptionsYear[0]?.id;
+    // Alle Nutzer, die verwaltete Verträge haben, aber noch keine Einträge dieses Jahr
+    const managedUsersWithoutEntries = await db
+        .select({
+            id: usersTable.id,
+            username: usersTable.username,
+            displayName: usersTable.displayName,
+        })
+        .from(usersTable)
+        .where(
+            and(
+                inArray(usersTable.id, Array.from(managedUserIdsSet)),
+                // Nur die, die nicht schon durch getUsersWithEntriesForYear abgedeckt sind
+                // Note: Da getUsersWithEntriesForYear schon managedUserIds filtert, können wir einfach alle holen
+            ),
+        );
+
+    const userMap = new Map<string, { id: string; label: string }>();
+
+    // Füge zuerst alle mit Einträgen hinzu
+    allUserOptions.forEach((u) => userMap.set(u.id, u));
+
+    // Füge die hinzu, die noch keine Einträge haben
+    managedUsersWithoutEntries.forEach((u) => {
+        if (!userMap.has(u.id)) {
+            userMap.set(u.id, {
+                id: u.id,
+                label: getUserLabel({ username: u.username ?? u.id, displayName: u.displayName }),
+            });
+        }
+    });
+
+    const userOptionsYear = Array.from(userMap.values());
+    userOptionsYear.sort((a, b) => a.label.localeCompare(b.label, 'de'));
+
+    // Nur Nutzer anzeigen, für die der Admin mindestens einen Vertrag verwalten darf
+    const finalUserOptions = userOptionsYear.filter((u) => managedUserIdsSet.has(u.id));
+
+    const selectedUserId = initialUserId && finalUserOptions.some((u) => u.id === initialUserId) ? initialUserId : finalUserOptions[0]?.id;
 
     // Verträge für den gewählten Nutzer laden
     const allContracts = selectedUserId ? await getContractsForUser(selectedUserId) : [];
@@ -235,6 +275,8 @@ export default async function Page({
     let unbilledAbsences: Array<HrpAbsenceEntry> = [];
     let previousPayroll: HrpMonthlyPayrollEntry | null = null;
     let currentPayroll: HrpMonthlyPayrollEntry | null = null;
+    let forecast: string | undefined = undefined;
+
     if (selectedUserId && selectedContractId && selectedContract?.type === 'hourly') {
         const edge = new Date(year, month, 23, 0, 0, 0, 0); // Ende des aktuellen Zeitraums (22. 23:59:59)
         // Wir laden unbilled logs ohne Zeitbeschränkung nach hinten, um ALLES zu erfassen
@@ -242,6 +284,8 @@ export default async function Page({
         unbilledAbsences = await getUnbilledAbsencesForUser(selectedUserId, edge);
         previousPayroll = await getPreviousPayrollHourly(selectedContractId, year, month);
         currentPayroll = await getCurrentPayrollHourly(selectedContractId, year, month);
+        const forecastEntry = await getForecastForContract(selectedContractId, year, month);
+        forecast = forecastEntry?.forecastedHours ?? undefined;
     }
 
     // Für die korrekte Gruppierung brauchen wir auch bereits abgerechnete Logs als Kontext
@@ -374,6 +418,11 @@ export default async function Page({
         }),
     );
 
+    // Fetch leave accounts for summary (overtime and vacation)
+    const leaveAccounts = selectedContractId ? await getLeaveAccounts(selectedContractId) : [];
+    const currentLeaveAccount = leaveAccounts.find((a) => a.year === year);
+    const payrollEntries = selectedUserId ? await getPayrollFixedEntriesForUser(selectedUserId, year) : [];
+
     // Monats-/Perioden-Summen
     const totals = dayStats.reduce(
         (acc, s) => {
@@ -388,10 +437,17 @@ export default async function Page({
         { gross: 0, breakActual: 0, breakAdjusted: 0, net: 0, target: 0, balance: 0 },
     );
 
-    // Fetch leave accounts for summary (overtime and vacation)
-    const leaveAccounts = selectedContractId ? await getLeaveAccounts(selectedContractId) : [];
-    const currentLeaveAccount = leaveAccounts.find((a) => a.year === year);
-    const payrollEntries = selectedUserId ? await getPayrollFixedEntriesForUser(selectedUserId, year) : [];
+    const currentPayrollFixed = payrollEntries.find((e) => e.month === month);
+    if (currentPayrollFixed) {
+        // Use the precise hours from DB converted to minutes, no rounding
+        totals.target = parseFloat((currentPayrollFixed.targetHours ?? 0).toString()) * 60;
+        totals.balance = totals.net - totals.target;
+    } else if (selectedContract) {
+        // Fallback to calculateTargetHoursForMonth if no payroll entry exists
+        const targetHours = await calculateTargetHoursForMonth(selectedContract, year, month);
+        totals.target = targetHours * 60;
+        totals.balance = totals.net - totals.target;
+    }
 
     const initialAnnualCarryover = parseFloat(currentLeaveAccount?.overtimeCarryoverHours?.toString() || '0');
 
@@ -1130,6 +1186,7 @@ export default async function Page({
                             unbilledDayStats={unbilledDayStats}
                             previousPayroll={previousPayroll}
                             currentPayrollHourly={currentPayroll}
+                            initialForecast={forecast}
                             periodMode={period}
                             isAlreadyFinalized={!!currentPayroll}
                         />

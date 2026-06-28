@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import type { HrpAbsenceEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
 import type { HrpContract } from '@/lib/db/contractActions';
-import { createPayrollHourly } from '@/lib/db/hrpAdminActions';
+import { createPayrollHourly, upsertForecast } from '@/lib/db/hrpAdminActions';
 
 interface UnbilledDayStat {
     dateStr: string;
@@ -29,6 +29,7 @@ interface PayrollHourlyClientProps {
     unbilledDayStats: Array<UnbilledDayStat>;
     previousPayroll: HrpMonthlyPayrollEntry | null;
     currentPayrollHourly?: HrpMonthlyPayrollEntry | null;
+    initialForecast?: string;
     periodMode?: 'calendar' | '23-22' | '15-14';
     isAlreadyFinalized?: boolean;
 }
@@ -43,11 +44,12 @@ export function PayrollHourlyClient({
     unbilledDayStats,
     previousPayroll,
     currentPayrollHourly,
+    initialForecast = '0',
     periodMode = '23-22',
     isAlreadyFinalized = false,
 }: PayrollHourlyClientProps): ReactElement {
     const router = useRouter();
-    const [forecastedHours, setForecastedHours] = useState<string>('0');
+    const [forecastedHours, setForecastedHours] = useState<string>(initialForecast);
 
     const hourlyRate = parseFloat(contract.hourlyRate || '0');
 
@@ -160,6 +162,13 @@ export function PayrollHourlyClient({
         try {
             const eventLogIds = unbilledLogs.map((l) => l.id).filter((id) => !excludedLogIds.has(id));
             const absenceIds = unbilledAbsences.map((a) => a.id).filter((id) => !excludedAbsenceIds.has(id));
+
+            await upsertForecast({
+                contractId,
+                year,
+                month,
+                forecastedHours: (parseFloat(forecastedHours) || 0).toFixed(2),
+            });
 
             await createPayrollHourly({
                 contractId,

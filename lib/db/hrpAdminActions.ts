@@ -1,28 +1,33 @@
 'use server';
 
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { getAbsences } from './hrpAbsenceActions';
 import { db } from '@/db';
 import type {
     HrpAbsenceEntry,
     HrpContractEntry,
     HrpEventLogEntry,
+    HrpHolidayConfigEntry,
     HrpMonthlyFixedEntry,
     HrpMonthlyPayrollEntry,
+    HrpPayrollHourlyForecastEntry,
     HrpYearlyEntry,
 } from '@/db/schema';
 import {
     groupsTable,
     hrpAbsencesTable,
     hrpContractsTable,
-    hrpDailyRecordTable,
     hrpEventLogTable,
+    hrpHolidayConfigsTable,
     hrpLeaveAccountsTable,
     hrpPayrollFixedTable,
+    hrpPayrollHourlyForecastsTable,
     hrpPayrollHourlyTable,
     membersTable,
     usersTable,
 } from '@/db/schema';
 import { getContractAtDate } from '@/lib/db/contractActions';
+import { computeDayStats, type DayEntries, groupEntriesByWorkday } from '@/lib/hrp/hrpLogic';
 import { format } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -159,6 +164,143 @@ export async function upsertLeaveAccount(data: {
 export async function deleteLeaveAccount(id: string): Promise<Array<HrpYearlyEntry>> {
     // eslint-disable-next-line no-return-await
     return await db.delete(hrpLeaveAccountsTable).where(eq(hrpLeaveAccountsTable.id, id)).returning();
+}
+
+/**
+ * Berechnet Soll-Stunden für einen Monat basierend auf Arbeitstagen
+ */
+export async function calculateTargetHoursForMonth(
+    contract: { weeklyHours: number | null; workingDays: Array<number> | null },
+    year: number,
+    month: number,
+): Promise<number> {
+    const workingDays = contract.workingDays || [1, 2, 3, 4, 5]; // Default: Mo-Fr
+    const weeklyHours = contract.weeklyHours || 0;
+
+    // Anzahl Arbeitstage pro Woche
+    const daysPerWeek = workingDays.length;
+    if (daysPerWeek === 0) {
+        return 0;
+    }
+
+    // Stunden pro Arbeitstag
+    const hoursPerDay = weeklyHours / daysPerWeek;
+
+    // Arbeitstage im Monat zählen
+    let workDaysInMonth = 0;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month, day);
+        const dayOfWeek = date.getDay(); // 0 = So, 1 = Mo, ... 6 = Sa
+
+        // JS getDay(): 0=So, 1=Mo, ..., 6=Sa.
+        // Annahme: workingDays nutzt 1-7 für Mo-So.
+        const dayMapping = dayOfWeek === 0 ? 7 : dayOfWeek;
+
+        if (workingDays.includes(dayMapping)) {
+            workDaysInMonth++;
+        }
+    }
+
+    return workDaysInMonth * hoursPerDay;
+}
+
+// ==========================================
+// Holiday Configs
+// ==========================================
+export async function getHolidayConfigs(contractId: string, year: number): Promise<Array<HrpHolidayConfigEntry>> {
+    return db
+        .select()
+        .from(hrpHolidayConfigsTable)
+        .where(and(eq(hrpHolidayConfigsTable.contractId, contractId), sql`EXTRACT(YEAR FROM ${hrpHolidayConfigsTable.date}) = ${year}`));
+}
+
+export async function upsertHolidayConfig(data: {
+    id?: string;
+    contractId: string;
+    date: string;
+    strategy: 'off' | 'work_required';
+    comment?: string;
+}): Promise<HrpHolidayConfigEntry> {
+    const { id, ...values } = data;
+    if (id) {
+        const result = (await db.update(hrpHolidayConfigsTable).set(values).where(eq(hrpHolidayConfigsTable.id, id)).returning())[0];
+        if (!result) {
+            throw new Error('Holiday config not found');
+        }
+        return result;
+    } else {
+        const result = (
+            await db
+                .insert(hrpHolidayConfigsTable)
+                .values({
+                    id: uuidv4(),
+                    ...values,
+                })
+                .returning()
+        )[0];
+        if (!result) {
+            throw new Error('Holiday config could not be created');
+        }
+        return result;
+    }
+}
+
+// ==========================================
+// Hourly Forecasts
+// ==========================================
+export async function getForecastForContract(
+    contractId: string,
+    year: number,
+    month: number,
+): Promise<HrpPayrollHourlyForecastEntry | null> {
+    return (
+        (
+            await db
+                .select()
+                .from(hrpPayrollHourlyForecastsTable)
+                .where(
+                    and(
+                        eq(hrpPayrollHourlyForecastsTable.contractId, contractId),
+                        eq(hrpPayrollHourlyForecastsTable.year, year),
+                        eq(hrpPayrollHourlyForecastsTable.month, month),
+                    ),
+                )
+                .limit(1)
+        )[0] || null
+    );
+}
+
+export async function upsertForecast(data: {
+    contractId: string;
+    year: number;
+    month: number;
+    forecastedHours: string;
+}): Promise<HrpPayrollHourlyForecastEntry> {
+    const result = (
+        await db
+            .insert(hrpPayrollHourlyForecastsTable)
+            .values({
+                id: uuidv4(),
+                ...data,
+            })
+            .onConflictDoUpdate({
+                target: [
+                    hrpPayrollHourlyForecastsTable.contractId,
+                    hrpPayrollHourlyForecastsTable.year,
+                    hrpPayrollHourlyForecastsTable.month,
+                ],
+                set: { forecastedHours: data.forecastedHours },
+            })
+            .returning()
+    )[0];
+
+    if (!result) {
+        throw new Error('Forecast could not be upserted');
+    }
+
+    return result;
 }
 
 /**
@@ -379,19 +521,18 @@ export async function getUnbilledLogs(userId: string, contractId: string, upToDa
  * Vertrag löschen (markieren)
  */
 export async function terminateContract(contractId: string, terminationDate: Date): Promise<Array<HrpContractEntry>> {
-    // eslint-disable-next-line no-return-await
-    return await db.update(hrpContractsTable).set({ validTo: terminationDate }).where(eq(hrpContractsTable.id, contractId)).returning();
+    return db.update(hrpContractsTable).set({ validTo: terminationDate }).where(eq(hrpContractsTable.id, contractId)).returning();
 }
 
 export async function getPayrollFixedEntries(contractId: string, year: number): Promise<Array<HrpMonthlyFixedEntry>> {
-    return await db.query.hrpPayrollFixedTable.findMany({
+    return db.query.hrpPayrollFixedTable.findMany({
         where: and(eq(hrpPayrollFixedTable.contractId, contractId), eq(hrpPayrollFixedTable.year, year)),
-        orderBy: (table, { asc }) => [asc(table.month)],
+        orderBy: (table, { asc: ascCallback }) => [ascCallback(table.month)],
     });
 }
 
 export async function getPayrollFixedEntriesForUser(userId: string, year: number): Promise<Array<HrpMonthlyFixedEntry>> {
-    return await db
+    return db
         .select({
             payroll: hrpPayrollFixedTable,
         })
@@ -415,13 +556,13 @@ export async function upsertPayrollFixedEntry(data: {
 }): Promise<Array<HrpMonthlyFixedEntry>> {
     const { id, ...values } = data;
     if (id) {
-        return await db
+        return db
             .update(hrpPayrollFixedTable)
             .set({ ...values, finalizedAt: values.status === 'finalized' ? new Date() : null })
             .where(eq(hrpPayrollFixedTable.id, id))
             .returning();
     } else {
-        return await db
+        return db
             .insert(hrpPayrollFixedTable)
             .values({
                 id: uuidv4(),
@@ -430,15 +571,6 @@ export async function upsertPayrollFixedEntry(data: {
             })
             .returning();
     }
-}
-
-export async function recalculatePayrollFixedForUserAtDate(userId: string, year: number, month: number): Promise<void> {
-    const targetDate = new Date(year, month, 1);
-    const contractForMonth = await getContractAtDate(userId, targetDate);
-    if (!contractForMonth) {
-        throw new Error('Kein gültiger Vertrag für diesen Monat gefunden');
-    }
-    await recalculatePayrollFixed(contractForMonth.contractId, year, month);
 }
 
 export async function recalculatePayrollFixed(contractId: string, year: number, month: number): Promise<void> {
@@ -450,30 +582,52 @@ export async function recalculatePayrollFixed(contractId: string, year: number, 
         throw new Error('Vertrag nicht gefunden');
     }
 
-    // Holen der täglichen Aufzeichnungen für diesen Monat
-    const startDate = format(new Date(year, month, 1), 'yyyy-MM-dd');
-    const endDate = format(new Date(year, month + 1, 1), 'yyyy-MM-dd');
-
-    const dailyRecords = await db.query.hrpDailyRecordTable.findMany({
+    const dailyLogs = await db.query.hrpEventLogTable.findMany({
         where: and(
-            eq(hrpDailyRecordTable.contractId, contractId),
-            gte(hrpDailyRecordTable.date, startDate),
-            lt(hrpDailyRecordTable.date, endDate),
+            eq(hrpEventLogTable.userId, contract.userId),
+            gte(hrpEventLogTable.loggedTimestamp, new Date(year, month, 1, 0, 0, 0)),
+            lt(hrpEventLogTable.loggedTimestamp, new Date(year, month + 1, 1, 0, 0, 0)),
+            isNull(hrpEventLogTable.deletedAt),
         ),
     });
 
-    const hasErrors = dailyRecords.some((r) => r.hasErrors);
-    if (hasErrors) {
-        throw new Error(
-            'Es liegen fehlerhafte Einträge für diesen Zeitraum vor (z.B. fehlendes Start/Stop). Bitte beheben Sie diese zuerst.',
+    const groupedLogs = groupEntriesByWorkday(dailyLogs);
+
+    let actualWorkHoursMinutes = 0;
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) {
+        const date = new Date(year, month, d);
+        const dateStr = format(date, 'yyyy-MM-dd');
+
+        const dayLogs = groupedLogs[dateStr] || [];
+        const absences = await getAbsences(contractId, dateStr, dateStr);
+
+        const dayEntries: DayEntries = [
+            ...dayLogs,
+            ...absences.map((a) => ({
+                id: a.id,
+                entryType: 'absence',
+                loggedTimestamp: a.date,
+                absence: a,
+            })),
+        ] as DayEntries;
+
+        const stats = computeDayStats(
+            dayEntries,
+            { weeklyHours: contract.weeklyHours, workingDays: contract.workingDays, type: contract.type },
+            date,
         );
+        actualWorkHoursMinutes += stats.netMinutes;
     }
 
-    const actualWorkHours = dailyRecords.reduce((sum, r) => sum + parseFloat(r.totalWorkHours?.toString() || '0'), 0);
+    const actualWorkHours = actualWorkHoursMinutes / 60;
+    const targetHours = await calculateTargetHoursForMonth(contract, year, month);
 
-    // Annahme: targetHours = weeklyHours * 4.345 (durchschnittlicher Monat)
-    // Besser wäre eine genauere Berechnung basierend auf den Arbeitstagen, aber für jetzt:
-    const targetHours = (contract.weeklyHours || 0) * 4.345;
+    // Feiertags-Anpassung
+    // Hier prüfen wir noch, ob wir die Feiertage korrekt berücksichtigen,
+    // aber die actualWorkHours-Berechnung ist jetzt konsistent mit der UI.
+
     const creditedHours = actualWorkHours - targetHours;
 
     // Bestehenden Eintrag suchen
@@ -490,10 +644,19 @@ export async function recalculatePayrollFixed(contractId: string, year: number, 
         contractId,
         year,
         month,
-        targetHours: targetHours.toFixed(2),
-        actualWorkHours: actualWorkHours.toFixed(2),
-        approvedOvertime: '0.00', // Manuelle Freigabe fehlt noch
-        creditedHours: creditedHours.toFixed(2),
+        targetHours: targetHours.toFixed(6),
+        actualWorkHours: actualWorkHours.toFixed(6),
+        approvedOvertime: '0.000000', // Manuelle Freigabe fehlt noch
+        creditedHours: creditedHours.toFixed(6),
         status: 'open',
     });
+}
+
+export async function recalculatePayrollFixedForUserAtDate(userId: string, year: number, month: number): Promise<void> {
+    const targetDate = new Date(year, month, 1);
+    const contractForMonth = await getContractAtDate(userId, targetDate);
+    if (!contractForMonth) {
+        throw new Error('Kein gültiger Vertrag für diesen Monat gefunden');
+    }
+    await recalculatePayrollFixed(contractForMonth.contractId, year, month);
 }
