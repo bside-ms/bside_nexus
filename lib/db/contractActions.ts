@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { groupsTable, hrpContractsTable } from '@/db/schema';
+import { format } from 'date-fns';
 
 export interface HrpContract {
     contractId: string;
@@ -64,6 +65,7 @@ export async function getContractsForUser(userId: string): Promise<Array<HrpCont
 }
 
 export async function getContractAtDate(userId: string, date: Date): Promise<HrpContract | null> {
+    const dateString = format(date, 'yyyy-MM-dd');
     const contracts = await db
         .select({
             contractId: hrpContractsTable.id,
@@ -82,8 +84,8 @@ export async function getContractAtDate(userId: string, date: Date): Promise<Hrp
         .where(
             and(
                 eq(hrpContractsTable.userId, userId),
-                lte(hrpContractsTable.validFrom, date),
-                or(isNull(hrpContractsTable.validTo), gte(hrpContractsTable.validTo, date)),
+                sql`${hrpContractsTable.validFrom}::date <= ${dateString}::date`,
+                or(isNull(hrpContractsTable.validTo), sql`${hrpContractsTable.validTo}::date >= ${dateString}::date`),
             ),
         )
         .limit(1);

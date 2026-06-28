@@ -9,7 +9,7 @@ import getUserSession from '@/lib/auth/getUserSession';
 import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions';
 import { getUpcomingVacations } from '@/lib/db/hrpAbsenceActions';
 import { getHrpLogForUser } from '@/lib/db/hrpActions';
-import { getLeaveAccounts } from '@/lib/db/hrpAdminActions';
+import { getLeaveAccounts, getPayrollFixedEntriesForUser } from '@/lib/db/hrpAdminActions';
 import type { DayEntries } from '@/lib/hrp/hrpLogic';
 import { computeDayStats, toTimeStr } from '@/lib/hrp/hrpLogic';
 
@@ -118,12 +118,10 @@ export default async function Page({
     const contracts = await getContractsForUser(currentUserId);
 
     let defaultContractId = contracts[0]?.contractId;
-    {
-        const startOfMonth = new Date(year, month, 1);
-        const activeContract = await getContractAtDate(currentUserId, startOfMonth);
-        if (activeContract && contracts.some((c) => c.contractId === activeContract.contractId)) {
-            defaultContractId = activeContract.contractId;
-        }
+    const startOfMonth = new Date(year, month, 1);
+    const activeContract = await getContractAtDate(currentUserId, startOfMonth);
+    if (activeContract && contracts.some((c) => c.contractId === activeContract.contractId)) {
+        defaultContractId = activeContract.contractId;
     }
 
     let selectedContractId = defaultContractId;
@@ -150,6 +148,9 @@ export default async function Page({
     // Fetch leave accounts for summary
     const leaveAccounts = selectedContractId ? await getLeaveAccounts(selectedContractId) : [];
     const currentLeaveAccount = leaveAccounts.find((a) => a.year === year);
+
+    // Fetch payroll fixed entries for dynamic carryover calculation
+    const payrollEntries = await getPayrollFixedEntriesForUser(currentUserId, year);
 
     // Fetch current user's name/display label
     const userRow = await db
@@ -350,7 +351,14 @@ export default async function Page({
     const totalVacationAvailable = vacationEntitlement + carryoverDays;
 
     // Mehrstunden / Overtime logic
-    const overtimeCarryover = parseFloat(currentLeaveAccount?.overtimeCarryoverHours?.toString() || '0');
+    const initialAnnualCarryover = parseFloat(currentLeaveAccount?.overtimeCarryoverHours?.toString() || '0');
+
+    // Sum of previous months' credited hours
+    const sumOfPreviousMonths = payrollEntries
+        .filter((e) => e.month < month)
+        .reduce((sum, e) => sum + parseFloat((e.creditedHours ?? '0').toString()), 0);
+
+    const overtimeCarryover = initialAnnualCarryover + sumOfPreviousMonths;
     const monthlyBalanceHours = totals.balance / 60;
     const totalOvertimeUncapped = overtimeCarryover + monthlyBalanceHours;
 

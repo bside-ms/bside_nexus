@@ -203,13 +203,6 @@ export const getHrpLogForUser = async (
         isNull(hrpEventLogTable.deletedAt),
     ];
 
-    if (contractId) {
-        const condition = or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId));
-        if (condition) {
-            whereConditions.push(condition);
-        }
-    }
-
     const entries = await db
         .select()
         .from(hrpEventLogTable)
@@ -239,11 +232,12 @@ export const getHrpLogForUser = async (
         isNull(hrpAbsencesTable.deletedAt),
     ];
 
-    if (contractId) {
-        absenceConditions.push(eq(hrpAbsencesTable.contractId, contractId));
-    } else {
-        absenceConditions.push(sql`${hrpAbsencesTable.contractId} IN (SELECT id FROM hrp_contracts WHERE "userId" = ${userId})`);
-    }
+    absenceConditions.push(
+        or(
+            sql`${hrpAbsencesTable.contractId} IN (SELECT id FROM hrp_contracts WHERE "userId" = ${userId})`,
+            isNull(hrpAbsencesTable.contractId),
+        ),
+    );
 
     const absences = await db.query.hrpAbsencesTable.findMany({
         where: and(...absenceConditions),
@@ -256,7 +250,7 @@ export const getHrpLogForUser = async (
         }
         byDay[d].push({
             id: abs.id,
-            entryType: 'absence' as string,
+            entryType: 'absence',
             loggedTimestamp: new Date(abs.date),
             comment: abs.type, // Typ als Kommentar speichern für Anzeige
             absence: abs,
@@ -288,13 +282,6 @@ export const getHrpLogsForAllUsers = async (
         lt(hrpEventLogTable.loggedTimestamp, endOfRange),
         isNull(hrpEventLogTable.deletedAt),
     ];
-
-    if (contractId) {
-        const condition = or(eq(hrpEventLogTable.contractId, contractId), isNull(hrpEventLogTable.contractId));
-        if (condition) {
-            whereConditions.push(condition);
-        }
-    }
 
     // Fetch distinct users with entries in the range
     const rows = await db

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { PayrollHourlyClient } from '@/components/hrp/PayrollHourlyClient';
 import { PrintButton } from '@/components/hrp/PrintButton';
+import { RecalculatePayrollButton } from '@/components/hrp/RecalculatePayrollButton';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -19,9 +20,11 @@ import {
     getCurrentPayrollHourly,
     getLeaveAccounts,
     getManagedContracts,
+    getPayrollFixedEntriesForUser,
     getPreviousPayrollHourly,
-    getUnbilledAbsences,
+    getUnbilledAbsencesForUser,
     getUnbilledLogs,
+    recalculatePayrollFixed,
 } from '@/lib/db/hrpAdminActions';
 import type { DayEntries, Entry } from '@/lib/hrp/hrpLogic';
 import { groupEntriesByWorkday } from '@/lib/hrp/hrpLogic';
@@ -236,7 +239,7 @@ export default async function Page({
         const edge = new Date(year, month, 23, 0, 0, 0, 0); // Ende des aktuellen Zeitraums (22. 23:59:59)
         // Wir laden unbilled logs ohne Zeitbeschränkung nach hinten, um ALLES zu erfassen
         unbilledLogs = await getUnbilledLogs(selectedUserId, selectedContractId, edge);
-        unbilledAbsences = await getUnbilledAbsences(selectedContractId, edge);
+        unbilledAbsences = await getUnbilledAbsencesForUser(selectedUserId, edge);
         previousPayroll = await getPreviousPayrollHourly(selectedContractId, year, month);
         currentPayroll = await getCurrentPayrollHourly(selectedContractId, year, month);
     }
@@ -388,8 +391,16 @@ export default async function Page({
     // Fetch leave accounts for summary (overtime and vacation)
     const leaveAccounts = selectedContractId ? await getLeaveAccounts(selectedContractId) : [];
     const currentLeaveAccount = leaveAccounts.find((a) => a.year === year);
+    const payrollEntries = selectedUserId ? await getPayrollFixedEntriesForUser(selectedUserId, year) : [];
 
-    const overtimeCarryover = parseFloat(currentLeaveAccount?.overtimeCarryoverHours?.toString() || '0');
+    const initialAnnualCarryover = parseFloat(currentLeaveAccount?.overtimeCarryoverHours?.toString() || '0');
+
+    // Sum of previous months' credited hours
+    const sumOfPreviousMonths = payrollEntries
+        .filter((e) => e.month < month)
+        .reduce((sum, e) => sum + parseFloat((e.creditedHours ?? '0').toString()), 0);
+
+    const overtimeCarryover = initialAnnualCarryover + sumOfPreviousMonths;
     const monthlyBalanceHours = totals.balance / 60;
     const totalOvertimeUncapped = overtimeCarryover + monthlyBalanceHours;
 
@@ -560,6 +571,19 @@ export default async function Page({
                                         <span>GLZ-Saldo (Summe):</span>
                                         <span>{totalOvertimeCapped.toFixed(2)} h</span>
                                     </div>
+                                    {selectedContractId && (
+                                        <form
+                                            action={async () => {
+                                                'use server';
+                                                await recalculatePayrollFixed(selectedContractId, year, month);
+                                            }}
+                                            className="pt-4"
+                                        >
+                                            <Button type="submit" variant="outline" className="w-full">
+                                                Abrechnung neu berechnen
+                                            </Button>
+                                        </form>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -611,7 +635,7 @@ export default async function Page({
                             </select>
                         </div>
 
-                        {contracts.length > 1 && (
+                        {new Set(contracts.map((c) => c.groupName)).size > 1 && (
                             <div className="flex flex-col gap-1 w-full sm:w-auto min-w-0">
                                 <label className="text-xs font-medium text-muted-foreground" htmlFor="contract-select">
                                     Vertrag
@@ -624,7 +648,7 @@ export default async function Page({
                                 >
                                     {contracts.map((c) => (
                                         <option key={c.contractId} value={c.contractId}>
-                                            {c.groupName}
+                                            {c.groupName} ({c.type === 'fixed_salary' ? 'Fest' : 'Stunden'})
                                         </option>
                                     ))}
                                 </select>
@@ -1056,6 +1080,11 @@ export default async function Page({
                                     <span>GLZ-Saldo (Summe):</span>
                                     <span>{totalOvertimeCapped.toFixed(2)} h</span>
                                 </div>
+                                {selectedContractId && selectedUserId && (
+                                    <div className="pt-2">
+                                        <RecalculatePayrollButton selectedUserId={selectedUserId} year={year} month={month} />
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
