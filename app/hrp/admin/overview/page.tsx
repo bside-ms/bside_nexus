@@ -456,13 +456,16 @@ export default async function Page({
         .filter((e) => e.month < month)
         .reduce((sum, e) => sum + parseFloat((e.creditedHours ?? '0').toString()), 0);
 
-    const overtimeCarryover = initialAnnualCarryover + sumOfPreviousMonths;
+    // Überstundenkappung bei der GmbH.
+    const cappedOvertime = 20;
+    let overtimeCarryover = initialAnnualCarryover + sumOfPreviousMonths;
+    if (selectedContractId === '1680099c-78e1-423c-bc70-92bec57e2f75' && overtimeCarryover > cappedOvertime) {
+        overtimeCarryover = cappedOvertime;
+    }
+
+    const totalOvertimeCapped = overtimeCarryover;
     const monthlyBalanceHours = totals.balance / 60;
     const totalOvertimeUncapped = overtimeCarryover + monthlyBalanceHours;
-
-    // TODO: Gekappte GLZ logic if applicable
-    const cappedOvertime = 0;
-    const totalOvertimeCapped = totalOvertimeUncapped - cappedOvertime;
 
     // Vacation summary logic
     const usedVacationDays = dayStats.reduce((acc, s) => {
