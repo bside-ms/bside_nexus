@@ -295,3 +295,28 @@ export async function deleteAbsenceGroup(userId: string, absenceIds: Array<strin
         return { success: true };
     });
 }
+
+export async function getPastAbsences(userId: string): Promise<Array<HrpAbsenceEntry>> {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  const startOfYear = format(new Date(), 'yyyy-01-01');
+
+  const contracts = await db.query.hrpContractsTable.findMany({
+    where: eq(hrpContractsTable.userId, userId),
+  });
+
+  const contractIds = contracts.map((c) => c.id);
+
+  if (contractIds.length === 0) {
+    return [];
+  }
+
+  return db.query.hrpAbsencesTable.findMany({
+    where: and(
+      sql`${hrpAbsencesTable.contractId} IN ${contractIds}`,
+      gte(hrpAbsencesTable.date, startOfYear),
+      lte(hrpAbsencesTable.date, today),
+      isNull(hrpAbsencesTable.deletedAt),
+    ),
+    orderBy: [desc(hrpAbsencesTable.date)],
+  });
+}

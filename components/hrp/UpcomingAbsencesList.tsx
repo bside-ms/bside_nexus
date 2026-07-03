@@ -9,7 +9,7 @@ import type { HrpAbsenceEntry } from '@/db/schema';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 
-export default function AbsenceOverview(): ReactElement {
+export default function UpcomingAbsencesList(): ReactElement {
     const [upcoming, setUpcoming] = useState<Array<HrpAbsenceEntry>>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState<string | null>(null);

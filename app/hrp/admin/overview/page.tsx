@@ -30,6 +30,7 @@ import { calculateBalanceSummary } from '@/lib/hrp/balance';
 import type { Entry } from '@/lib/hrp/hrpLogic';
 import { computeDayStats, groupEntriesByWorkday, toTimeStr } from '@/lib/hrp/hrpLogic';
 import { calculatePeriodTotals } from '@/lib/hrp/period-calculation';
+import VacationOverview from '@/components/hrp/VacationOverview';
 
 const breadCrumbs = [
     { title: 'Zeiterfassung', url: '/hrp' },
@@ -341,19 +342,15 @@ export default async function Page({
     const anzeigeSelectedContract = balanceSummary.contract ?? selectedContract;
 
     const now = new Date();
-    // Vacation summary logic
-    const leaveAccounts = selectedContractId ? await getLeaveAccounts(selectedContractId) : [];
-    const currentLeaveAccount = leaveAccounts.find((a) => a.year === year);
-    const usedVacationDays = dayStats.reduce((acc, s) => {
-        return acc + s.absences.filter((a) => a.absence?.type === 'vacation').length;
-    }, 0);
 
-    const plannedVacationDaysRow = selectedUserId ? await getUpcomingVacations(selectedUserId, year) : [];
-    const plannedVacationDays = plannedVacationDaysRow.length;
-
-    const vacationEntitlement = currentLeaveAccount?.totalVacationDays || selectedContract?.vacationDaysPerYear || 0;
-    const carryoverDays = currentLeaveAccount?.remainingDaysFromLastYear || 0;
-    const totalVacationAvailable = vacationEntitlement + carryoverDays;
+    let vacationViewDate = new Date();
+    vacationViewDate.setHours(0, 0, 0, 0);
+    const lastDayOfSelectedMonth = new Date(year, month + 1, 0);
+    lastDayOfSelectedMonth.setHours(0, 0, 0, 0);
+    if (lastDayOfSelectedMonth < vacationViewDate) {
+        vacationViewDate = lastDayOfSelectedMonth;
+    }
+    
 
     // Zeit-Token: gleiche Breite, zentriert, auf großen Displays etwas breiter (alle Zeitfenster gleich)
     const timeToken = 'inline-flex font-medium items-center justify-center w-[5ch] sm:w-[5.5ch] lg:w-[6ch]';
@@ -515,12 +512,6 @@ export default async function Page({
                                         <span>GLZ-Saldo (Summe):</span>
                                         <span>{balanceSummary.finalBalanceCapped?.toFixed(2)} h</span>
                                     </div>
-                                    <div className="flex justify-between border-b pb-1 text-xs text-muted-foreground print:text-foreground">
-                                        <span>(Finaler Saldo ungekappt):</span>
-                                        <span className="font-medium text-foreground">
-                                            ({balanceSummary.finalBalanceUncapped?.toFixed(2)} h)
-                                        </span>
-                                    </div>
                                     {selectedContractId && (
                                         <form
                                             action={async () => {
@@ -538,31 +529,7 @@ export default async function Page({
                             </div>
                         )}
 
-                        <div className="rounded border bg-card p-6 text-card-foreground shadow-sm break-inside-avoid w-full">
-                            <h2 className="text-[14pt] font-semibold mb-4 border-b-2 pb-2">Urlaubskonto {year}</h2>
-                            <div className="space-y-3 text-[11pt] break-inside-avoid">
-                                <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
-                                    <span>Jahresanspruch:</span>
-                                    <span className="font-medium text-foreground">{vacationEntitlement} Tage</span>
-                                </div>
-                                <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
-                                    <span>Resturlaub Vorjahr:</span>
-                                    <span className="font-medium text-foreground">{carryoverDays} Tage</span>
-                                </div>
-                                <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
-                                    <span>Genommen im Zeitraum:</span>
-                                    <span className="font-medium text-foreground">{usedVacationDays} Tage</span>
-                                </div>
-                                <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
-                                    <span>Geplant (Zukunft):</span>
-                                    <span className="font-medium text-foreground">{plannedVacationDays} Tage</span>
-                                </div>
-                                <div className="flex justify-between pt-1 font-bold text-[12pt] border-t-2 border-zinc-300 mt-1">
-                                    <span>Verbleibend (Gesamtjahr):</span>
-                                    <span>{totalVacationAvailable - usedVacationDays - plannedVacationDays} Tage</span>
-                                </div>
-                            </div>
-                        </div>
+                        <VacationOverview showDatePicker={false} initialDate={vacationViewDate} />
                     </div>
 
                     {/* Filter */}
@@ -1036,10 +1003,6 @@ export default async function Page({
                                     <span>GLZ-Saldo (Summe):</span>
                                     <span>{balanceSummary.finalBalanceCapped?.toFixed(2)} h</span>
                                 </div>
-                                <div className="flex justify-between text-muted-foreground">
-                                    <span>(Finaler Saldo ungekappt):</span>
-                                    <span>({balanceSummary.finalBalanceUncapped?.toFixed(2)} h)</span>
-                                </div>
                                 {selectedContractId && selectedUserId && (
                                     <div className="pt-2">
                                         <RecalculatePayrollButton selectedUserId={selectedUserId} year={year} month={month} />
@@ -1049,33 +1012,7 @@ export default async function Page({
                         </div>
                     )}
 
-                    {selectedContract?.type === 'fixed_salary' && (
-                        <div className="rounded border bg-card p-3 text-card-foreground shadow-sm break-inside-avoid w-full">
-                            <h2 className="text-sm font-semibold mb-2 border-b pb-1">Urlaubskonto {year}</h2>
-                            <div className="space-y-1 text-xs">
-                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
-                                    <span>Jahresanspruch:</span>
-                                    <span className="font-medium text-foreground">{vacationEntitlement} Tage</span>
-                                </div>
-                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
-                                    <span>Resturlaub Vorjahr:</span>
-                                    <span className="font-medium text-foreground">{carryoverDays} Tage</span>
-                                </div>
-                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
-                                    <span>Genommen im Zeitraum:</span>
-                                    <span className="font-medium text-foreground">{usedVacationDays} Tage</span>
-                                </div>
-                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
-                                    <span>Geplant (Zukunft):</span>
-                                    <span className="font-medium text-foreground">{plannedVacationDays} Tage</span>
-                                </div>
-                                <div className="flex justify-between pt-0.5 font-bold">
-                                    <span>Verbleibend (Gesamtjahr):</span>
-                                    <span>{totalVacationAvailable - usedVacationDays - plannedVacationDays} Tage</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    {selectedContract?.type === 'fixed_salary' && <VacationOverview showDatePicker={false} initialDate={vacationViewDate} />}
                 </div>
 
                 {selectedUserId && selectedContractId && selectedContract?.type === 'hourly' && (
