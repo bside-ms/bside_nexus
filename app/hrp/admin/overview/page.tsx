@@ -15,22 +15,21 @@ import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions';
 import { getUpcomingVacations } from '@/lib/db/hrpAbsenceActions';
-import { getHrpLogsForAllUsers } from '@/lib/db/hrpActions';
+import { getLeaveAccounts } from '@/lib/db/hrpAdminActions';
 import {
-    calculateTargetHoursForMonth,
     getCurrentPayrollHourly,
     getForecastForContract,
-    getLeaveAccounts,
     getManagedContracts,
-    getPayrollFixedEntriesForUser,
     getPreviousPayrollHourly,
     getUnbilledAbsencesForUser,
     getUnbilledLogs,
     recalculatePayrollFixed,
 } from '@/lib/db/hrpAdminActions';
-import type { DayEntries, Entry } from '@/lib/hrp/hrpLogic';
-import { groupEntriesByWorkday } from '@/lib/hrp/hrpLogic';
-import { computeDayStats, toTimeStr } from '@/lib/hrp/hrpLogic';
+import type { BalanceSummary } from '@/lib/hrp/balance';
+import { calculateBalanceSummary } from '@/lib/hrp/balance';
+import type { Entry } from '@/lib/hrp/hrpLogic';
+import { computeDayStats, groupEntriesByWorkday, toTimeStr } from '@/lib/hrp/hrpLogic';
+import { calculatePeriodTotals } from '@/lib/hrp/period-calculation';
 
 const breadCrumbs = [
     { title: 'Zeiterfassung', url: '/hrp' },
@@ -44,10 +43,6 @@ export const metadata: Metadata = {
 };
 
 type PeriodMode = 'calendar' | '23-22' | '15-14';
-
-function getDaysInMonth(year: number, monthZeroBased: number): number {
-    return new Date(year, monthZeroBased + 1, 0).getDate();
-}
 
 function cap(s: string): string {
     if (!s) {
@@ -107,10 +102,6 @@ const sumToHHMM = (totalMinutes: number): string => {
     const sign = totalMinutes < 0 ? '-' : totalMinutes > 0 ? '+' : '';
     return `${sign}${toHHMM(totalMinutes)}`;
 };
-
-function buildDayArray<T>(count: number, map: (indexZero: number) => T): Array<T> {
-    return Array.from({ length: count }, (_, i) => map(i));
-}
 
 const getUserLabel = (u: { username: string; displayName: string | null }): string => {
     return u.displayName?.trim() || u.username;
@@ -333,141 +324,26 @@ export default async function Page({
         }
     });
 
-    const logsCurrentByUser = await getHrpLogsForAllUsers(year, month, selectedContractId);
+    const { totals, dayStats, dayRefs } = selectedUserId
+        ? await calculatePeriodTotals(selectedUserId, year, month, period)
+        : { totals: { gross: 0, breakActual: 0, breakAdjusted: 0, net: 0, target: 0, balance: 0 }, dayStats: [], dayRefs: [] };
 
-    // Für 23.–22.-Ansicht und 15.-14.-Ansicht auch Vormonat laden
     const prevEdge = new Date(year, month, 0);
     const prevYear = prevEdge.getFullYear();
     const prevMonth = prevEdge.getMonth();
-    const logsPrevByUser = period !== 'calendar' ? await getHrpLogsForAllUsers(prevYear, prevMonth, selectedContractId) : undefined;
 
-    const selectedCurrent = selectedUserId ? logsCurrentByUser[selectedUserId] : undefined;
-    const selectedPrev = selectedUserId && logsPrevByUser ? logsPrevByUser[selectedUserId] : undefined;
+    const balanceCurrentMonth = totals.balance / 60;
+    const balanceSummary = selectedUserId
+        ? await calculateBalanceSummary(selectedUserId, year, month + 1, balanceCurrentMonth)
+        : ({} as BalanceSummary);
 
-    // Tage für Ansicht bestimmen
-    interface DayRef {
-        source: 'curr' | 'prev';
-        day: number;
-    }
-    let dayRefs: Array<DayRef> = [];
-    if (period === 'calendar') {
-        const dim = getDaysInMonth(year, month);
-        dayRefs = buildDayArray(dim, (i) => ({ source: 'curr', day: i + 1 }));
-    } else if (period === '23-22') {
-        const daysInPrev = new Date(year, month, 0).getDate();
-        const prevPart: Array<DayRef> = [];
-        for (let d = 23; d <= daysInPrev; d++) {
-            prevPart.push({ source: 'prev', day: d });
-        }
-        const currPart: Array<DayRef> = [];
-        for (let d = 1; d <= 22; d++) {
-            currPart.push({ source: 'curr', day: d });
-        }
-        dayRefs = [...prevPart, ...currPart];
-    } else if (period === '15-14') {
-        const daysInPrev = new Date(year, month, 0).getDate();
-        const prevPart: Array<DayRef> = [];
-        for (let d = 15; d <= daysInPrev; d++) {
-            prevPart.push({ source: 'prev', day: d });
-        }
-        const currPart: Array<DayRef> = [];
-        for (let d = 1; d <= 14; d++) {
-            currPart.push({ source: 'curr', day: d });
-        }
-        dayRefs = [...prevPart, ...currPart];
-    }
+    // Fallback if the function returns no contract
+    const anzeigeSelectedContract = balanceSummary.contract ?? selectedContract;
 
-    // Calculate daily stats
     const now = new Date();
-    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(now);
-    const currentHourBerlin = parseInt(
-        new Intl.DateTimeFormat('de-DE', { hour: 'numeric', hour12: false, timeZone: 'Europe/Berlin' }).format(now),
-        10,
-    );
-
-    // Tageswerte berechnen
-    const dayStats = await Promise.all(
-        dayRefs.map(async (ref) => {
-            const dYear = ref.source === 'curr' ? year : prevYear;
-            const dMonth = ref.source === 'curr' ? month : prevMonth;
-            const refDate = new Date(dYear, dMonth, ref.day);
-
-            const contractAtDate = await getContractAtDate(selectedUserId!, refDate);
-
-            const entries =
-                ref.source === 'prev'
-                    ? ((selectedPrev?.logs?.[ref.day] ?? []) as DayEntries)
-                    : ((selectedCurrent?.logs?.[ref.day] ?? []) as DayEntries);
-            const stats = computeDayStats(
-                entries,
-                contractAtDate
-                    ? {
-                          weeklyHours: contractAtDate.weeklyHours,
-                          workingDays: contractAtDate.workingDays,
-                          type: contractAtDate.type,
-                      }
-                    : undefined,
-                refDate,
-                todayStr,
-                currentHourBerlin,
-            );
-
-            // Abwesenheiten für Hinweise sammeln
-            const absences = entries.filter((e) => e.entryType === 'absence');
-            return { ...stats, absences };
-        }),
-    );
-
-    // Fetch leave accounts for summary (overtime and vacation)
+    // Vacation summary logic
     const leaveAccounts = selectedContractId ? await getLeaveAccounts(selectedContractId) : [];
     const currentLeaveAccount = leaveAccounts.find((a) => a.year === year);
-    const payrollEntries = selectedUserId ? await getPayrollFixedEntriesForUser(selectedUserId, year) : [];
-
-    // Monats-/Perioden-Summen
-    const totals = dayStats.reduce(
-        (acc, s) => {
-            acc.gross += s.sessionMinutes;
-            acc.breakActual += s.actualBreakMinutes;
-            acc.breakAdjusted += s.adjustedBreakMinutes;
-            acc.net += s.netMinutes;
-            acc.target += s.targetMinutes;
-            acc.balance += s.balanceMinutes;
-            return acc;
-        },
-        { gross: 0, breakActual: 0, breakAdjusted: 0, net: 0, target: 0, balance: 0 },
-    );
-
-    const currentPayrollFixed = payrollEntries.find((e) => e.month === month);
-    if (currentPayrollFixed) {
-        // Use the precise hours from DB converted to minutes, no rounding
-        totals.target = parseFloat((currentPayrollFixed.targetHours ?? 0).toString()) * 60;
-        totals.balance = totals.net - totals.target;
-    } else if (selectedContract) {
-        // Fallback to calculateTargetHoursForMonth if no payroll entry exists
-        const targetHours = await calculateTargetHoursForMonth(selectedContract, year, month);
-        totals.target = targetHours * 60;
-        totals.balance = totals.net - totals.target;
-    }
-
-    const initialAnnualCarryover = parseFloat(currentLeaveAccount?.overtimeCarryoverHours?.toString() || '0');
-
-    // Sum of previous months' credited hours
-    const sumOfPreviousMonths = payrollEntries
-        .filter((e) => e.month < month)
-        .reduce((sum, e) => sum + parseFloat((e.creditedHours ?? '0').toString()), 0);
-
-    // Überstundenkappung bei der GmbH.
-    const cappedOvertime = 20;
-    let overtimeCarryover = initialAnnualCarryover + sumOfPreviousMonths;
-    if (selectedContractId === '1680099c-78e1-423c-bc70-92bec57e2f75' && overtimeCarryover > cappedOvertime) {
-        overtimeCarryover = cappedOvertime;
-    }
-
-    const totalOvertimeCapped = overtimeCarryover;
-    const monthlyBalanceHours = totals.balance / 60;
-    const totalOvertimeUncapped = overtimeCarryover + monthlyBalanceHours;
-
-    // Vacation summary logic
     const usedVacationDays = dayStats.reduce((acc, s) => {
         return acc + s.absences.filter((a) => a.absence?.type === 'vacation').length;
     }, 0);
@@ -497,10 +373,7 @@ export default async function Page({
         .sort((a, b) => a.dateStr.localeCompare(b.dateStr));
 
     // Header & Auswahllisten
-    const selectedUserLabel =
-        userOptionsYear.find((u) => u.id === selectedUserId)?.label ??
-        (selectedCurrent ? getUserLabel(selectedCurrent.user) : undefined) ??
-        'Unbekannt';
+    const selectedUserLabel = userOptionsYear.find((u) => u.id === selectedUserId)?.label ?? 'Unbekannt';
 
     const monthOptions = Array.from({ length: 12 }, (_, i) => {
         const label = new Date(year, i, 1).toLocaleDateString('de-DE', { month: 'long' });
@@ -603,32 +476,50 @@ export default async function Page({
 
                     {/* Summary Wrapper (Only shown BEFORE table in print, hidden BEFORE table on web) */}
                     <div className="hidden print:grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 w-full print:mb-8">
-                        {selectedContract?.type === 'fixed_salary' && (
+                        {anzeigeSelectedContract?.type === 'fixed_salary' && balanceSummary && (
                             <div className="rounded border bg-card p-6 text-card-foreground shadow-sm break-inside-avoid w-full">
                                 <h2 className="text-[14pt] font-semibold mb-4 border-b-2 pb-2">Arbeitszeit & Saldo</h2>
                                 <div className="space-y-3 text-[11pt] break-inside-avoid">
                                     <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
                                         <span>Wöchentliche Arbeitszeit:</span>
-                                        <span className="font-medium text-foreground">{selectedContract.weeklyHours?.toFixed(2)} h</span>
+                                        <span className="font-medium text-foreground">
+                                            {anzeigeSelectedContract.weeklyHours?.toFixed(2)} h
+                                        </span>
                                     </div>
                                     <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
-                                        <span>GLZ-Übertrag aus Vormonat:</span>
-                                        <span className="font-medium text-foreground">{overtimeCarryover.toFixed(2)} h</span>
+                                        <span>GLZ-Übertrag Vormonat (ungekappt):</span>
+                                        <span className="font-medium text-foreground">
+                                            {balanceSummary.balanceAtStartOfMonthUncapped?.toFixed(2)} h
+                                        </span>
+                                    </div>
+                                    {balanceSummary.cappedHours > 0 && (
+                                        <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground text-red-600">
+                                            <span>Gekappte Stunden:</span>
+                                            <span className="font-medium">-{balanceSummary.cappedHours.toFixed(2)} h</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
+                                        <span>GLZ-Übertrag Vormonat (gekappt):</span>
+                                        <span className="font-medium text-foreground">
+                                            {balanceSummary.balanceAtStartOfMonthCapped?.toFixed(2)} h
+                                        </span>
                                     </div>
                                     <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
                                         <span>GLZ-Saldo aktueller Zeitraum:</span>
                                         <span className="font-medium text-foreground">
-                                            {monthlyBalanceHours >= 0 ? '+' : ''}
-                                            {monthlyBalanceHours.toFixed(2)} h
+                                            {balanceSummary.balanceCurrentMonth >= 0 ? '+' : ''}
+                                            {balanceSummary.balanceCurrentMonth?.toFixed(2)} h
                                         </span>
-                                    </div>
-                                    <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
-                                        <span>GLZ-Saldo ungekappt:</span>
-                                        <span className="font-medium text-foreground">{totalOvertimeUncapped.toFixed(2)} h</span>
                                     </div>
                                     <div className="flex justify-between pt-1 font-bold text-[12pt] border-t-2 border-zinc-300 mt-1">
                                         <span>GLZ-Saldo (Summe):</span>
-                                        <span>{totalOvertimeCapped.toFixed(2)} h</span>
+                                        <span>{balanceSummary.finalBalanceCapped?.toFixed(2)} h</span>
+                                    </div>
+                                    <div className="flex justify-between border-b pb-1 text-xs text-muted-foreground print:text-foreground">
+                                        <span>(Finaler Saldo ungekappt):</span>
+                                        <span className="font-medium text-foreground">
+                                            ({balanceSummary.finalBalanceUncapped?.toFixed(2)} h)
+                                        </span>
                                     </div>
                                     {selectedContractId && (
                                         <form
@@ -909,9 +800,11 @@ export default async function Page({
                                             ? 'Urlaub'
                                             : a.absence?.type === 'sick'
                                               ? 'Krankheit'
-                                              : a.absence?.type === 'holiday'
-                                                ? 'Feiertag'
-                                                : a.absence?.type;
+                                              : a.absence?.type === 'sick_with'
+                                                ? 'Krankheit (mit Attest)'
+                                                : a.absence?.type === 'holiday'
+                                                  ? 'Feiertag'
+                                                  : a.absence?.type;
                                     hints.push({
                                         text: `${typeLabel} (${a.absence?.hoursValue}h)`,
                                         className: 'font-semibold text-blue-600',
@@ -1112,32 +1005,40 @@ export default async function Page({
 
                 {/* Summary Wrapper */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-8 w-full print:hidden">
-                    {selectedContract?.type === 'fixed_salary' && (
+                    {anzeigeSelectedContract?.type === 'fixed_salary' && balanceSummary && (
                         <div className="rounded border bg-card p-3 text-card-foreground shadow-sm break-inside-avoid w-full">
                             <h2 className="text-sm font-semibold mb-2 border-b pb-1">Arbeitszeit & Saldo</h2>
                             <div className="space-y-1 text-xs">
                                 <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
                                     <span>Wöchentliche Arbeitszeit:</span>
-                                    <span className="font-medium text-foreground">{selectedContract.weeklyHours?.toFixed(2)} h</span>
+                                    <span className="font-medium text-foreground">{anzeigeSelectedContract.weeklyHours?.toFixed(2)} h</span>
                                 </div>
                                 <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
-                                    <span>GLZ-Übertrag aus Vormonat:</span>
-                                    <span className="font-medium text-foreground">{overtimeCarryover.toFixed(2)} h</span>
+                                    <span>GLZ-Übertrag Vormonat (gekappt):</span>
+                                    <span className="font-medium text-foreground">
+                                        {balanceSummary.balanceAtStartOfMonthCapped?.toFixed(2)} h
+                                    </span>
                                 </div>
+                                {balanceSummary.cappedHours > 0 && (
+                                    <div className="flex justify-between border-b pb-0.5 text-red-600">
+                                        <span>(Gekappte Stunden):</span>
+                                        <span className="font-medium">(-{balanceSummary.cappedHours.toFixed(2)} h)</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
                                     <span>GLZ-Saldo aktueller Zeitraum:</span>
                                     <span className="font-medium text-foreground">
-                                        {monthlyBalanceHours >= 0 ? '+' : ''}
-                                        {monthlyBalanceHours.toFixed(2)} h
+                                        {balanceSummary.balanceCurrentMonth >= 0 ? '+' : ''}
+                                        {balanceSummary.balanceCurrentMonth?.toFixed(2)} h
                                     </span>
-                                </div>
-                                <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
-                                    <span>GLZ-Saldo ungekappt:</span>
-                                    <span className="font-medium text-foreground">{totalOvertimeUncapped.toFixed(2)} h</span>
                                 </div>
                                 <div className="flex justify-between pt-0.5 font-bold">
                                     <span>GLZ-Saldo (Summe):</span>
-                                    <span>{totalOvertimeCapped.toFixed(2)} h</span>
+                                    <span>{balanceSummary.finalBalanceCapped?.toFixed(2)} h</span>
+                                </div>
+                                <div className="flex justify-between text-muted-foreground">
+                                    <span>(Finaler Saldo ungekappt):</span>
+                                    <span>({balanceSummary.finalBalanceUncapped?.toFixed(2)} h)</span>
                                 </div>
                                 {selectedContractId && selectedUserId && (
                                     <div className="pt-2">
