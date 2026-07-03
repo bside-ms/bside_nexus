@@ -28,9 +28,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     const upcoming = await getUpcomingVacations(session.id);
     return NextResponse.json({ success: true, upcoming });
   } catch (error) {
-    console.error('Failed to get absences:', error);
     return NextResponse.json(
-      { message: 'An internal error occurred.' },
+      { message: 'Failed to get absences', error },
       { status: 500 },
     );
   }

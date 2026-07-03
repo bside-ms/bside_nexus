@@ -6,31 +6,36 @@ import type { ReactElement } from 'react';
 import { PayrollHourlyClient } from '@/components/hrp/PayrollHourlyClient';
 import { PrintButton } from '@/components/hrp/PrintButton';
 import { RecalculatePayrollButton } from '@/components/hrp/RecalculatePayrollButton';
+import VacationOverview from '@/components/hrp/VacationOverview';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { db } from '@/db';
-import type { HrpAbsenceEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
+import type {
+  HrpAbsenceEntry,
+  HrpEventLogEntry,
+  HrpMonthlyPayrollEntry,
+} from '@/db/schema';
 import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions';
-import { getUpcomingVacations } from '@/lib/db/hrpAbsenceActions';
-import { getLeaveAccounts } from '@/lib/db/hrpAdminActions';
 import {
-    getCurrentPayrollHourly,
-    getForecastForContract,
-    getManagedContracts,
-    getPreviousPayrollHourly,
-    getUnbilledAbsencesForUser,
-    getUnbilledLogs,
-    recalculatePayrollFixed,
+  getCurrentPayrollHourly,
+  getForecastForContract,
+  getManagedContracts,
+  getPreviousPayrollHourly,
+  getUnbilledAbsencesForUser,
+  getUnbilledLogs,
 } from '@/lib/db/hrpAdminActions';
 import type { BalanceSummary } from '@/lib/hrp/balance';
 import { calculateBalanceSummary } from '@/lib/hrp/balance';
 import type { Entry } from '@/lib/hrp/hrpLogic';
-import { computeDayStats, groupEntriesByWorkday, toTimeStr } from '@/lib/hrp/hrpLogic';
+import {
+  computeDayStats,
+  groupEntriesByWorkday,
+  toTimeStr,
+} from '@/lib/hrp/hrpLogic';
 import { calculatePeriodTotals } from '@/lib/hrp/period-calculation';
-import VacationOverview from '@/components/hrp/VacationOverview';
 
 const breadCrumbs = [
     { title: 'Zeiterfassung', url: '/hrp' },
@@ -350,7 +355,7 @@ export default async function Page({
     if (lastDayOfSelectedMonth < vacationViewDate) {
         vacationViewDate = lastDayOfSelectedMonth;
     }
-    
+
 
     // Zeit-Token: gleiche Breite, zentriert, auf großen Displays etwas breiter (alle Zeitfenster gleich)
     const timeToken = 'inline-flex font-medium items-center justify-center w-[5ch] sm:w-[5.5ch] lg:w-[6ch]';
@@ -473,7 +478,7 @@ export default async function Page({
 
                     {/* Summary Wrapper (Only shown BEFORE table in print, hidden BEFORE table on web) */}
                     <div className="hidden print:grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 w-full print:mb-8">
-                        {anzeigeSelectedContract?.type === 'fixed_salary' && balanceSummary && (
+                        {anzeigeSelectedContract?.type === 'fixed_salary' && balanceSummary.contract && (
                             <div className="rounded border bg-card p-6 text-card-foreground shadow-sm break-inside-avoid w-full">
                                 <h2 className="text-[14pt] font-semibold mb-4 border-b-2 pb-2">Arbeitszeit & Saldo</h2>
                                 <div className="space-y-3 text-[11pt] break-inside-avoid">
@@ -484,19 +489,7 @@ export default async function Page({
                                         </span>
                                     </div>
                                     <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
-                                        <span>GLZ-Übertrag Vormonat (ungekappt):</span>
-                                        <span className="font-medium text-foreground">
-                                            {balanceSummary.balanceAtStartOfMonthUncapped?.toFixed(2)} h
-                                        </span>
-                                    </div>
-                                    {balanceSummary.cappedHours > 0 && (
-                                        <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground text-red-600">
-                                            <span>Gekappte Stunden:</span>
-                                            <span className="font-medium">-{balanceSummary.cappedHours.toFixed(2)} h</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
-                                        <span>GLZ-Übertrag Vormonat (gekappt):</span>
+                                        <span>GLZ-Übertrag aus Vormonat:</span>
                                         <span className="font-medium text-foreground">
                                             {balanceSummary.balanceAtStartOfMonthCapped?.toFixed(2)} h
                                         </span>
@@ -508,28 +501,26 @@ export default async function Page({
                                             {balanceSummary.balanceCurrentMonth?.toFixed(2)} h
                                         </span>
                                     </div>
+                                    {balanceSummary.cappedHoursThisMonth > 0 && (
+                                        <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground text-red-600">
+                                            <span>Gekappte Stunden (diesen Monat):</span>
+                                            <span className="font-medium">(-{balanceSummary.cappedHoursThisMonth.toFixed(2)} h)</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between pt-1 font-bold text-[12pt] border-t-2 border-zinc-300 mt-1">
-                                        <span>GLZ-Saldo (Summe):</span>
+                                        <span>GLZ-Saldo (total):</span>
                                         <span>{balanceSummary.finalBalanceCapped?.toFixed(2)} h</span>
                                     </div>
-                                    {selectedContractId && (
-                                        <form
-                                            action={async () => {
-                                                'use server';
-                                                await recalculatePayrollFixed(selectedContractId, year, month);
-                                            }}
-                                            className="pt-4"
-                                        >
-                                            <Button type="submit" variant="outline" className="w-full">
-                                                Abrechnung neu berechnen
-                                            </Button>
-                                        </form>
+                                    {selectedContractId && selectedUserId && (
+                                        <div className="pt-2">
+                                            <RecalculatePayrollButton selectedUserId={selectedUserId} year={year} month={month} />
+                                        </div>
                                     )}
                                 </div>
                             </div>
                         )}
 
-                        <VacationOverview showDatePicker={false} initialDate={vacationViewDate} />
+                        <VacationOverview showDatePicker={false} initialDate={vacationViewDate} userId={selectedUserId} />
                     </div>
 
                     {/* Filter */}
@@ -972,7 +963,7 @@ export default async function Page({
 
                 {/* Summary Wrapper */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-8 w-full print:hidden">
-                    {anzeigeSelectedContract?.type === 'fixed_salary' && balanceSummary && (
+                    {anzeigeSelectedContract?.type === 'fixed_salary' && balanceSummary.contract && (
                         <div className="rounded border bg-card p-3 text-card-foreground shadow-sm break-inside-avoid w-full">
                             <h2 className="text-sm font-semibold mb-2 border-b pb-1">Arbeitszeit & Saldo</h2>
                             <div className="space-y-1 text-xs">
@@ -981,17 +972,11 @@ export default async function Page({
                                     <span className="font-medium text-foreground">{anzeigeSelectedContract.weeklyHours?.toFixed(2)} h</span>
                                 </div>
                                 <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
-                                    <span>GLZ-Übertrag Vormonat (gekappt):</span>
+                                    <span>GLZ-Übertrag aus Vormonat:</span>
                                     <span className="font-medium text-foreground">
                                         {balanceSummary.balanceAtStartOfMonthCapped?.toFixed(2)} h
                                     </span>
                                 </div>
-                                {balanceSummary.cappedHours > 0 && (
-                                    <div className="flex justify-between border-b pb-0.5 text-red-600">
-                                        <span>(Gekappte Stunden):</span>
-                                        <span className="font-medium">(-{balanceSummary.cappedHours.toFixed(2)} h)</span>
-                                    </div>
-                                )}
                                 <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
                                     <span>GLZ-Saldo aktueller Zeitraum:</span>
                                     <span className="font-medium text-foreground">
@@ -999,8 +984,14 @@ export default async function Page({
                                         {balanceSummary.balanceCurrentMonth?.toFixed(2)} h
                                     </span>
                                 </div>
+                                {balanceSummary.cappedHoursThisMonth > 0 && (
+                                    <div className="flex justify-between border-b pb-0.5 text-red-600">
+                                        <span>Gekappte Stunden (diesen Monat):</span>
+                                        <span className="font-medium">(-{balanceSummary.cappedHoursThisMonth.toFixed(2)} h)</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between pt-0.5 font-bold">
-                                    <span>GLZ-Saldo (Summe):</span>
+                                    <span>GLZ-Saldo (total):</span>
                                     <span>{balanceSummary.finalBalanceCapped?.toFixed(2)} h</span>
                                 </div>
                                 {selectedContractId && selectedUserId && (
@@ -1012,7 +1003,7 @@ export default async function Page({
                         </div>
                     )}
 
-                    {selectedContract?.type === 'fixed_salary' && <VacationOverview showDatePicker={false} initialDate={vacationViewDate} />}
+                    {selectedContract?.type === 'fixed_salary' && <VacationOverview showDatePicker={false} initialDate={vacationViewDate} userId={selectedUserId} />}
                 </div>
 
                 {selectedUserId && selectedContractId && selectedContract?.type === 'hourly' && (

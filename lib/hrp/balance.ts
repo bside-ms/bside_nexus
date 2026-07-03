@@ -15,7 +15,8 @@ export interface BalanceSummary {
     carryoverFromLastYear: number;
     balanceChangeInPreviousMonths: number;
     balanceAtStartOfMonthUncapped: number;
-    cappedHours: number;
+    cappedHoursInCarryover: number;
+    cappedHoursThisMonth: number;
     balanceAtStartOfMonthCapped: number;
     balanceCurrentMonth: number;
     finalBalanceUncapped: number;
@@ -111,7 +112,8 @@ export async function calculateBalanceSummary(
             carryoverFromLastYear: 0,
             balanceChangeInPreviousMonths: 0,
             balanceAtStartOfMonthUncapped: 0,
-            cappedHours: 0,
+            cappedHoursInCarryover: 0,
+            cappedHoursThisMonth: 0,
             balanceAtStartOfMonthCapped: 0,
             balanceCurrentMonth,
             finalBalanceUncapped: balanceCurrentMonth,
@@ -142,30 +144,60 @@ export async function calculateBalanceSummary(
 
     const carryoverFromLastYear = leaveAccounts.reduce((sum, acc) => sum + parseFloat(acc.overtimeCarryoverHours?.toString() ?? '0'), 0);
 
-    let balanceChangeInPreviousMonths = 0;
+    // Iteratively calculate the balance up to the start of the selected month, applying capping at each step.
+    let runningCappedBalance = carryoverFromLastYear;
+    let runningUncappedBalance = carryoverFromLastYear;
+
     for (let i = 1; i < month; i++) {
-        balanceChangeInPreviousMonths += await calculateCalendarMonthBalance(userId, year, i);
+        const monthBalanceChange = await calculateCalendarMonthBalance(userId, year, i);
+        runningUncappedBalance += monthBalanceChange;
+
+        const endOfMonthUncapped = runningCappedBalance + monthBalanceChange;
+
+        const dateInMonthI = new Date(year, i - 1, 15);
+        const contractForMonthI =
+            relevantContracts.find((c) => {
+                const validFrom = new Date(c.validFrom);
+                const validTo = c.validTo ? new Date(c.validTo) : null;
+                return validFrom <= dateInMonthI && (!validTo || validTo >= dateInMonthI);
+            }) ?? relevantContracts[0];
+
+        const isGmbhContractInMonthI = contractForMonthI?.employerGroupId === GMBH_GROUP_ID && contractForMonthI?.type === 'fixed_salary';
+
+        let endOfMonthCapped = endOfMonthUncapped;
+        if (isGmbhContractInMonthI && endOfMonthUncapped > OVERTIME_CAP_HOURS) {
+            endOfMonthCapped = OVERTIME_CAP_HOURS;
+        }
+        runningCappedBalance = endOfMonthCapped;
     }
 
-    const balanceAtStartOfMonthUncapped = carryoverFromLastYear + balanceChangeInPreviousMonths;
+    const balanceAtStartOfMonthCapped = runningCappedBalance;
+    const balanceAtStartOfMonthUncapped = runningUncappedBalance;
+    const cappedHoursInCarryover = balanceAtStartOfMonthUncapped - balanceAtStartOfMonthCapped;
+    const balanceChangeInPreviousMonths = balanceAtStartOfMonthUncapped - carryoverFromLastYear;
 
-    let balanceAtStartOfMonthCapped = balanceAtStartOfMonthUncapped;
-    let cappedHours = 0;
-    const isGmbhContract = activeContractForMonth?.employerGroupId === GMBH_GROUP_ID;
+    // Start the calculation for the selected month.
+    const isGmbhContract = activeContractForMonth?.employerGroupId === GMBH_GROUP_ID && activeContractForMonth?.type === 'fixed_salary';
 
-    if (isGmbhContract && balanceAtStartOfMonthUncapped > OVERTIME_CAP_HOURS) {
-        cappedHours = balanceAtStartOfMonthUncapped - OVERTIME_CAP_HOURS;
-        balanceAtStartOfMonthCapped = OVERTIME_CAP_HOURS;
-    }
-
-    const finalBalanceCapped = balanceAtStartOfMonthCapped + balanceCurrentMonth;
+    // The final uncapped balance includes the full history + current month's uncapped change
     const finalBalanceUncapped = balanceAtStartOfMonthUncapped + balanceCurrentMonth;
+
+    // The final capped balance calculation starts from the correctly capped carry-over
+    const finalBalanceIntermediate = balanceAtStartOfMonthCapped + balanceCurrentMonth;
+
+    let finalBalanceCapped = finalBalanceIntermediate;
+    let cappedHoursThisMonth = 0;
+    if (isGmbhContract && finalBalanceIntermediate > OVERTIME_CAP_HOURS) {
+        cappedHoursThisMonth = finalBalanceIntermediate - OVERTIME_CAP_HOURS;
+        finalBalanceCapped = OVERTIME_CAP_HOURS;
+    }
 
     return {
         carryoverFromLastYear,
         balanceChangeInPreviousMonths,
         balanceAtStartOfMonthUncapped,
-        cappedHours,
+        cappedHoursInCarryover,
+        cappedHoursThisMonth,
         balanceAtStartOfMonthCapped,
         balanceCurrentMonth,
         finalBalanceUncapped,

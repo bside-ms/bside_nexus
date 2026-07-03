@@ -2,16 +2,15 @@ import { eq } from 'drizzle-orm';
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
 import { PrintButton } from '@/components/hrp/PrintButton';
+import VacationOverview from '@/components/hrp/VacationOverview';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { db } from '@/db';
 import { usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions';
-import { getUpcomingVacations } from '@/lib/db/hrpAbsenceActions';
 import { getLeaveAccounts } from '@/lib/db/hrpAdminActions';
 import { calculateBalanceSummary } from '@/lib/hrp/balance';
 import { toTimeStr } from '@/lib/hrp/hrpLogic';
-import VacationOverview from '@/components/hrp/VacationOverview';
 import { calculatePeriodTotals } from '@/lib/hrp/period-calculation';
 
 const breadCrumbs = [
@@ -140,8 +139,9 @@ export default async function Page({
     const selectedContract = contracts.find((c) => c.contractId === selectedContractId);
 
     // Fetch leave accounts for summary
-    const leaveAccounts = selectedContractId ? await getLeaveAccounts(selectedContractId) : [];
-    const currentLeaveAccount = leaveAccounts.find((a) => a.year === year);
+    if (selectedContractId) {
+        await getLeaveAccounts(selectedContractId);
+    }
 
     // Fetch current user's name/display label
     const userRow = await db
@@ -276,17 +276,11 @@ export default async function Page({
                                         </span>
                                     </div>
                                     <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
-                                        <span>GLZ-Übertrag Vormonat (gekappt):</span>
+                                        <span>GLZ-Übertrag aus Vormonat:</span>
                                         <span className="font-medium text-foreground">
                                             {balanceSummary.balanceAtStartOfMonthCapped?.toFixed(2)} h
                                         </span>
                                     </div>
-                                    {balanceSummary.cappedHours > 0 && (
-                                        <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground text-red-600">
-                                            <span>(Gekappte Stunden):</span>
-                                            <span className="font-medium">(-{balanceSummary.cappedHours.toFixed(2)} h)</span>
-                                        </div>
-                                    )}
                                     <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground">
                                         <span>GLZ-Saldo aktueller Zeitraum:</span>
                                         <span className="font-medium text-foreground">
@@ -294,8 +288,14 @@ export default async function Page({
                                             {balanceSummary.balanceCurrentMonth?.toFixed(2)} h
                                         </span>
                                     </div>
+                                    {balanceSummary.cappedHoursThisMonth > 0 && (
+                                        <div className="flex justify-between border-b pb-1 text-muted-foreground print:text-foreground text-red-600">
+                                            <span>Gekappte Stunden (diesen Monat):</span>
+                                            <span className="font-medium">(-{balanceSummary.cappedHoursThisMonth.toFixed(2)} h)</span>
+                                        </div>
+                                    )}
                                     <div className="flex justify-between pt-1 font-bold text-[12pt] border-t-2 border-zinc-300 mt-1">
-                                        <span>GLZ-Saldo (Summe):</span>
+                                        <span>GLZ-Saldo (total):</span>
                                         <span>{balanceSummary.finalBalanceCapped?.toFixed(2)} h</span>
                                     </div>
                                 </div>
@@ -713,17 +713,11 @@ export default async function Page({
                                     <span className="font-medium text-foreground">{anzeigeSelectedContract.weeklyHours?.toFixed(2)} h</span>
                                 </div>
                                 <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
-                                    <span>GLZ-Übertrag Vormonat (gekappt):</span>
+                                    <span>GLZ-Übertrag aus Vormonat:</span>
                                     <span className="font-medium text-foreground">
                                         {balanceSummary.balanceAtStartOfMonthCapped?.toFixed(2)} h
                                     </span>
                                 </div>
-                                {balanceSummary.cappedHours > 0 && (
-                                    <div className="flex justify-between border-b pb-0.5 text-red-600">
-                                        <span>(Gekappte Stunden):</span>
-                                        <span className="font-medium">(-{balanceSummary.cappedHours.toFixed(2)} h)</span>
-                                    </div>
-                                )}
                                 <div className="flex justify-between border-b pb-0.5 text-muted-foreground">
                                     <span>GLZ-Saldo aktueller Zeitraum:</span>
                                     <span className="font-medium text-foreground">
@@ -731,8 +725,14 @@ export default async function Page({
                                         {balanceSummary.balanceCurrentMonth?.toFixed(2)} h
                                     </span>
                                 </div>
+                                {balanceSummary.cappedHoursThisMonth > 0 && (
+                                    <div className="flex justify-between border-b pb-0.5 text-red-600">
+                                        <span>Gekappte Stunden (diesen Monat):</span>
+                                        <span className="font-medium">(-{balanceSummary.cappedHoursThisMonth.toFixed(2)} h)</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between pt-0.5 font-bold">
-                                    <span>GLZ-Saldo (Summe):</span>
+                                    <span>GLZ-Saldo (total):</span>
                                     <span>{balanceSummary.finalBalanceCapped?.toFixed(2)} h</span>
                                 </div>
                             </div>

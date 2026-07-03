@@ -13,6 +13,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   const { searchParams } = new URL(req.url);
   const dateParam = searchParams.get('date');
+  const userIdParam = searchParams.get('userId');
 
   if (!dateParam) {
     return NextResponse.json(
@@ -29,16 +30,26 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     );
   }
 
+  let targetUserId = session.id;
+  if (userIdParam && userIdParam !== session.id) {
+    if (!session.roles?.includes('arbeitszeiterfassung-admin')) {
+      return NextResponse.json(
+        { message: 'You are not authorized to view other users vacation data.' },
+        { status: 403 },
+      );
+    }
+    targetUserId = userIdParam;
+  }
+
   try {
     const vacationDetails = await getVacationAccountDetails(
-      session.id,
+      targetUserId,
       targetDate,
     );
     return NextResponse.json(vacationDetails);
   } catch (error) {
-    console.error('Failed to get vacation account details:', error);
     return NextResponse.json(
-      { message: 'An internal error occurred.' },
+      { message: 'Failed to get vacation account details:', error },
       { status: 500 },
     );
   }
