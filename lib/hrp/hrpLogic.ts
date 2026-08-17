@@ -134,7 +134,10 @@ export const computeDayStats = (
         }
     }
 
-    const shouldSkipBalance = isFuture || isSkippedDueToTime || contract?.type === 'hourly';
+    // Einen GLZ-Saldo gibt es nur bei Festanstellung.
+    const tracksBalance = contract?.type === 'fixed_salary';
+
+    const shouldSkipBalance = isFuture || isSkippedDueToTime || !tracksBalance;
 
     if (!entries || entries.length === 0) {
         const es = emptyStats();
@@ -255,7 +258,7 @@ export const computeDayStats = (
         }
     }
 
-    const balanceMinutes = netMinutes - targetMinutes;
+    const balanceMinutes = tracksBalance ? netMinutes - targetMinutes : 0;
 
     return {
         starts,

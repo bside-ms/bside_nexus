@@ -31,6 +31,29 @@ function getDaysInMonth(year: number, monthZeroBased: number): number {
     return new Date(year, monthZeroBased + 1, 0).getDate();
 }
 
+/** Nur Festanstellungen führen ein Gleitzeitkonto. */
+function isFixedSalary(contract?: { type: string } | null): boolean {
+    return contract?.type === 'fixed_salary';
+}
+
+/**
+ * Vertrag, der an `date` gültig ist. Erwartet nach validFrom absteigend sortierte Verträge.
+ * Laufen mehrere Verträge parallel, gewinnt die Festanstellung – sonst würde ein zusätzlicher
+ * Stundenvertrag das Gleitzeitkonto fälschlich beenden.
+ */
+function findContractAtDate<T extends { type: string; validFrom: Date; validTo: Date | null }>(
+    contracts: Array<T>,
+    date: Date,
+): T | undefined {
+    const valid = contracts.filter((c) => {
+        const validFrom = new Date(c.validFrom);
+        const validTo = c.validTo ? new Date(c.validTo) : null;
+        return validFrom <= date && (!validTo || validTo >= date);
+    });
+
+    return valid.find((c) => isFixedSalary(c)) ?? valid[0];
+}
+
 /**
  * Calculates the balance for a single calendar month from raw event and absence data.
  * This is the single source of truth for a month's balance calculation.
@@ -46,7 +69,7 @@ async function calculateCalendarMonthBalance(userId: string, year: number, month
                 db
                     .select({ id: schema.hrpContractsTable.id })
                     .from(schema.hrpContractsTable)
-                    .where(eq(schema.hrpContractsTable.userId, userId)),
+                    .where(and(eq(schema.hrpContractsTable.userId, userId), eq(schema.hrpContractsTable.type, 'fixed_salary'))),
             ),
         ),
     });
@@ -125,22 +148,21 @@ export async function calculateBalanceSummary(
     }
 
     const dateInSelectedMonth = new Date(year, month - 1, 15);
-    const activeContractForMonth =
-        relevantContracts.find((c) => {
-            const validFrom = new Date(c.validFrom);
-            const validTo = c.validTo ? new Date(c.validTo) : null;
-            return validFrom <= dateInSelectedMonth && (!validTo || validTo >= dateInSelectedMonth);
-        }) ?? relevantContracts[0];
+    const activeContractForMonth = findContractAtDate(relevantContracts, dateInSelectedMonth) ?? relevantContracts[0];
 
-    const leaveAccounts = await db.query.hrpLeaveAccountsTable.findMany({
-        where: and(
-            inArray(
-                schema.hrpLeaveAccountsTable.contractId,
-                relevantContracts.map((c) => c.id),
-            ),
-            eq(schema.hrpLeaveAccountsTable.year, year),
-        ),
-    });
+    // Der Überstunden-Startsaldo aus dem Vorjahr gilt nur für Festanstellungen.
+    // Jahreskonten ausgelaufener Stundenverträge dürfen nicht in ein Gleitzeitkonto einfließen.
+    const fixedContractIds = relevantContracts.filter((c) => isFixedSalary(c)).map((c) => c.id);
+
+    const leaveAccounts =
+        fixedContractIds.length > 0
+            ? await db.query.hrpLeaveAccountsTable.findMany({
+                  where: and(
+                      inArray(schema.hrpLeaveAccountsTable.contractId, fixedContractIds),
+                      eq(schema.hrpLeaveAccountsTable.year, year),
+                  ),
+              })
+            : [];
 
     const carryoverFromLastYear = leaveAccounts.reduce((sum, acc) => sum + parseFloat(acc.overtimeCarryoverHours?.toString() ?? '0'), 0);
 
@@ -149,20 +171,21 @@ export async function calculateBalanceSummary(
     let runningUncappedBalance = carryoverFromLastYear;
 
     for (let i = 1; i < month; i++) {
+        const dateInMonthI = new Date(year, i - 1, 15);
+        const contractForMonthI = findContractAtDate(relevantContracts, dateInMonthI);
+
+        // Ein Stundenvertrag (oder eine vertragslose Lücke) beendet das Gleitzeitkonto.
+        if (!isFixedSalary(contractForMonthI)) {
+            runningCappedBalance = 0;
+            runningUncappedBalance = 0;
+        }
+
         const monthBalanceChange = await calculateCalendarMonthBalance(userId, year, i);
         runningUncappedBalance += monthBalanceChange;
 
         const endOfMonthUncapped = runningCappedBalance + monthBalanceChange;
 
-        const dateInMonthI = new Date(year, i - 1, 15);
-        const contractForMonthI =
-            relevantContracts.find((c) => {
-                const validFrom = new Date(c.validFrom);
-                const validTo = c.validTo ? new Date(c.validTo) : null;
-                return validFrom <= dateInMonthI && (!validTo || validTo >= dateInMonthI);
-            }) ?? relevantContracts[0];
-
-        const isGmbhContractInMonthI = contractForMonthI?.employerGroupId === GMBH_GROUP_ID && contractForMonthI?.type === 'fixed_salary';
+        const isGmbhContractInMonthI = contractForMonthI?.employerGroupId === GMBH_GROUP_ID && isFixedSalary(contractForMonthI);
 
         let endOfMonthCapped = endOfMonthUncapped;
         if (isGmbhContractInMonthI && endOfMonthUncapped > OVERTIME_CAP_HOURS) {

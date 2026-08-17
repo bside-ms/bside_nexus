@@ -88,6 +88,8 @@ export async function getContractAtDate(userId: string, date: Date): Promise<Hrp
                 or(isNull(hrpContractsTable.validTo), sql`${hrpContractsTable.validTo}::date >= ${dateString}::date`),
             ),
         )
+        // Bei parallel laufenden Verträgen gewinnt die Festanstellung.
+        .orderBy(sql`(${hrpContractsTable.type} = 'fixed_salary') DESC`, desc(hrpContractsTable.validFrom))
         .limit(1);
 
     return contracts.length > 0 ? contracts[0]! : null;

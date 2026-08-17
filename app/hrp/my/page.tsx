@@ -503,7 +503,9 @@ export default async function Page({
                                                 ? 'Krankheit (mit Attest)'
                                                 : a.absence?.type === 'holiday'
                                                   ? 'Feiertag'
-                                                  : a.absence?.type;
+                                                  : a.absence?.type === 'compensatory_day'
+                                                    ? 'Ausgleichtag'
+                                                    : a.absence?.type;
                                     hints.push({
                                         text: `${typeLabel} (${a.absence?.hoursValue}h)`,
                                         className: 'font-semibold text-blue-600',

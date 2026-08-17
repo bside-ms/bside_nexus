@@ -11,30 +11,22 @@ import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { db } from '@/db';
-import type {
-  HrpAbsenceEntry,
-  HrpEventLogEntry,
-  HrpMonthlyPayrollEntry,
-} from '@/db/schema';
+import type { HrpAbsenceEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
 import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions';
 import {
-  getCurrentPayrollHourly,
-  getForecastForContract,
-  getManagedContracts,
-  getPreviousPayrollHourly,
-  getUnbilledAbsencesForUser,
-  getUnbilledLogs,
+    getCurrentPayrollHourly,
+    getForecastForContract,
+    getManagedContracts,
+    getPreviousPayrollHourly,
+    getUnbilledAbsencesForUser,
+    getUnbilledLogs,
 } from '@/lib/db/hrpAdminActions';
 import type { BalanceSummary } from '@/lib/hrp/balance';
 import { calculateBalanceSummary } from '@/lib/hrp/balance';
 import type { Entry } from '@/lib/hrp/hrpLogic';
-import {
-  computeDayStats,
-  groupEntriesByWorkday,
-  toTimeStr,
-} from '@/lib/hrp/hrpLogic';
+import { computeDayStats, groupEntriesByWorkday, toTimeStr } from '@/lib/hrp/hrpLogic';
 import { calculatePeriodTotals } from '@/lib/hrp/period-calculation';
 
 const breadCrumbs = [
@@ -355,7 +347,6 @@ export default async function Page({
     if (lastDayOfSelectedMonth < vacationViewDate) {
         vacationViewDate = lastDayOfSelectedMonth;
     }
-
 
     // Zeit-Token: gleiche Breite, zentriert, auf großen Displays etwas breiter (alle Zeitfenster gleich)
     const timeToken = 'inline-flex font-medium items-center justify-center w-[5ch] sm:w-[5.5ch] lg:w-[6ch]';
@@ -762,7 +753,9 @@ export default async function Page({
                                                 ? 'Krankheit (mit Attest)'
                                                 : a.absence?.type === 'holiday'
                                                   ? 'Feiertag'
-                                                  : a.absence?.type;
+                                                  : a.absence?.type === 'compensatory_day'
+                                                    ? 'Ausgleichtag'
+                                                    : a.absence?.type;
                                     hints.push({
                                         text: `${typeLabel} (${a.absence?.hoursValue}h)`,
                                         className: 'font-semibold text-blue-600',
@@ -1003,7 +996,9 @@ export default async function Page({
                         </div>
                     )}
 
-                    {selectedContract?.type === 'fixed_salary' && <VacationOverview showDatePicker={false} initialDate={vacationViewDate} userId={selectedUserId} />}
+                    {selectedContract?.type === 'fixed_salary' && (
+                        <VacationOverview showDatePicker={false} initialDate={vacationViewDate} userId={selectedUserId} />
+                    )}
                 </div>
 
                 {selectedUserId && selectedContractId && selectedContract?.type === 'hourly' && (
