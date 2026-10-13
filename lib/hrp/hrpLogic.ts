@@ -111,7 +111,7 @@ export const computeDayStats = (
     const isFuture = refDateStr && refDateStr > internalTodayStr;
     const isToday = refDateStr && refDateStr === internalTodayStr;
 
-    // Spezielle Logik für "heute" und "vorheriger Tag vor 8 Uhr morgens"
+    // Spezielle Logik für "heute" und "vorheriger Tag vor 8 Uhr morgens".   let isSkippedDueToTime = false;
     let isSkippedDueToTime = false;
     if (isToday) {
         isSkippedDueToTime = true;
@@ -214,6 +214,10 @@ export const computeDayStats = (
         issues.push('Fehlendes Start/Stop');
     }
 
+    // Hat der Tag bereits Start und Stop, ist die Schicht abgeschlossen und der Tag kann sofort verrechnet werden.
+    const isShiftComplete = starts.length > 0 && starts.length === stops.length;
+    const skipBalance = isFuture || (isSkippedDueToTime && !isShiftComplete) || !tracksBalance;
+
     // Breaks
     let actualBreakMinutes = 0;
     const breakPairs: Array<{ from?: Date; to?: Date }> = [];
@@ -248,7 +252,7 @@ export const computeDayStats = (
 
     // Target and Balance
     let targetMinutes = 0;
-    if (!shouldSkipBalance && contract && (date || (timeEvents.length > 0 && timeEvents[0]?.ts))) {
+    if (!skipBalance && contract && (date || (timeEvents.length > 0 && timeEvents[0]?.ts))) {
         const targetDate = date || timeEvents[0]?.ts;
         const dayOfWeek = targetDate!.getDay();
         const mappedDay = dayOfWeek === 0 ? 7 : dayOfWeek;
@@ -258,7 +262,9 @@ export const computeDayStats = (
         }
     }
 
-    const balanceMinutes = tracksBalance ? netMinutes - targetMinutes : 0;
+    // Solange für den Tag noch kein Soll angesetzt wird, dürfen Abwesenheiten den Saldo nicht erhöhen.
+    const balanceNetMinutes = skipBalance ? Math.max(0, sessionMinutesWithoutAbsences - adjustedBreakMinutes) : netMinutes;
+    const balanceMinutes = tracksBalance ? balanceNetMinutes - targetMinutes : 0;
 
     return {
         starts,
