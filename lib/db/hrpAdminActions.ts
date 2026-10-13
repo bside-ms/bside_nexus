@@ -795,7 +795,7 @@ export async function bookHoliday(holidayId: string, userId: string, contractId:
 
     // 2. Recalculate
     const d = new Date(date);
-    await recalculatePayrollFixedForUserAtDate(userId, d.getFullYear(), d.getMonth() + 1);
+    await recalculatePayrollFixedForUserAtDate(userId, d.getFullYear(), d.getMonth());
 
     // 3. Update status
     await db
