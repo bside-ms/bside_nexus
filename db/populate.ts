@@ -1,4 +1,4 @@
-import { eq, isNull, or } from 'drizzle-orm';
+import { and, eq, isNull, notInArray, or, sql } from 'drizzle-orm';
 import { isEmpty } from 'lodash-es';
 import 'dotenv/config';
 import { db } from '@/db/index';
@@ -138,6 +138,11 @@ async function populateMembers(): Promise<void> {
         let members: Array<AugmentedUserRepresentation> = [];
         let admins: Array<AugmentedUserRepresentation> = [];
 
+        // Ohne Quelle in Keycloak lässt sich nichts abgleichen – bestehende Einträge bleiben unangetastet.
+        if (group.groupType !== 'subgroup' && memberGroupId === null && adminGroupId === null) {
+            continue;
+        }
+
         if (group.groupType === 'subgroup') {
             members = await keycloakGetDirectMembers(groupId);
         }
@@ -177,14 +182,25 @@ async function populateMembers(): Promise<void> {
             }
         });
 
-        if (entries.length > 0) {
-            await db
-                .insert(membersTable)
-                .values(entries)
-                .onConflictDoNothing({
-                    target: [membersTable.userId, membersTable.groupId],
-                });
-        }
+        const isGroupEntry = eq(membersTable.groupId, groupId);
+        const userIds = entries.map((entry) => entry.userId);
+
+        await db.transaction(async (tx) => {
+            if (entries.length > 0) {
+                await tx
+                    .insert(membersTable)
+                    .values(entries)
+                    .onConflictDoUpdate({
+                        target: [membersTable.userId, membersTable.groupId],
+                        set: { isAdmin: sql`excluded."isAdmin"` },
+                    });
+            }
+
+            // Mitgliedschaften entfernen, die es in Keycloak nicht mehr gibt.
+            await tx
+                .delete(membersTable)
+                .where(entries.length > 0 ? and(isGroupEntry, notInArray(membersTable.userId, userIds)) : isGroupEntry);
+        });
     }
 
     // eslint-disable-next-line no-console
