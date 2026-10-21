@@ -1,9 +1,6 @@
 declare namespace NodeJS {
     export interface ProcessEnv {
-        DB_HOST: string;
-        DB_NAME: string;
-        DB_USER: string;
-        DB_PASS: string;
+        DATABASE_URL: string;
 
         AUTH_URL: string;
         AUTH_SECRET: string;
@@ -15,21 +12,12 @@ declare namespace NodeJS {
         KEYCLOAK_CLIENT_ID: string;
         KEYCLOAK_CLIENT_SECRET: string;
 
-        NEXTCLOUD_URL: string;
-        NEXTCLOUD_API_USER: string;
-        NEXTCLOUD_API_PASS: string;
-
         MATTERMOST_URL: string;
         MATTERMOST_AUTH_TOKEN: string;
 
-        REDMINE_URL: string;
-        REDMINE_API_KEY: string;
+        PDF_DOCX_ENABLED?: string;
+        PDF_TIMEOUT_MS?: string;
 
-        LOG_LEVEL: string;
-
-        MAINTENANCE_MODE: string;
-        TESTING: string;
-
-        BASE: string;
+        NEXT_PUBLIC_BASE_PATH?: string;
     }
 }

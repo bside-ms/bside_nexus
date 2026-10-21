@@ -16,7 +16,7 @@ export function canModifyEntry(contractType: string, entryDate: Date): { allowed
     if (contractType === 'hourly') {
         // Warnung im Frontend anzeigen, aber Backend erlaubt es (außer es ist uralt)
         if (daysDiff > 90) {
-            return { allowed: false, error: 'Eintrag zu alt (> 30 Tage).' };
+            return { allowed: false, error: 'Eintrag zu alt (> 90 Tage).' };
         }
         return { allowed: true };
     }

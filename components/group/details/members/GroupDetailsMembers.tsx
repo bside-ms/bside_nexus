@@ -1,12 +1,13 @@
 'use client';
 
+import { useMemo } from 'react';
 import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { useBreakpointContext } from '@/components/common/BreakpointContext';
 import type { GroupMember } from '@/components/group/details/members/GroupMembersColumns';
-import { GroupMembersColumnsAdmin } from '@/components/group/details/members/GroupMembersColumns';
-import { GroupMembersColumns } from '@/components/group/details/members/GroupMembersColumns';
+import { getGroupMembersColumnsAdmin, GroupMembersColumns } from '@/components/group/details/members/GroupMembersColumns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/datatable';
@@ -21,6 +22,10 @@ interface GroupMembersProps {
 
 export function GroupDetailsMembers({ groupId, groupMembers, isAdmin, isGlobalAdmin }: GroupMembersProps): ReactElement {
     const { isLg } = useBreakpointContext();
+    const router = useRouter();
+
+    // Re-render the server page after a member change, so the table gets the new member list.
+    const adminColumns = useMemo(() => getGroupMembersColumnsAdmin(() => router.refresh()), [router]);
 
     const isAdminOrGlobalAdmin = isAdmin === 'Admin' || isGlobalAdmin;
 
@@ -38,9 +43,7 @@ export function GroupDetailsMembers({ groupId, groupMembers, isAdmin, isGlobalAd
                 )}
             </CardHeader>
             {isAdminOrGlobalAdmin ? (
-                <CardContent>
-                    {groupMembers.length > 0 && isLg && <DataTable columns={GroupMembersColumnsAdmin} data={groupMembers} />}
-                </CardContent>
+                <CardContent>{groupMembers.length > 0 && isLg && <DataTable columns={adminColumns} data={groupMembers} />}</CardContent>
             ) : (
                 <CardContent>
                     {groupMembers.length > 0 && isLg && <DataTable columns={GroupMembersColumns} data={groupMembers} />}

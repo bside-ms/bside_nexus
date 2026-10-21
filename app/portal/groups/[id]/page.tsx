@@ -43,7 +43,6 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
         },
     ];
 
-    // ToDo: Reload table when group members change (deletion, promotion, demotion).
     // ToDo: UseEffect to load the group members.
     const groupMemberPromise = getGroupMembers(groupId);
     const subgroupsPromise = getSubgroups(groupId);

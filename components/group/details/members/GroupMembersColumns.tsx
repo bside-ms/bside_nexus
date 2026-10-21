@@ -27,7 +27,7 @@ export interface GroupMember {
     status: 'invited' | 'member' | 'disabled' | 'admin';
 }
 
-async function removeMember(userId: string, groupId: string): Promise<void> {
+async function removeMember(userId: string, groupId: string, onSuccess: () => void): Promise<void> {
     try {
         // Send POST request to remove the member
         const response = await axios.post('/api/group/remove', {
@@ -37,6 +37,7 @@ async function removeMember(userId: string, groupId: string): Promise<void> {
 
         if (response.data.success) {
             toast.success('Benutzer*in wurde erfolgreich entfernt.');
+            onSuccess();
         } else {
             toast.error(response.data.error ?? 'Fehler beim Entfernen der Benutzer*in.');
         }
@@ -45,7 +46,7 @@ async function removeMember(userId: string, groupId: string): Promise<void> {
     }
 }
 
-async function promoteMember(userId: string, groupId: string): Promise<void> {
+async function promoteMember(userId: string, groupId: string, onSuccess: () => void): Promise<void> {
     try {
         // Send POST request to remove the member
         const response = await axios.post('/api/group/promote', {
@@ -55,6 +56,7 @@ async function promoteMember(userId: string, groupId: string): Promise<void> {
 
         if (response.data.success) {
             toast.success('Benutzer*in wurde erfolgreich zur Administrator*innen ernannt.');
+            onSuccess();
         } else {
             toast.error(response.data.error ?? 'Fehler beim Ernennen der Administrator*in.');
         }
@@ -63,7 +65,7 @@ async function promoteMember(userId: string, groupId: string): Promise<void> {
     }
 }
 
-async function demoteMember(userId: string, groupId: string): Promise<void> {
+async function demoteMember(userId: string, groupId: string, onSuccess: () => void): Promise<void> {
     try {
         // Send POST request to remove the member
         const response = await axios.post('/api/group/demote', {
@@ -73,6 +75,7 @@ async function demoteMember(userId: string, groupId: string): Promise<void> {
 
         if (response.data.success) {
             toast.success('Administrator*in wurde erfolgreich entfernt.');
+            onSuccess();
         } else {
             toast.error(response.data.error ?? 'Fehler beim Entfernen der Administrator*in.');
         }
@@ -94,13 +97,12 @@ const formatMemberStatus = (status: string): string => {
     }
 };
 
-export const GroupMembersColumnsAdmin: Array<ColumnDef<GroupMember>> = [
+export const getGroupMembersColumnsAdmin = (onMembersChanged: () => void): Array<ColumnDef<GroupMember>> => [
     {
         accessorKey: 'avatar',
         header: ({ column }) => <DataTableColumnHeader column={column} title="" />,
         enableGlobalFilter: false,
         enableSorting: false,
-        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
         cell: ({ row }): ReactElement => {
             const username: string = row.getValue('Username') ?? '';
             return (
@@ -122,7 +124,6 @@ export const GroupMembersColumnsAdmin: Array<ColumnDef<GroupMember>> = [
         accessorKey: 'username',
         id: 'Username',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Username" />,
-        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
         cell: ({ row }): ReactElement => {
             return <Fragment>@{row.getValue('Username')}</Fragment>;
         },
@@ -137,7 +138,6 @@ export const GroupMembersColumnsAdmin: Array<ColumnDef<GroupMember>> = [
         id: 'Status',
         enableGlobalFilter: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
         cell: ({ row }): ReactElement => {
             return <Fragment>{formatMemberStatus(row.getValue('Status'))}</Fragment>;
         },
@@ -146,7 +146,6 @@ export const GroupMembersColumnsAdmin: Array<ColumnDef<GroupMember>> = [
         id: 'actions',
         header: 'Aktionen',
         enableGlobalFilter: false,
-        // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
         cell: ({ row }): ReactElement => {
             const member = row.original;
 
@@ -167,16 +166,16 @@ export const GroupMembersColumnsAdmin: Array<ColumnDef<GroupMember>> = [
                             Kopiere die Mail-Adresse
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => removeMember(member.userId, member.groupId)}>
+                        <DropdownMenuItem onClick={() => removeMember(member.userId, member.groupId, onMembersChanged)}>
                             Aus der Gruppe entfernen
                         </DropdownMenuItem>
                         {member.status === 'admin' && (
-                            <DropdownMenuItem onClick={() => demoteMember(member.userId, member.groupId)}>
+                            <DropdownMenuItem onClick={() => demoteMember(member.userId, member.groupId, onMembersChanged)}>
                                 Administrator*in entfernen
                             </DropdownMenuItem>
                         )}
                         {member.status === 'member' && (
-                            <DropdownMenuItem onClick={() => promoteMember(member.userId, member.groupId)}>
+                            <DropdownMenuItem onClick={() => promoteMember(member.userId, member.groupId, onMembersChanged)}>
                                 Administrator*innen ernennen
                             </DropdownMenuItem>
                         )}
