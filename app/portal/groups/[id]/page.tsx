@@ -10,7 +10,14 @@ import type { GroupMember } from '@/components/group/details/members/GroupMember
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Separator } from '@/components/ui/separator';
 import getUserSession from '@/lib/auth/getUserSession';
-import { getGroupAdminStatus, getGroupById, getGroupMembers, getSubgroups, isGroupAdmin } from '@/lib/db/groupActions';
+import {
+    getGroupAdminStatus,
+    getGroupById,
+    getGroupMembers,
+    getSubgroups,
+    isGlobalAdmin as isSystemAdminUser,
+    isGroupAdmin,
+} from '@/lib/db/groupActions';
 
 interface GroupPageProps {
     params: Promise<{
@@ -73,7 +80,7 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
     return (
         <div className="">
             <NavbarTop items={breadCrumbs} />
-            <div className="space-y-6 p-10 pb-16">
+            <div className="space-y-6 px-4 pt-4 pb-16 sm:px-6 sm:pt-6 lg:px-10 lg:pt-10">
                 <GroupDetailsHeader displayName={group.displayName ?? group.name} />
                 <Separator className="my-6" />
 
@@ -95,7 +102,14 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
 
                 <Separator className="my-6" />
 
-                <GroupDetailsMembers groupMembers={members} isAdmin={isAdmin} groupId={group.id} isGlobalAdmin={isGlobalAdmin} />
+                <GroupDetailsMembers
+                    groupMembers={members}
+                    isAdmin={isAdmin}
+                    groupId={group.id}
+                    isGlobalAdmin={isGlobalAdmin}
+                    isSystemAdmin={isSystemAdminUser(user?.id ?? '')}
+                    currentUserId={user?.id ?? ''}
+                />
             </div>
 
             <Toaster

@@ -1,83 +1,16 @@
 import { redirect } from 'next/navigation';
 import type { ReactElement } from 'react';
-import { Toaster } from 'sonner';
-import { GroupDetailsMembersForm } from '@/components/group/details/members/GroupDetailsMembersForm';
-import { SectionHeader } from '@/components/group/SectionHeader';
-import NavbarTop from '@/components/sidebar/NavbarTop';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
-import getUserSession from '@/lib/auth/getUserSession';
-import { getGroupById, isGroupAdmin } from '@/lib/db/groupActions';
 
-interface GroupPageProps {
+interface AddMembersPageProps {
     params: Promise<{
         id: string;
     }>;
 }
 
-const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
+// Members are added in a panel on the group page now. Kept as a redirect for old links and bookmarks.
+const AddMembersPage = async ({ params }: AddMembersPageProps): Promise<ReactElement> => {
     const { id: groupId } = await params;
-    const group = await getGroupById(groupId);
-    const user = await getUserSession();
-
-    // Handle when the group is not found
-    if (group === null) {
-        redirect('/portal/groups');
-    }
-
-    const breadCrumbs = [
-        {
-            title: 'Meine Gruppen',
-            url: `/portal/groups`,
-        },
-        {
-            title: group.categoryName ?? '',
-            url: `/portal/groups`,
-        },
-        {
-            title: group.displayName ?? '',
-            url: `/portal/groups/${groupId}`,
-        },
-        {
-            title: 'Mitglieder hinzufügen',
-            active: true,
-        },
-    ];
-
-    const isAdmin = await isGroupAdmin(user?.id ?? '', group.id, true);
-    if (!isAdmin) {
-        redirect(`/portal/groups/${groupId}`);
-    }
-
-    return (
-        <>
-            <NavbarTop items={breadCrumbs} />
-            <div className="space-y-6 p-10 pb-16">
-                <SectionHeader
-                    title={`Gruppenverwaltung: ${group.displayName ?? group.name}`}
-                    description="Hier kannst du Mitglieder zu dieser Gruppe hinzufügen."
-                />
-                <Separator className="my-6" />
-
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <Card className="">
-                        <CardHeader className="">
-                            <CardTitle>Mitglieder hinzufügen</CardTitle>
-                        </CardHeader>
-                        <CardContent className="">
-                            <GroupDetailsMembersForm groupId={group.id} />
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-
-            <Toaster
-                position="top-right"
-                richColors
-                toastOptions={{}} // Voluntarily passing empty object as a workaround for `richColors` to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
-            />
-        </>
-    );
+    redirect(`/portal/groups/${groupId}`);
 };
 
-export default Group;
+export default AddMembersPage;

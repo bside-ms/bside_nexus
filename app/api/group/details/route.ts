@@ -33,9 +33,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         return updateGroupDescription(groupId, userId, ipAddress, newDescription, newWikiLink, newWebsiteLink);
     } catch (error: unknown) {
+        // Do not pass the message on, it can contain internals from Keycloak or the database.
+        // eslint-disable-next-line no-console
+        console.error('[api/group/details]', error);
         return NextResponse.json(
             {
-                error: error instanceof Error ? error.message : 'Die Gruppendetails konnten nicht aktualisiert werden.',
+                error: 'Die Gruppendetails konnten nicht aktualisiert werden.',
             },
             { status: 500 },
         );

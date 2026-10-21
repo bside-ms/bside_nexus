@@ -27,9 +27,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         const ipAddress = getClientIP(req);
         return addAdminToGroup(userIdToBePromoted, groupId, userId, ipAddress);
     } catch (error: unknown) {
+        // Do not pass the message on, it can contain internals from Keycloak or the database.
+        // eslint-disable-next-line no-console
+        console.error('[api/group/promote]', error);
         return NextResponse.json(
             {
-                error: error instanceof Error ? error.message : 'Die Benutzer*in konnte nicht zum Administrator ernannt werden.',
+                error: 'Die Benutzer*in konnte nicht zur Administrator*in ernannt werden.',
             },
             { status: 500 },
         );

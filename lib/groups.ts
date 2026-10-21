@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server';
 import {
     addAdminToDbGroup,
     addUserToDbGroup,
+    countOtherActiveGroupAdmins,
     getGroupAdminStatus,
     getGroupById,
+    isGlobalAdmin,
     isGroupAdmin,
     removeAdminFromDbGroup,
     removeUserFromDbGroup,
@@ -14,8 +16,37 @@ import {
 } from './db/groupActions';
 import getUserSession from '@/lib/auth/getUserSession';
 import { writeLogEntry } from '@/lib/db/logActions';
+import { getPossibleGroupMembers } from '@/lib/db/userActions';
 import { keycloakUpdateGroupAttributes } from '@/lib/keycloak/groupActions';
 import { keycloakAddUserToGroup, keycloakRemoveUserFromGroup } from '@/lib/keycloak/userActions';
+
+/**
+ * A group must keep at least one active admin.
+ * System admins can, but only with allowWithoutAdmin, which the UI sends after an extra warning.
+ * Returns the error response, or null if the change is allowed.
+ */
+const checkRemainingAdmins = async (
+    userIdToLoseAdmin: string,
+    groupId: string,
+    executingUserId: string,
+    allowWithoutAdmin: boolean,
+): Promise<NextResponse | null> => {
+    if ((await countOtherActiveGroupAdmins(groupId, userIdToLoseAdmin)) > 0) {
+        return null;
+    }
+
+    if (allowWithoutAdmin && isGlobalAdmin(executingUserId)) {
+        return null;
+    }
+
+    return NextResponse.json(
+        {
+            error: 'Die Gruppe braucht mindestens eine Administrator*in. Ernenne zuerst eine weitere Person zur Administrator*in.',
+            code: 'LAST_ADMIN',
+        },
+        { status: 409 },
+    );
+};
 
 /**
  * Demotes a user from an admin in a group.
@@ -24,12 +55,14 @@ import { keycloakAddUserToGroup, keycloakRemoveUserFromGroup } from '@/lib/keycl
  * @param groupId
  * @param executingUserId
  * @param ipAddress
+ * @param allowWithoutAdmin only for system admins: allows demoting the last admin
  */
 export const removeAdminFromGroup = async (
     userIdToBeDemoted: string,
     groupId: string,
     executingUserId: string,
     ipAddress: string,
+    allowWithoutAdmin: boolean = false,
 ): Promise<NextResponse> => {
     const idpGroup = await getGroupById(groupId);
     if (idpGroup === null) {
@@ -43,12 +76,17 @@ export const removeAdminFromGroup = async (
 
     const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
     if (!adminStatus) {
-        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte um diese Aktion durchzuführen.' }, { status: 403 });
+        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
     }
 
     const userIsMemberOfGroup = await getGroupAdminStatus(userIdToBeDemoted, groupId);
     if (userIsMemberOfGroup !== 'Admin') {
         return NextResponse.json({ error: 'Die Administrator*in konnte nicht entfernt werden.' }, { status: 400 });
+    }
+
+    const remainingAdminsError = await checkRemainingAdmins(userIdToBeDemoted, groupId, executingUserId, allowWithoutAdmin);
+    if (remainingAdminsError !== null) {
+        return remainingAdminsError;
     }
 
     await keycloakRemoveUserFromGroup(userIdToBeDemoted, dbGroup.adminGroup);
@@ -94,12 +132,12 @@ export const addAdminToGroup = async (
 
     const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
     if (!adminStatus) {
-        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte um diese Aktion durchzuführen.' }, { status: 403 });
+        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
     }
 
     const userIsMemberOfGroup = await getGroupAdminStatus(userIdToBePromoted, groupId);
     if (userIsMemberOfGroup !== 'Member') {
-        return NextResponse.json({ error: 'Die Benutzer*in kann nicht zur Administrator*innen ernannt werden.' }, { status: 400 });
+        return NextResponse.json({ error: 'Die Benutzer*in kann nicht zur Administrator*in ernannt werden.' }, { status: 400 });
     }
 
     await keycloakAddUserToGroup(userIdToBePromoted, dbGroup.adminGroup);
@@ -120,24 +158,20 @@ export const addAdminToGroup = async (
 };
 
 /**
- * Adds a user from a group.
+ * Adds users to a group as members.
  * This function is triggered by the /api/group/add endpoint.
- * @param userIdToBeAdded
+ *
+ * @param userIdsToBeAdded
  * @param groupId
  * @param executingUserId
  * @param ipAddress
  */
-export const addUserToGroup = async (
-    userIdToBeAdded: string,
+export const addUsersToGroup = async (
+    userIdsToBeAdded: Array<string>,
     groupId: string,
     executingUserId: string,
     ipAddress: string,
 ): Promise<NextResponse> => {
-    const idpGroup = await getGroupById(groupId);
-    if (idpGroup === null) {
-        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
-    }
-
     const dbGroup = await getGroupById(groupId);
     if (dbGroup === null || dbGroup.memberGroup === null) {
         return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
@@ -145,29 +179,53 @@ export const addUserToGroup = async (
 
     const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
     if (!adminStatus) {
-        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte um diese Aktion durchzuführen.' }, { status: 403 });
+        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
     }
 
-    const userIsMemberOfGroup = await getGroupAdminStatus(userIdToBeAdded, groupId);
-    if (userIsMemberOfGroup !== 'None') {
-        return NextResponse.json({ error: 'Die Benutzer*in ist bereits Mitglied dieser Gruppe.' }, { status: 400 });
+    const possibleMemberIds = new Set((await getPossibleGroupMembers(groupId)).map((user) => user.id));
+    const userIds = [...new Set(userIdsToBeAdded)].filter((userId) => possibleMemberIds.has(userId));
+    if (userIds.length === 0) {
+        return NextResponse.json(
+            { error: 'Die ausgewählten Personen sind bereits Mitglied oder können nicht hinzugefügt werden.' },
+            { status: 400 },
+        );
     }
 
-    await keycloakAddUserToGroup(userIdToBeAdded, dbGroup.memberGroup);
-    await addUserToDbGroup(userIdToBeAdded, dbGroup.id);
+    const addedUserIds: Array<string> = [];
+    for (const userId of userIds) {
+        try {
+            await keycloakAddUserToGroup(userId, dbGroup.memberGroup);
+            await addUserToDbGroup(userId, dbGroup.id);
+            addedUserIds.push(userId);
 
-    // ToDo: Force a refresh in our other tools.
+            // ToDo: Force a refresh in our other tools.
 
-    await writeLogEntry({
-        userId: executingUserId,
-        ipAddress,
-        eventType: 'group.add',
-        affectedUserId: userIdToBeAdded,
-        affectedGroupId: groupId,
-        description: 'Als Mitglied der Gruppe hinzugefügt.',
-    });
+            await writeLogEntry({
+                userId: executingUserId,
+                ipAddress,
+                eventType: 'group.add',
+                affectedUserId: userId,
+                affectedGroupId: groupId,
+                description: 'Als Mitglied der Gruppe hinzugefügt.',
+            });
+        } catch (error: unknown) {
+            // Do not pass the message on, it can contain internals from Keycloak or the database.
+            // eslint-disable-next-line no-console
+            console.error('[addUsersToGroup]', error);
+            return NextResponse.json(
+                {
+                    error:
+                        addedUserIds.length === 0
+                            ? 'Die Personen konnten nicht hinzugefügt werden.'
+                            : `Es wurden nur ${addedUserIds.length} von ${userIds.length} Personen hinzugefügt. Versuche es für die übrigen erneut.`,
+                    addedUserIds,
+                },
+                { status: 500 },
+            );
+        }
+    }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, addedUserIds });
 };
 
 /**
@@ -177,12 +235,14 @@ export const addUserToGroup = async (
  * @param groupId
  * @param executingUserId
  * @param ipAddress
+ * @param allowWithoutAdmin only for system admins: allows removing the last admin
  */
 export const removeUserFromGroup = async (
     userIdToBeRemoved: string,
     groupId: string,
     executingUserId: string,
     ipAddress: string,
+    allowWithoutAdmin: boolean = false,
 ): Promise<NextResponse> => {
     const idpGroup = await getGroupById(groupId);
     if (idpGroup === null) {
@@ -196,7 +256,7 @@ export const removeUserFromGroup = async (
 
     const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
     if (!adminStatus) {
-        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte um diese Aktion durchzuführen.' }, { status: 403 });
+        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
     }
 
     const userIsMemberOfGroup = await getGroupAdminStatus(userIdToBeRemoved, groupId);
@@ -204,15 +264,24 @@ export const removeUserFromGroup = async (
         return NextResponse.json({ error: 'Die Benutzer*in ist nicht Teil dieser Gruppe.' }, { status: 400 });
     }
 
-    if (userIsMemberOfGroup === 'Admin' && dbGroup.adminGroup !== null) {
-        await keycloakRemoveUserFromGroup(userIdToBeRemoved, dbGroup.adminGroup);
-        await removeUserFromDbGroup(userIdToBeRemoved, dbGroup.id);
+    if (userIsMemberOfGroup === 'Admin') {
+        const remainingAdminsError = await checkRemainingAdmins(userIdToBeRemoved, groupId, executingUserId, allowWithoutAdmin);
+        if (remainingAdminsError !== null) {
+            return remainingAdminsError;
+        }
     }
 
-    if (userIsMemberOfGroup === 'Member' && dbGroup.memberGroup !== null) {
-        await keycloakRemoveUserFromGroup(userIdToBeRemoved, dbGroup.memberGroup);
-        await removeUserFromDbGroup(userIdToBeRemoved, dbGroup.id);
+    // Without a member subgroup, Keycloak can not be changed from here.
+    if (dbGroup.memberGroup === null) {
+        return NextResponse.json({ error: 'Die Mitgliedschaft in dieser Gruppe kann hier nicht geändert werden.' }, { status: 400 });
     }
+
+    // Admins are usually in both subgroups in Keycloak. Remove them from both.
+    if (userIsMemberOfGroup === 'Admin' && dbGroup.adminGroup !== null) {
+        await keycloakRemoveUserFromGroup(userIdToBeRemoved, dbGroup.adminGroup);
+    }
+    await keycloakRemoveUserFromGroup(userIdToBeRemoved, dbGroup.memberGroup);
+    await removeUserFromDbGroup(userIdToBeRemoved, dbGroup.id);
 
     // ToDo: Force a refresh in our other tools.
 
@@ -263,7 +332,7 @@ export const updateGroupDescription = async (
 
     const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
     if (!adminStatus) {
-        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte um diese Aktion durchzuführen.' }, { status: 403 });
+        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
     }
 
     const currentDescription = isEmpty(dbGroup.description) ? undefined : dbGroup.description;

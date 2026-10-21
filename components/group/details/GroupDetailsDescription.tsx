@@ -69,7 +69,7 @@ const GroupDetailsDescriptionMobile = ({
     return (
         <Drawer open={open} onOpenChange={setOpen}>
             <Card className="w-full max-w-full lg:max-w-[50%]">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle>Gruppenbeschreibung</CardTitle>
                     {isAdminOrGlobalAdmin && (
                         <DrawerTrigger asChild>
@@ -82,7 +82,7 @@ const GroupDetailsDescriptionMobile = ({
                 </CardHeader>
                 <CardContent>
                     <p>{isEmpty(description) ? 'Diese Gruppe hat aktuell noch keine Beschreibung.' : description}</p>
-                    <div className="mt-4 flex space-x-4">
+                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
                         <MemberStatusBadge isAdmin={isAdmin} />
                         {!isEmpty(websiteLink) && (
                             <Link href={websiteLink} target="_blank" className="flex items-center text-sm text-blue-600 hover:underline">
@@ -137,7 +137,7 @@ const GroupDetailsDescriptionDesktop = ({
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <Card className="col-span-2">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
                     <CardTitle>Gruppenbeschreibung</CardTitle>
                     {isAdminOrGlobalAdmin && (
                         <DialogTrigger asChild>
@@ -150,7 +150,7 @@ const GroupDetailsDescriptionDesktop = ({
                 </CardHeader>
                 <CardContent>
                     <p>{isEmpty(description) ? 'Diese Gruppe hat aktuell noch keine Beschreibung.' : description}</p>
-                    <div className="mt-4 flex space-x-4">
+                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
                         <MemberStatusBadge isAdmin={isAdmin} />
                         {!isEmpty(websiteLink) && (
                             <Link href={websiteLink} target="_blank" className="flex items-center text-sm text-blue-600 hover:underline">

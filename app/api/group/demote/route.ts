@@ -18,21 +18,25 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             return NextResponse.json({ error: 'Die eingeloggte Benutzer*in konnte nicht identifiziert werden.' }, { status: 400 });
         }
 
-        const { userIdToBeDemoted, groupId }: { userIdToBeDemoted: string; groupId: string } = await req.json();
+        const {
+            userIdToBeDemoted,
+            groupId,
+            allowWithoutAdmin,
+        }: { userIdToBeDemoted: string; groupId: string; allowWithoutAdmin?: boolean } = await req.json();
 
         if (isEmpty(userIdToBeDemoted) || isEmpty(groupId)) {
             return NextResponse.json({ error: 'Die Benutzer*in oder die Gruppe konnte nicht identifiziert werden.' }, { status: 400 });
         }
 
         const ipAddress = getClientIP(req);
-        return removeAdminFromGroup(userIdToBeDemoted, groupId, userId, ipAddress);
+        return removeAdminFromGroup(userIdToBeDemoted, groupId, userId, ipAddress, allowWithoutAdmin === true);
     } catch (error: unknown) {
+        // Do not pass the message on, it can contain internals from Keycloak or the database.
+        // eslint-disable-next-line no-console
+        console.error('[api/group/demote]', error);
         return NextResponse.json(
             {
-                error:
-                    error instanceof Error
-                        ? error.message
-                        : 'Die Benutzer*in konnte nicht aus der Gruppe der Administrator*innen entfernt werden.',
+                error: 'Die Benutzer*in konnte nicht aus der Gruppe der Administrator*innen entfernt werden.',
             },
             { status: 500 },
         );

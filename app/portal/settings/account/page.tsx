@@ -24,7 +24,7 @@ export default async function Page(): Promise<ReactElement> {
     return (
         <>
             <NavbarTop items={breadCrumbs} />
-            <div className="space-y-6 p-10 pb-16">
+            <div className="space-y-6 px-4 pt-4 pb-16 sm:px-6 sm:pt-6 lg:px-10 lg:pt-10">
                 <div className="space-y-0.5">
                     <h2 className="text-2xl font-bold tracking-tight">Einstellungen</h2>
                     <p>Hier kannst du Einstellungen deines Accounts ändern, die für alle unsere Anwendungen gültig sind.</p>

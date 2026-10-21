@@ -15,7 +15,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
         <div className="flex items-center justify-between px-2 py-4">
             <div className="text-muted-foreground flex-1 text-sm" />
             <div className="flex items-center space-x-6 lg:space-x-8">
-                <div className="flex items-center space-x-2">
+                <div className="hidden items-center space-x-2 sm:flex">
                     <p className="text-sm font-medium">Zeilen pro Seite</p>
                     <Select
                         value={`${table.getState().pagination.pageSize}`}
@@ -36,7 +36,7 @@ export function DataTablePagination<TData>({ table }: DataTablePaginationProps<T
                     </Select>
                 </div>
                 <div className="flex w-[100px] items-center justify-center text-sm font-medium">
-                    Seite {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+                    Seite {table.getState().pagination.pageIndex + 1} von {table.getPageCount()}
                 </div>
                 <div className="flex items-center space-x-2">
                     <Button

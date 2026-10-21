@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
-import { keycloakChangeMail } from '@/lib/keycloak/accountActions';
+import { AccountChangeError, keycloakChangeMail } from '@/lib/keycloak/accountActions';
 import { invalidateMattermostSession } from '@/lib/mattermost/accountActions';
 
 export async function POST(req: Request): Promise<NextResponse> {
@@ -29,9 +29,13 @@ export async function POST(req: Request): Promise<NextResponse> {
 
         return NextResponse.json({ success: true });
     } catch (error: unknown) {
-        return NextResponse.json(
-            { error: error instanceof Error ? error.message : 'eine Mail-Adresse wurde nicht geändert.' },
-            { status: 500 },
-        );
+        if (error instanceof AccountChangeError) {
+            return NextResponse.json({ error: error.message }, { status: error.status });
+        }
+
+        // Do not pass other messages on, they can contain internals from Keycloak or Mattermost.
+        // eslint-disable-next-line no-console
+        console.error('[api/account/change-mail]', error);
+        return NextResponse.json({ error: 'Deine Mail-Adresse wurde nicht geändert.' }, { status: 500 });
     }
 }

@@ -1,4 +1,4 @@
-import { and, count, eq, isNull } from 'drizzle-orm';
+import { and, count, eq, isNull, ne } from 'drizzle-orm';
 import { inArray } from 'drizzle-orm/sql/expressions/conditions';
 import { isEmpty } from 'lodash-es';
 import { db } from '@/db';
@@ -120,6 +120,23 @@ export const isSubGroupMember = async (userId: string, groupId: string): Promise
 export const getSubgroups = async (groupId: string): Promise<Array<Group>> => {
     const subgroups = await db.select().from(groupsTable).where(eq(groupsTable.parentGroup, groupId));
     return subgroups ?? [];
+};
+
+// Counts the active admins of a group apart from the given user. Disabled users do not count, like in the member list.
+export const countOtherActiveGroupAdmins = async (groupId: string, userId: string): Promise<number> => {
+    const result = await db
+        .select({ count: count() })
+        .from(membersTable)
+        .innerJoin(usersTable, eq(membersTable.userId, usersTable.id))
+        .where(
+            and(
+                eq(membersTable.groupId, groupId),
+                eq(membersTable.isAdmin, true),
+                ne(membersTable.userId, userId),
+                eq(usersTable.enabled, true),
+            ),
+        );
+    return result[0]?.count ?? 0;
 };
 
 export const isGroupAdmin = async (userId: string, groupId: string, global: boolean = false): Promise<boolean> => {

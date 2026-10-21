@@ -17,18 +17,25 @@ export async function POST(req: Request): Promise<NextResponse> {
             return NextResponse.json({ error: 'Die eingeloggte Benutzer*in konnte nicht identifiziert werden.' }, { status: 400 });
         }
 
-        const { userIdToBeRemoved, groupId }: { userIdToBeRemoved: string; groupId: string } = await req.json();
+        const {
+            userIdToBeRemoved,
+            groupId,
+            allowWithoutAdmin,
+        }: { userIdToBeRemoved: string; groupId: string; allowWithoutAdmin?: boolean } = await req.json();
 
         if (isEmpty(userIdToBeRemoved) || isEmpty(groupId)) {
             return NextResponse.json({ error: 'Die Benutzer*in oder die Gruppe konnte nicht identifiziert werden.' }, { status: 400 });
         }
 
         const ipAddress = getClientIP(req);
-        return removeUserFromGroup(userIdToBeRemoved, groupId, userId, ipAddress);
+        return removeUserFromGroup(userIdToBeRemoved, groupId, userId, ipAddress, allowWithoutAdmin === true);
     } catch (error: unknown) {
+        // Do not pass the message on, it can contain internals from Keycloak or the database.
+        // eslint-disable-next-line no-console
+        console.error('[api/group/remove]', error);
         return NextResponse.json(
             {
-                error: error instanceof Error ? error.message : 'Die Benutzer*in konnte nicht aus der Gruppe entfernt werden.',
+                error: 'Die Benutzer*in konnte nicht aus der Gruppe entfernt werden.',
             },
             { status: 500 },
         );

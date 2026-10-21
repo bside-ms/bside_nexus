@@ -12,7 +12,7 @@ export async function GroupDetailsSubgroups({ subgroups }: { subgroups: Array<Gr
 
     return (
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle>Untergruppen</CardTitle>
                 <Button size="sm" variant="outline" disabled={true}>
                     <PlusCircle className="mr-2 size-4" />
