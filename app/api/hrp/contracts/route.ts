@@ -1,19 +1,10 @@
-import { and, eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { hrpContractsTable, membersTable } from '@/db/schema';
+import { hrpContractsTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getActiveContractsForUser } from '@/lib/db/contractActions';
 import { isGlobalAdmin } from '@/lib/db/groupActions';
 import { v4 as uuidv4 } from 'uuid';
-
-// Helper: Darf der User für diese Gruppe einen Vertrag erstellen?
-async function isGroupAdmin(userId: string, groupId: string): Promise<boolean> {
-    const member = await db.query.membersTable.findFirst({
-        where: and(eq(membersTable.userId, userId), eq(membersTable.groupId, groupId), eq(membersTable.isAdmin, true)),
-    });
-    return !!member;
-}
 
 export async function GET(): Promise<NextResponse> {
     const session = await getUserSession();
@@ -50,13 +41,12 @@ export async function POST(req: Request): Promise<NextResponse> {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await req.json();
-
-    // Validierung: Darf der Admin das?
-    const isAllowed = (await isGroupAdmin(session.id, body.employerGroupId)) || isGlobalAdmin(session.id);
-    if (!isAllowed) {
-        return NextResponse.json({ message: 'Du bist kein Admin dieser Gruppe.' }, { status: 403 });
+    // Verträge dürfen nur Systemadmins anlegen.
+    if (!isGlobalAdmin(session.id)) {
+        return NextResponse.json({ message: 'Nur Systemadministrator*innen dürfen Verträge anlegen.' }, { status: 403 });
     }
+
+    const body = await req.json();
 
     // Vertrag erstellen
     await db.insert(hrpContractsTable).values({

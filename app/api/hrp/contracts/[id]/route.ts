@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
+import { isGlobalAdmin } from '@/lib/db/groupActions';
 import { getContractById, getLeaveAccounts, terminateContract, updateContract } from '@/lib/db/hrpAdminActions';
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
@@ -24,6 +25,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
             data: {
                 contract,
                 leaveAccounts,
+                canEdit: isGlobalAdmin(session.id),
             },
         });
     } catch {
@@ -36,6 +38,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const isAllowedRole = session?.roles?.includes('arbeitszeiterfassung-admin') ?? false;
     if (!session || !isAllowedRole) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!isGlobalAdmin(session.id)) {
+        return NextResponse.json({ success: false, message: 'Nur Systemadministrator*innen dürfen Verträge ändern.' }, { status: 403 });
     }
 
     const { id } = await params;
@@ -70,6 +76,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     const isAllowedRole = session?.roles?.includes('arbeitszeiterfassung-admin') ?? false;
     if (!session || !isAllowedRole) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!isGlobalAdmin(session.id)) {
+        return NextResponse.json({ success: false, message: 'Nur Systemadministrator*innen dürfen Verträge beenden.' }, { status: 403 });
     }
 
     const { id } = await params;

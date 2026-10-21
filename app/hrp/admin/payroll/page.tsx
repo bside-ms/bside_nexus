@@ -3,7 +3,7 @@ import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import getUserSession from '@/lib/auth/getUserSession';
-import { getAllPayrollHourly, getManagedContracts } from '@/lib/db/hrpAdminActions';
+import { canViewPayroll, getAllPayrollHourly, getManagedContracts } from '@/lib/db/hrpAdminActions';
 
 const breadCrumbs = [
     { title: 'Zeiterfassung', url: '/hrp' },
@@ -18,7 +18,23 @@ const monthLabel = (monthZeroBased: number) =>
 
 export default async function PayrollPage(): Promise<ReactElement> {
     const session = await getUserSession();
-    const contracts = await getManagedContracts(session!.id);
+    if (session === null || !(await canViewPayroll())) {
+        return (
+            <div>
+                <NavbarTop items={breadCrumbs} sidebar={true} />
+                <div className="p-8">
+                    <h1 className="text-2xl font-bold underline">Fehlende Berechtigungen</h1>
+                    <p className="mt-4">
+                        Abrechnungen können nur von Administrator*innen der Gastro-Gruppe und von Systemadministrator*innen eingesehen
+                        werden.
+                    </p>
+                    <p className="mt-4">Bitte kontaktiere eine Administrator*in, wenn du dies für einen Fehler hälst.</p>
+                </div>
+            </div>
+        );
+    }
+
+    const contracts = await getManagedContracts(session.id);
 
     const payrolls = await getAllPayrollHourly();
     const filteredPayrolls = payrolls.filter((p) => contracts.some((c) => c.id === p.contractId));

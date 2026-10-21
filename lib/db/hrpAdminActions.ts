@@ -28,7 +28,10 @@ import {
     membersTable,
     usersTable,
 } from '@/db/schema';
+import getUserSession from '@/lib/auth/getUserSession';
+import { HRP_EMPLOYER_GROUP_IDS } from '@/lib/constants';
 import { getContractAtDate } from '@/lib/db/contractActions';
+import { isGlobalAdmin } from '@/lib/db/groupActions';
 import { computeDayStats, type DayEntries, groupEntriesByWorkday } from '@/lib/hrp/hrpLogic';
 import { format } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
@@ -43,6 +46,23 @@ async function getManagedGroupIds(userId: string): Promise<Array<string>> {
         .where(and(eq(membersTable.userId, userId), eq(membersTable.isAdmin, true)));
 
     return memberships.map((m) => m.groupId);
+}
+
+/**
+ *  Only Gastro- and System-Admins are allowed to use payroll functions.
+ */
+export async function canViewPayroll(): Promise<boolean> {
+    const userId = (await getUserSession())?.id;
+    if (userId === undefined) {
+        return false;
+    }
+
+    if (isGlobalAdmin(userId)) {
+        return true;
+    }
+
+    const managedGroupIds = await getManagedGroupIds(userId);
+    return managedGroupIds.includes(HRP_EMPLOYER_GROUP_IDS.gastro);
 }
 
 export interface ManagedContract {
@@ -314,6 +334,10 @@ export async function upsertForecast(data: {
     month: number;
     forecastedHours: string;
 }): Promise<HrpPayrollHourlyForecastEntry> {
+    if (!(await canViewPayroll())) {
+        throw new Error('Not allowed to manage payrolls');
+    }
+
     const result = (
         await db
             .insert(hrpPayrollHourlyForecastsTable)
@@ -399,6 +423,10 @@ export async function createPayrollHourly(data: {
     eventLogIds: Array<string>;
     absenceIds?: Array<string>;
 }): Promise<string> {
+    if (!(await canViewPayroll())) {
+        throw new Error('Not allowed to manage payrolls');
+    }
+
     // eslint-disable-next-line no-return-await
     return await db.transaction(async (tx) => {
         const id = uuidv4();
@@ -483,6 +511,10 @@ export async function getCurrentPayrollHourly(contractId: string, year: number, 
 }
 
 export async function getAllPayrollHourly(): Promise<Array<HrpMonthlyPayrollEntry & { userName: string | null }>> {
+    if (!(await canViewPayroll())) {
+        return [];
+    }
+
     const results = await db
         .select({
             payroll: hrpPayrollHourlyTable,

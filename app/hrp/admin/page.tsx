@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { ReactElement } from 'react';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { canViewPayroll } from '@/lib/db/hrpAdminActions';
 
 const breadCrumbs = [
     { title: 'Zeiterfassung', url: '/hrp' },
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
     robots: 'noindex, nofollow',
 };
 
-export default function Page(): ReactElement {
+export default async function Page(): Promise<ReactElement> {
     const navItems = [
         {
             title: 'Verträge',
@@ -33,13 +34,16 @@ export default function Page(): ReactElement {
             href: '/hrp/admin/overview',
             icon: SquareChartGantt,
         },
-        {
+    ];
+
+    if (await canViewPayroll()) {
+        navItems.push({
             title: 'Abgeschlossene Abrechnungen',
             description: 'Übersicht über alle bereits durchgeführten Abrechnungen.',
             href: '/hrp/admin/payroll',
             icon: FileCheck,
-        },
-    ];
+        });
+    }
 
     return (
         <div className="">

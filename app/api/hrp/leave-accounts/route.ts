@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
+import { isGlobalAdmin } from '@/lib/db/groupActions';
 import { deleteLeaveAccount, upsertLeaveAccount } from '@/lib/db/hrpAdminActions';
 
 export async function POST(req: Request): Promise<NextResponse> {
@@ -7,6 +8,13 @@ export async function POST(req: Request): Promise<NextResponse> {
     const isAllowedRole = session?.roles?.includes('arbeitszeiterfassung-admin') ?? false;
     if (!session || !isAllowedRole) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!isGlobalAdmin(session.id)) {
+        return NextResponse.json(
+            { success: false, message: 'Nur Systemadministrator*innen dürfen Jahresabschlüsse ändern.' },
+            { status: 403 },
+        );
     }
 
     try {
@@ -23,6 +31,13 @@ export async function DELETE(req: Request): Promise<NextResponse> {
     const isAllowedRole = session?.roles?.includes('arbeitszeiterfassung-admin') ?? false;
     if (!session || !isAllowedRole) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!isGlobalAdmin(session.id)) {
+        return NextResponse.json(
+            { success: false, message: 'Nur Systemadministrator*innen dürfen Jahresabschlüsse ändern.' },
+            { status: 403 },
+        );
     }
 
     try {

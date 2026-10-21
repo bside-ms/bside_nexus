@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
+import { HRP_EMPLOYER_GROUP_IDS } from '@/lib/constants';
 import { getGroupsWithMembers } from '@/lib/db/groupActions';
 
-const TARGET_GROUP_IDS = [
-    'dc4fb9a9-7a32-4318-ba33-fdd6627ccea9',
-    '1680099c-78e1-423c-bc70-92bec57e2f75',
-    '0ff34819-fbe0-4119-87d4-f73666ed2464',
-];
+const TARGET_GROUP_IDS = Object.values(HRP_EMPLOYER_GROUP_IDS);
 
 export async function GET(): Promise<NextResponse> {
     const session = await getUserSession();

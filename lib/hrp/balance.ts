@@ -3,12 +3,13 @@ import type { DayEntries } from './hrpLogic';
 import { db } from '@/db';
 import type { HrpContractEntry } from '@/db/schema';
 import * as schema from '@/db/schema';
+import { HRP_EMPLOYER_GROUP_IDS } from '@/lib/constants';
 import { getContractAtDate } from '@/lib/db/contractActions';
 import { getHrpLogForUser } from '@/lib/db/hrpActions';
 import { computeDayStats } from '@/lib/hrp/hrpLogic';
 
 // B-Side GmbH has a special overtime cap of 20 hours. This is a business rule that is hardcoded here for now.
-const GMBH_GROUP_ID = '1680099c-78e1-423c-bc70-92bec57e2f75';
+const GMBH_GROUP_ID = HRP_EMPLOYER_GROUP_IDS.gmbh;
 const OVERTIME_CAP_HOURS = 20;
 
 export interface BalanceSummary {

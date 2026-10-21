@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { ManagedContract } from '@/lib/db/hrpAdminActions';
 
-export function ContractsTable({ data }: { data: Array<ManagedContract> }): ReactElement {
+export function ContractsTable({ data, canEdit }: { data: Array<ManagedContract>; canEdit: boolean }): ReactElement {
     const router = useRouter();
 
     return (
@@ -46,7 +46,7 @@ export function ContractsTable({ data }: { data: Array<ManagedContract> }): Reac
                             </td>
                             <td className="p-3 text-right">
                                 <Button variant="ghost" size="sm" onClick={() => router.push(`/hrp/admin/contracts/${c.id}`)}>
-                                    Bearbeiten
+                                    {canEdit ? 'Bearbeiten' : 'Ansehen'}
                                 </Button>
                             </td>
                         </tr>

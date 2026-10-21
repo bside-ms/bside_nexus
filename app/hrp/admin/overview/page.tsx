@@ -16,6 +16,7 @@ import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions';
 import {
+    canViewPayroll,
     getCurrentPayrollHourly,
     getForecastForContract,
     getManagedContracts,
@@ -259,6 +260,10 @@ export default async function Page({
 
     const selectedContract = contracts.find((c) => c.contractId === selectedContractId);
 
+    // Abrechnungen nur für Admins der Gastro-Gruppe und Systemadmins.
+    const showPayroll = await canViewPayroll();
+    const showPayrollHourly = showPayroll && selectedContract?.type === 'hourly';
+
     // Nicht abgerechnete Stunden für Payroll-Vorschau
     let unbilledLogs: Array<HrpEventLogEntry> = [];
     let unbilledAbsences: Array<HrpAbsenceEntry> = [];
@@ -266,7 +271,7 @@ export default async function Page({
     let currentPayroll: HrpMonthlyPayrollEntry | null = null;
     let forecast: string | undefined = undefined;
 
-    if (selectedUserId && selectedContractId && selectedContract?.type === 'hourly') {
+    if (selectedUserId && selectedContractId && showPayrollHourly) {
         const edge = new Date(year, month, 23, 0, 0, 0, 0); // Ende des aktuellen Zeitraums (22. 23:59:59)
         // Wir laden unbilled logs ohne Zeitbeschränkung nach hinten, um ALLES zu erfassen
         unbilledLogs = await getUnbilledLogs(selectedUserId, selectedContractId, edge);
@@ -279,7 +284,7 @@ export default async function Page({
 
     // Für die korrekte Gruppierung brauchen wir auch bereits abgerechnete Logs als Kontext
     let contextLogs: Array<HrpEventLogEntry> = [];
-    if (selectedUserId && selectedContractId && selectedContract?.type === 'hourly') {
+    if (selectedUserId && selectedContractId && showPayrollHourly) {
         // Lade alle Logs der letzten 60 Tage als Kontext (sollte für Schichtübergänge reichen)
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
@@ -298,7 +303,7 @@ export default async function Page({
     }
 
     const unbilledByDay =
-        selectedUserId && selectedContractId && selectedContract?.type === 'hourly'
+        selectedUserId && selectedContractId && showPayrollHourly
             ? groupEntriesByWorkday([
                   ...contextLogs,
                   ...unbilledAbsences.map((a) => ({ entryType: 'absence', loggedTimestamp: a.date, absence: a })),
@@ -1001,7 +1006,7 @@ export default async function Page({
                     )}
                 </div>
 
-                {selectedUserId && selectedContractId && selectedContract?.type === 'hourly' && (
+                {selectedUserId && selectedContractId && showPayrollHourly && (
                     <div className="print:hidden">
                         <PayrollHourlyClient
                             contractId={selectedContractId}

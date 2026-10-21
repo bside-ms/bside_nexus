@@ -29,7 +29,7 @@ export default function ContractDetailPage(): ReactElement {
     const router = useRouter();
     const contractId = params?.id;
 
-    const [data, setData] = useState<{ contract: ContractDetails; leaveAccounts: Array<HrpYearlyEntry> } | null>(null);
+    const [data, setData] = useState<{ contract: ContractDetails; leaveAccounts: Array<HrpYearlyEntry>; canEdit: boolean } | null>(null);
     const [loading, setLoading] = useState(true);
 
     // Dialog State für Leave Accounts
@@ -201,7 +201,8 @@ export default function ContractDetailPage(): ReactElement {
         return <div>Vertrag nicht gefunden.</div>;
     }
 
-    const { contract, leaveAccounts } = data;
+    // Nur Systemadmins dürfen Verträge und Jahresabschlüsse ändern.
+    const { contract, leaveAccounts, canEdit } = data;
 
     return (
         <div>
@@ -215,14 +216,16 @@ export default function ContractDetailPage(): ReactElement {
                             <p className="text-zinc-500">{contract.userEmail}</p>
                         </div>
                         <div className="text-right space-y-2">
-                            <div className="space-x-2">
-                                <Button variant="outline" size="sm" onClick={() => setIsContractDialogOpen(true)}>
-                                    <BiEdit className="mr-1" /> Ändern
-                                </Button>
-                                <Button variant="destructive" size="sm" onClick={() => setIsTerminateDialogOpen(true)}>
-                                    <BiTrash className="mr-1" /> Beenden
-                                </Button>
-                            </div>
+                            {canEdit && (
+                                <div className="space-x-2">
+                                    <Button variant="outline" size="sm" onClick={() => setIsContractDialogOpen(true)}>
+                                        <BiEdit className="mr-1" /> Ändern
+                                    </Button>
+                                    <Button variant="destructive" size="sm" onClick={() => setIsTerminateDialogOpen(true)}>
+                                        <BiTrash className="mr-1" /> Beenden
+                                    </Button>
+                                </div>
+                            )}
                             <p className="font-semibold">{contract.groupName}</p>
                             <p className="text-sm px-2 py-1 bg-zinc-100 rounded-full inline-block dark:bg-zinc-800">
                                 {contract.type === 'fixed_salary' ? 'Festanstellung' : 'Stundenbasis'}
@@ -261,9 +264,11 @@ export default function ContractDetailPage(): ReactElement {
                 {/* Leave Accounts Sektion */}
                 <div className="flex justify-between items-center">
                     <h3 className="text-xl font-bold">Jahresabschluss / Überträge</h3>
-                    <Button onClick={handleOpenAdd} size="sm">
-                        <BiPlus className="mr-1" /> Neu anlegen
-                    </Button>
+                    {canEdit && (
+                        <Button onClick={handleOpenAdd} size="sm">
+                            <BiPlus className="mr-1" /> Neu anlegen
+                        </Button>
+                    )}
                 </div>
 
                 <Card>
@@ -274,7 +279,7 @@ export default function ContractDetailPage(): ReactElement {
                                 <TableHead>Urlaubsanspruch</TableHead>
                                 <TableHead>Resturlaub VJ</TableHead>
                                 <TableHead>Überstunden VJ</TableHead>
-                                <TableHead className="text-right">Aktionen</TableHead>
+                                {canEdit && <TableHead className="text-right">Aktionen</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -284,19 +289,26 @@ export default function ContractDetailPage(): ReactElement {
                                     <TableCell>{acc.totalVacationDays} Tage</TableCell>
                                     <TableCell>{acc.remainingDaysFromLastYear} Tage</TableCell>
                                     <TableCell>{acc.overtimeCarryoverHours} h</TableCell>
-                                    <TableCell className="text-right space-x-2">
-                                        <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(acc)}>
-                                            <BiEdit />
-                                        </Button>
-                                        <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDelete(acc.id)}>
-                                            <BiTrash />
-                                        </Button>
-                                    </TableCell>
+                                    {canEdit && (
+                                        <TableCell className="text-right space-x-2">
+                                            <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(acc)}>
+                                                <BiEdit />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="text-red-500"
+                                                onClick={() => handleDelete(acc.id)}
+                                            >
+                                                <BiTrash />
+                                            </Button>
+                                        </TableCell>
+                                    )}
                                 </TableRow>
                             ))}
                             {leaveAccounts.length === 0 && (
                                 <TableRow>
-                                    <TableCell colSpan={5} className="text-center py-8 text-zinc-500">
+                                    <TableCell colSpan={canEdit ? 5 : 4} className="text-center py-8 text-zinc-500">
                                         Keine Einträge vorhanden.
                                     </TableCell>
                                 </TableRow>
