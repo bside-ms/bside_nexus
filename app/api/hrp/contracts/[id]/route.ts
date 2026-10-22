@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
 import { isGlobalAdmin } from '@/lib/db/groupActions';
 import { getContractById, getLeaveAccounts, terminateContract, updateContract } from '@/lib/db/hrpAdminActions';
+import getSupportEmail from '@/lib/utils/getSupportEmail';
+
+const getErrorMessage = (): string => {
+    const supportEmail = getSupportEmail();
+
+    return `Es ist ein Fehler aufgetreten. Bitte wende dich an ${supportEmail ?? 'die IT'}.`;
+};
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }): Promise<NextResponse> {
     const session = await getUserSession();
@@ -64,10 +71,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
         return NextResponse.json({ success: true, newId });
     } catch {
-        return NextResponse.json(
-            { success: false, message: 'Es ist ein Fehler aufgetreten. Bitte wende dich an it@b-side.ms.' },
-            { status: 500 },
-        );
+        return NextResponse.json({ success: false, message: getErrorMessage() }, { status: 500 });
     }
 }
 
@@ -96,9 +100,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 
         return NextResponse.json({ success: true });
     } catch {
-        return NextResponse.json(
-            { success: false, message: 'Es ist ein Fehler aufgetreten. Bitte wende dich an it@b-side.ms.' },
-            { status: 500 },
-        );
+        return NextResponse.json({ success: false, message: getErrorMessage() }, { status: 500 });
     }
 }

@@ -4,13 +4,11 @@ import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { SiMattermost } from 'react-icons/si';
 import { Button } from '@/components/ui/button';
+import { MATTERMOST_SUPPORT_CHANNEL_URL, MATTERMOST_SUPPORT_DM_URL } from '@/lib/constants';
 
 export const metadata: Metadata = {
     title: 'Altes Portal abgeschaltet | B-Side Intern',
 };
-
-const channelUrl = 'https://chat.b-side.ms/bside/channels/it_allgemeines';
-const directMessageUrl = 'https://chat.b-side.ms/bside/messages/@kennet';
 
 // Öffentliche Landing-Page für Weiterleitungen von https://portal.b-side.ms
 // In middleware.ts vom Login ausgenommen.
@@ -49,7 +47,7 @@ export default function Page(): ReactElement {
                                 Einige Funktionen des alten Portals gibt es in B-Side Intern noch nicht. Wenn dir etwas fehlt oder du nicht
                                 weiterkommst, schreib im Zweifel eine Nachricht bei Mattermost im Kanal{' '}
                                 <a
-                                    href={channelUrl}
+                                    href={MATTERMOST_SUPPORT_CHANNEL_URL}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="font-semibold underline underline-offset-4"
@@ -58,7 +56,7 @@ export default function Page(): ReactElement {
                                 </a>{' '}
                                 oder eine Direktnachricht an{' '}
                                 <a
-                                    href={directMessageUrl}
+                                    href={MATTERMOST_SUPPORT_DM_URL}
                                     target="_blank"
                                     rel="noreferrer"
                                     className="font-semibold underline underline-offset-4"
@@ -70,13 +68,13 @@ export default function Page(): ReactElement {
                         </div>
                         <div className="grid gap-2 sm:grid-cols-2">
                             <Button variant="outline" className="w-full" asChild>
-                                <a href={channelUrl} target="_blank" rel="noreferrer">
+                                <a href={MATTERMOST_SUPPORT_CHANNEL_URL} target="_blank" rel="noreferrer">
                                     <SiMattermost />
                                     ~it_allgemeines
                                 </a>
                             </Button>
                             <Button variant="outline" className="w-full" asChild>
-                                <a href={directMessageUrl} target="_blank" rel="noreferrer">
+                                <a href={MATTERMOST_SUPPORT_DM_URL} target="_blank" rel="noreferrer">
                                     <SiMattermost />
                                     DM an @kennet
                                 </a>

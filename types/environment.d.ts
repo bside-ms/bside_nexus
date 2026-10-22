@@ -15,6 +15,8 @@ declare namespace NodeJS {
         MATTERMOST_URL: string;
         MATTERMOST_AUTH_TOKEN: string;
 
+        SUPPORT_EMAIL?: string;
+
         PDF_DOCX_ENABLED?: string;
         PDF_TIMEOUT_MS?: string;
 

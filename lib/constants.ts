@@ -4,6 +4,10 @@
 // Maximum number of users that can be added to a group at a time.
 export const MAX_USERS_PER_ADD = 10;
 
+// Inofficial Support-Channels.
+export const MATTERMOST_SUPPORT_CHANNEL_URL = 'https://chat.b-side.ms/bside/channels/it_allgemeines';
+export const MATTERMOST_SUPPORT_DM_URL = 'https://chat.b-side.ms/bside/messages/@kennet';
+
 // HRP: employer-groups for contracts and other HRP-business logic.
 export const HRP_EMPLOYER_GROUP_IDS = {
     gastro: 'dc4fb9a9-7a32-4318-ba33-fdd6627ccea9', // Cafe - Mitarbeitende (GmbH Gastro)
