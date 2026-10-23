@@ -15,12 +15,12 @@ import { getGroupMembersColumns } from '@/components/group/details/members/Group
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DataTable } from '@/components/ui/datatable';
-import type { GroupAdminStatus } from '@/lib/db/groupActions';
 
 interface GroupMembersProps {
     groupMembers: Array<GroupMember>;
-    isAdmin: GroupAdminStatus;
-    isGlobalAdmin: boolean;
+    canManage: boolean;
+    // False if the admins of the parent group manage it too.
+    requiresAdmin: boolean;
     isSystemAdmin: boolean;
     currentUserId: string;
     groupId: string;
@@ -29,14 +29,12 @@ interface GroupMembersProps {
 export function GroupDetailsMembers({
     groupId,
     groupMembers,
-    isAdmin,
-    isGlobalAdmin,
+    canManage,
+    requiresAdmin,
     isSystemAdmin,
     currentUserId,
 }: GroupMembersProps): ReactElement {
     const router = useRouter();
-
-    const isAdminOrGlobalAdmin = isAdmin === 'Admin' || isGlobalAdmin;
 
     // Re-render the server page after a member change, so the table gets the new member list.
     const onMembersChanged = useCallback(() => router.refresh(), [router]);
@@ -53,12 +51,12 @@ export function GroupDetailsMembers({
     );
 
     const actionContext = useMemo((): GroupMemberActionContext | undefined => {
-        if (!isAdminOrGlobalAdmin) {
+        if (!canManage) {
             return undefined;
         }
         const adminCount = groupMembers.filter((member) => member.status === 'admin').length;
-        return { onMembersChanged, currentUserId, isSystemAdmin, adminCount };
-    }, [isAdminOrGlobalAdmin, groupMembers, onMembersChanged, currentUserId, isSystemAdmin]);
+        return { onMembersChanged, currentUserId, isSystemAdmin, adminCount, requiresAdmin };
+    }, [canManage, groupMembers, onMembersChanged, currentUserId, isSystemAdmin, requiresAdmin]);
 
     // One panel for all members. The selection is kept after closing, so the panel does not go blank while it animates out.
     const [panelSelection, setPanelSelection] = useState<GroupMemberPanelSelection | null>(null);
@@ -72,10 +70,7 @@ export function GroupDetailsMembers({
     const [isAddPanelOpen, setIsAddPanelOpen] = useState(false);
     const openAddPanel = useCallback((): void => setIsAddPanelOpen(true), []);
 
-    const columns = useMemo(
-        () => getGroupMembersColumns(isAdminOrGlobalAdmin, (member) => openPanel(member, 'sheet')),
-        [isAdminOrGlobalAdmin, openPanel],
-    );
+    const columns = useMemo(() => getGroupMembersColumns(canManage, (member) => openPanel(member, 'sheet')), [canManage, openPanel]);
 
     const handleRowClick = useCallback((row: Row<GroupMember>): void => openPanel(row.original, 'sheet'), [openPanel]);
 
@@ -90,7 +85,7 @@ export function GroupDetailsMembers({
         <Card className="col-span-2">
             <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle>Mitglieder</CardTitle>
-                {isAdminOrGlobalAdmin && (
+                {canManage && (
                     <Button size="sm" variant="outline" onClick={openAddPanel}>
                         <PlusCircle className="mr-2 size-4" />
                         Mitglieder hinzufügen
@@ -107,7 +102,7 @@ export function GroupDetailsMembers({
                     onOpenChange={setIsPanelOpen}
                     actionContext={actionContext}
                 />
-                {isAdminOrGlobalAdmin && (
+                {canManage && (
                     <GroupMemberAddPanel
                         groupId={groupId}
                         isOpen={isAddPanelOpen}

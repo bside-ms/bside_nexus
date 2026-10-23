@@ -2,11 +2,13 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { Toaster } from 'sonner';
-import GroupOverviewCard from '@/components/group/overview/GroupOverviewCard';
+import ArchivedGroups from '@/components/group/overview/ArchivedGroups';
+import GroupList from '@/components/group/overview/GroupList';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Separator } from '@/components/ui/separator';
 import getUserSession from '@/lib/auth/getUserSession';
-import { getAllGroups, isGlobalAdmin } from '@/lib/db/groupActions';
+import { canViewGroup, getAllGroups } from '@/lib/db/groupActions';
+import { buildGroupOverview } from '@/lib/groupOverview';
 
 const breadCrumbs = [
     {
@@ -33,15 +35,13 @@ export default async function Page(): Promise<ReactElement> {
         redirect('/portal');
     }
 
-    const groups = await getAllGroups();
-
-    const circles = groups
-        .filter((group) => group.groupType === 'kreis')
-        .sort((a, b) => (a?.displayName ?? 'zzz').localeCompare(b?.displayName ?? 'zzz') ?? 0);
-
-    const bodies = groups
-        .filter((group) => group.groupType === 'koerperschaft' && (group.displayName !== 'Kollektiv' || isGlobalAdmin(user?.id)))
-        .sort((a, b) => a?.displayName?.localeCompare(b?.displayName ?? '') ?? 0);
+    const userId = user?.id ?? '';
+    const allGroups = await getAllGroups();
+    const isVisible = await Promise.all(allGroups.map((group) => canViewGroup(userId, group)));
+    const { bodies, groups, archived } = await buildGroupOverview(
+        allGroups.filter((_, index) => isVisible[index]),
+        userId,
+    );
 
     return (
         <div className="">
@@ -54,15 +54,7 @@ export default async function Page(): Promise<ReactElement> {
 
                 <Separator className="my-6" />
 
-                <div className="flex flex-col space-y-8 lg:flex-row">
-                    <div className="flex flex-1 flex-col gap-4 p-4">
-                        <div className="grid auto-rows-min gap-4 lg:grid-cols-2">
-                            {bodies.map((body) => (
-                                <GroupOverviewCard key={body.id} group={body} />
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                <GroupList entries={bodies} emptyText="Es gibt keine Vereine." />
 
                 <Separator className="my-6" />
 
@@ -73,21 +65,15 @@ export default async function Page(): Promise<ReactElement> {
 
                 <Separator className="my-6" />
 
-                <div className="flex flex-col space-y-8 lg:flex-row">
-                    <div className="flex flex-1 flex-col gap-4 p-4">
-                        <div className="grid auto-rows-min gap-4 lg:grid-cols-2">
-                            {circles.map((circle) => (
-                                <GroupOverviewCard key={circle.id} group={circle} />
-                            ))}
-                        </div>
-                    </div>
+                <GroupList entries={groups} emptyText="Es gibt keine Gruppen." />
 
-                    <Toaster
-                        position="top-right"
-                        richColors
-                        toastOptions={{}} // Voluntarily passing empty object as a workaround for `richColors` to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
-                    />
-                </div>
+                <ArchivedGroups entries={archived} />
+
+                <Toaster
+                    position="top-right"
+                    richColors
+                    toastOptions={{}} // Voluntarily passing empty object as a workaround for `richColors` to work. Refer: https://github.com/shadcn-ui/ui/issues/2234.
+                />
             </div>
         </div>
     );

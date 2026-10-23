@@ -1,19 +1,13 @@
-import { isEmpty } from 'lodash-es';
-import { ArrowRight, FolderTree, LinkIcon, Star, Users } from 'lucide-react';
+import { LinkIcon } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import type { Group } from '@/db/schema';
-import getUserSession from '@/lib/auth/getUserSession';
-import { getGroupAdminStatus, getGroupMemberCount, getSubgroups, isSubGroupMember } from '@/lib/db/groupActions';
-import { hiddenSubGroups } from '@/lib/groups';
+import { cn } from '@/lib/utils';
 
-const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
+const GroupLogo = ({ group, className }: { group: Group; className?: string }): ReactElement | null => {
     const { categoryName } = group;
 
     if (categoryName === undefined) {
@@ -25,7 +19,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
             return (
                 <HoverCard>
                     <HoverCardTrigger asChild>
-                        <div className="flex aspect-square size-10 items-center justify-center rounded-lg">
+                        <div className={cn('flex aspect-square size-10 shrink-0 items-center justify-center rounded-lg', className)}>
                             <Image src="/logo_kv.png" alt="KV" width={120} height={120} />
                         </div>
                     </HoverCardTrigger>
@@ -45,7 +39,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
                                 <div className="flex items-center pt-2">
                                     <LinkIcon className="mr-2 size-4 opacity-70" />{' '}
                                     <Link href="https://b-side.ms/kultur" target="_blank">
-                                        <span className="text-muted text-sm">Mehr Informationen</span>
+                                        <span className="text-muted-foreground text-sm">Mehr Informationen</span>
                                     </Link>
                                 </div>
                             </div>
@@ -58,7 +52,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
             return (
                 <HoverCard>
                     <HoverCardTrigger asChild>
-                        <div className="flex aspect-square size-10 items-center justify-center rounded-lg">
+                        <div className={cn('flex aspect-square size-10 shrink-0 items-center justify-center rounded-lg', className)}>
                             <Image src="/logo_gmbh.png" alt="GmbH" width={120} height={120} />
                         </div>
                     </HoverCardTrigger>
@@ -79,7 +73,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
                                 <div className="flex items-center pt-2">
                                     <LinkIcon className="mr-2 size-4 opacity-70" />{' '}
                                     <Link href="https://b-side.ms/quartier" target="_blank">
-                                        <span className="text-muted text-sm">Mehr Informationen</span>
+                                        <span className="text-muted-foreground text-sm">Mehr Informationen</span>
                                     </Link>
                                 </div>
                             </div>
@@ -92,7 +86,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
             return (
                 <HoverCard>
                     <HoverCardTrigger asChild>
-                        <div className="flex aspect-square size-10 items-center justify-center rounded-lg">
+                        <div className={cn('flex aspect-square size-10 shrink-0 items-center justify-center rounded-lg', className)}>
                             <Image src="/logo_ev.png" alt="Hausverein" width={120} height={120} />
                         </div>
                     </HoverCardTrigger>
@@ -112,7 +106,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
                                 <div className="flex items-center pt-2">
                                     <LinkIcon className="mr-2 size-4 opacity-70" />{' '}
                                     <Link href="https://b-side.ms/bside/traegerschaft" target="_blank">
-                                        <span className="text-muted text-sm">Mehr Informationen</span>
+                                        <span className="text-muted-foreground text-sm">Mehr Informationen</span>
                                     </Link>
                                 </div>
                             </div>
@@ -125,7 +119,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
             return (
                 <HoverCard>
                     <HoverCardTrigger asChild>
-                        <div className="flex aspect-square size-10 items-center justify-center rounded-lg">
+                        <div className={cn('flex aspect-square size-10 shrink-0 items-center justify-center rounded-lg', className)}>
                             <Image src="/logo.png" alt="Kollektiv" width={120} height={120} />
                         </div>
                     </HoverCardTrigger>
@@ -141,7 +135,7 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
                                 <div className="flex items-center pt-2">
                                     <LinkIcon className="mr-2 size-4 opacity-70" />{' '}
                                     <Link href="https://b-side.ms/bside/kollektiv" target="_blank">
-                                        <span className="text-muted text-sm">Mehr Informationen</span>
+                                        <span className="text-muted-foreground text-sm">Mehr Informationen</span>
                                     </Link>
                                 </div>
                             </div>
@@ -152,76 +146,4 @@ const GroupLogo = ({ group }: { group: Group }): ReactElement | null => {
     }
 };
 
-const GroupOverviewCard = async ({ group }: { group: Group }): Promise<ReactElement> => {
-    const user = await getUserSession();
-
-    const isAdmin = await getGroupAdminStatus(user?.id ?? '', group.id);
-    const memberCount = await getGroupMemberCount(group.id);
-    const subGroups: Array<Group> = await getSubgroups(group.id);
-
-    return (
-        <Card className="flex h-full flex-col justify-between rounded-xl">
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <CardTitle>{group.displayName}</CardTitle>
-                    <GroupLogo group={group} />
-                </div>
-                <CardDescription className="text-base">
-                    <div className=" flex items-center gap-2">
-                        <Badge variant="outline" className="flex items-center gap-1">
-                            <Users className="size-3" />
-                            <span>{memberCount}</span>
-                        </Badge>
-                        {isAdmin !== 'None' && (
-                            <Badge variant={isAdmin === 'Admin' ? 'default' : 'secondary'} className="">
-                                {isAdmin === 'Admin' ? (
-                                    <>
-                                        <Star className="mr-1 size-3" /> Administrator*in
-                                    </>
-                                ) : (
-                                    <>
-                                        <Users className="mr-1 size-3" /> Mitglied
-                                    </>
-                                )}
-                            </Badge>
-                        )}
-                    </div>
-                </CardDescription>
-            </CardHeader>
-
-            {!isEmpty(group.description) && <CardContent>{group.description}</CardContent>}
-
-            {subGroups.length > 0 && (
-                <CardContent className="grid flex-1 gap-6">
-                    <div>
-                        <div className="mb-1 flex items-center">
-                            <FolderTree className="mr-1 size-4" />
-                            <span className="font-semibold">Untergruppen:</span>
-                        </div>
-                        <ul className="list-inside list-disc">
-                            {subGroups.map(async (subGroup) => {
-                                const subGroupName =
-                                    hiddenSubGroups.includes(`${subGroup.id}`) &&
-                                    !(await isSubGroupMember(user?.id ?? '', subGroup.id ?? ''))
-                                        ? '(Geschützte Gruppe)'
-                                        : subGroup.displayName;
-                                return <li key={subGroup.id}>{subGroupName}</li>;
-                            })}
-                        </ul>
-                    </div>
-                </CardContent>
-            )}
-
-            <CardFooter className="pt-2">
-                <Link className="w-full" href={`/portal/groups/${group.id}`}>
-                    <Button size="default" variant="outline" className="w-full text-base">
-                        Zu den Gruppendetails
-                        <ArrowRight className="ml-2 size-4" />
-                    </Button>
-                </Link>
-            </CardFooter>
-        </Card>
-    );
-};
-
-export default GroupOverviewCard;
+export default GroupLogo;

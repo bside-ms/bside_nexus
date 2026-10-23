@@ -107,6 +107,7 @@ export interface GroupMemberActionContext {
     currentUserId: string;
     isSystemAdmin: boolean;
     adminCount: number;
+    requiresAdmin: boolean;
 }
 
 // Without a context (no group admin), only the copy actions are available.
@@ -135,9 +136,9 @@ export const getGroupMemberActions = (member: GroupMember, context?: GroupMember
         return actions;
     }
 
-    const { onMembersChanged, currentUserId, isSystemAdmin, adminCount } = context;
+    const { onMembersChanged, currentUserId, isSystemAdmin, adminCount, requiresAdmin } = context;
     const isSelf = member.userId === currentUserId;
-    const isLastAdmin = member.status === 'admin' && adminCount <= 1;
+    const isLastAdmin = requiresAdmin && member.status === 'admin' && adminCount <= 1;
 
     const lastAdminReason =
         isLastAdmin && !isSystemAdmin

@@ -2,11 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { Toaster } from 'sonner';
-import GroupOverviewCard from '@/components/group/overview/GroupOverviewCard';
+import ArchivedGroups from '@/components/group/overview/ArchivedGroups';
+import GroupList from '@/components/group/overview/GroupList';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import getUserSession from '@/lib/auth/getUserSession';
 import { getUserGroups } from '@/lib/db/groupActions';
+import { buildGroupOverview } from '@/lib/groupOverview';
 import { isKollektivMitglied } from '@/lib/groups';
 
 const breadCrumbs = [
@@ -23,15 +26,8 @@ export const metadata: Metadata = {
 };
 
 export default async function Page(): Promise<ReactElement> {
-    const groups = await getUserGroups();
-
-    const circles = groups
-        .filter((group) => group.groupType === 'kreis')
-        .sort((a, b) => (a?.displayName ?? 'zzz').localeCompare(b?.displayName ?? 'zzz') ?? 0);
-
-    const bodies = groups
-        .filter((group) => group.groupType === 'koerperschaft')
-        .sort((a, b) => a?.displayName?.localeCompare(b?.displayName ?? '') ?? 0);
+    const userId = (await getUserSession())?.id ?? '';
+    const { bodies, groups, archived } = await buildGroupOverview(await getUserGroups(), userId);
 
     return (
         <>
@@ -56,15 +52,7 @@ export default async function Page(): Promise<ReactElement> {
                     </div>
                 </div>
 
-                <div className="flex flex-col space-y-8 lg:flex-row">
-                    <div className="flex flex-1 flex-col gap-4 p-4">
-                        <div className="grid auto-rows-min gap-4 lg:grid-cols-2">
-                            {bodies.map((body) => (
-                                <GroupOverviewCard key={body.id} group={body} />
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                <GroupList entries={bodies} emptyText="Du bist in keinem Verein Mitglied." />
 
                 <Separator className="my-6" />
 
@@ -84,15 +72,9 @@ export default async function Page(): Promise<ReactElement> {
                     </div>
                 </div>
 
-                <div className="flex flex-col space-y-8 lg:flex-row">
-                    <div className="flex flex-1 flex-col gap-4 p-4">
-                        <div className="grid auto-rows-min gap-4 lg:grid-cols-2">
-                            {circles.map((circle) => (
-                                <GroupOverviewCard key={circle.id} group={circle} />
-                            ))}
-                        </div>
-                    </div>
-                </div>
+                <GroupList entries={groups} emptyText="Du bist in keiner Gruppe Mitglied." />
+
+                <ArchivedGroups entries={archived} />
 
                 <Toaster
                     position="top-right"

@@ -30,7 +30,7 @@ export function ContractSelect({ contracts, selectedId, onChange }: Props): Reac
 
     return (
         <div className="space-y-1.5 mb-4">
-            <label htmlFor="contract-select" className="text-sm font-medium text-muted-foreground">
+            <label htmlFor="contract-select" className="text-sm font-medium">
                 Bereich / Vertrag
             </label>
             <Select value={selectedId || ''} onValueChange={onChange}>

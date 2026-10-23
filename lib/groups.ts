@@ -1,37 +1,60 @@
 import { isEmpty } from 'lodash-es';
 import { NextResponse } from 'next/server';
+import type { Group } from '@/db/schema';
+import getUserSession from '@/lib/auth/getUserSession';
 import {
     addAdminToDbGroup,
     addUserToDbGroup,
+    canManageGroup,
     countOtherActiveGroupAdmins,
     getGroupAdminStatus,
     getGroupById,
     isGlobalAdmin,
-    isGroupAdmin,
+    isLegacySubgroup,
     removeAdminFromDbGroup,
     removeUserFromDbGroup,
     updateDescription,
     updateWebsiteLink,
     updateWikiLink,
-} from './db/groupActions';
-import getUserSession from '@/lib/auth/getUserSession';
+} from '@/lib/db/groupActions';
 import { writeLogEntry } from '@/lib/db/logActions';
 import { getPossibleGroupMembers } from '@/lib/db/userActions';
 import { keycloakUpdateGroupAttributes } from '@/lib/keycloak/groupActions';
 import { keycloakAddUserToGroup, keycloakRemoveUserFromGroup } from '@/lib/keycloak/userActions';
 
+// Returns the group, or the error response if the user may not manage it.
+const getManageableGroup = async (groupId: string, executingUserId: string): Promise<Group | NextResponse> => {
+    const group = await getGroupById(groupId);
+    if (group === null) {
+        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
+    }
+
+    if (isLegacySubgroup(group)) {
+        return NextResponse.json(
+            { error: 'Diese Untergruppe wird noch zentral verwaltet und kann hier nicht geändert werden.' },
+            { status: 400 },
+        );
+    }
+
+    if (!(await canManageGroup(executingUserId, group))) {
+        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
+    }
+
+    return group;
+};
+
 /**
- * A group must keep at least one active admin.
+ * A group must keep at least one active admin, unless parentAdminsManage is set.
  * System admins can, but only with allowWithoutAdmin, which the UI sends after an extra warning.
  * Returns the error response, or null if the change is allowed.
  */
 const checkRemainingAdmins = async (
     userIdToLoseAdmin: string,
-    groupId: string,
+    group: Group,
     executingUserId: string,
     allowWithoutAdmin: boolean,
 ): Promise<NextResponse | null> => {
-    if ((await countOtherActiveGroupAdmins(groupId, userIdToLoseAdmin)) > 0) {
+    if (group.parentAdminsManage || (await countOtherActiveGroupAdmins(group.id, userIdToLoseAdmin)) > 0) {
         return null;
     }
 
@@ -64,19 +87,13 @@ export const removeAdminFromGroup = async (
     ipAddress: string,
     allowWithoutAdmin: boolean = false,
 ): Promise<NextResponse> => {
-    const idpGroup = await getGroupById(groupId);
-    if (idpGroup === null) {
-        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
+    const dbGroup = await getManageableGroup(groupId, executingUserId);
+    if (dbGroup instanceof NextResponse) {
+        return dbGroup;
     }
 
-    const dbGroup = await getGroupById(groupId);
-    if (dbGroup === null || dbGroup.adminGroup === null) {
-        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
-    }
-
-    const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
-    if (!adminStatus) {
-        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
+    if (dbGroup.adminGroup === null) {
+        return NextResponse.json({ error: 'Die Gruppe hat keine Administrator*innen-Gruppe.' }, { status: 400 });
     }
 
     const userIsMemberOfGroup = await getGroupAdminStatus(userIdToBeDemoted, groupId);
@@ -84,7 +101,7 @@ export const removeAdminFromGroup = async (
         return NextResponse.json({ error: 'Die Administrator*in konnte nicht entfernt werden.' }, { status: 400 });
     }
 
-    const remainingAdminsError = await checkRemainingAdmins(userIdToBeDemoted, groupId, executingUserId, allowWithoutAdmin);
+    const remainingAdminsError = await checkRemainingAdmins(userIdToBeDemoted, dbGroup, executingUserId, allowWithoutAdmin);
     if (remainingAdminsError !== null) {
         return remainingAdminsError;
     }
@@ -120,19 +137,13 @@ export const addAdminToGroup = async (
     executingUserId: string,
     ipAddress: string,
 ): Promise<NextResponse> => {
-    const idpGroup = await getGroupById(groupId);
-    if (idpGroup === null) {
-        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
+    const dbGroup = await getManageableGroup(groupId, executingUserId);
+    if (dbGroup instanceof NextResponse) {
+        return dbGroup;
     }
 
-    const dbGroup = await getGroupById(groupId);
-    if (dbGroup === null || dbGroup.adminGroup === null) {
-        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
-    }
-
-    const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
-    if (!adminStatus) {
-        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
+    if (dbGroup.adminGroup === null) {
+        return NextResponse.json({ error: 'Die Gruppe hat keine Administrator*innen-Gruppe.' }, { status: 400 });
     }
 
     const userIsMemberOfGroup = await getGroupAdminStatus(userIdToBePromoted, groupId);
@@ -172,14 +183,13 @@ export const addUsersToGroup = async (
     executingUserId: string,
     ipAddress: string,
 ): Promise<NextResponse> => {
-    const dbGroup = await getGroupById(groupId);
-    if (dbGroup === null || dbGroup.memberGroup === null) {
-        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
+    const dbGroup = await getManageableGroup(groupId, executingUserId);
+    if (dbGroup instanceof NextResponse) {
+        return dbGroup;
     }
 
-    const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
-    if (!adminStatus) {
-        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
+    if (dbGroup.memberGroup === null) {
+        return NextResponse.json({ error: 'Die Mitgliedschaft in dieser Gruppe kann hier nicht geändert werden.' }, { status: 400 });
     }
 
     const possibleMemberIds = new Set((await getPossibleGroupMembers(groupId)).map((user) => user.id));
@@ -244,19 +254,9 @@ export const removeUserFromGroup = async (
     ipAddress: string,
     allowWithoutAdmin: boolean = false,
 ): Promise<NextResponse> => {
-    const idpGroup = await getGroupById(groupId);
-    if (idpGroup === null) {
-        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
-    }
-
-    const dbGroup = await getGroupById(groupId);
-    if (dbGroup === null) {
-        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
-    }
-
-    const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
-    if (!adminStatus) {
-        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
+    const dbGroup = await getManageableGroup(groupId, executingUserId);
+    if (dbGroup instanceof NextResponse) {
+        return dbGroup;
     }
 
     const userIsMemberOfGroup = await getGroupAdminStatus(userIdToBeRemoved, groupId);
@@ -265,7 +265,7 @@ export const removeUserFromGroup = async (
     }
 
     if (userIsMemberOfGroup === 'Admin') {
-        const remainingAdminsError = await checkRemainingAdmins(userIdToBeRemoved, groupId, executingUserId, allowWithoutAdmin);
+        const remainingAdminsError = await checkRemainingAdmins(userIdToBeRemoved, dbGroup, executingUserId, allowWithoutAdmin);
         if (remainingAdminsError !== null) {
             return remainingAdminsError;
         }
@@ -325,14 +325,9 @@ export const updateGroupDescription = async (
         return NextResponse.json({ error: 'Die eingeloggte Benutzer*in konnte nicht identifiziert werden.' }, { status: 400 });
     }
 
-    const dbGroup = await getGroupById(groupId);
-    if (dbGroup === null) {
-        return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
-    }
-
-    const adminStatus = await isGroupAdmin(executingUserId, groupId, true);
-    if (!adminStatus) {
-        return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
+    const dbGroup = await getManageableGroup(groupId, executingUserId);
+    if (dbGroup instanceof NextResponse) {
+        return dbGroup;
     }
 
     const currentDescription = isEmpty(dbGroup.description) ? undefined : dbGroup.description;
@@ -379,8 +374,6 @@ export const updateGroupDescription = async (
 
     return NextResponse.json({ success: true });
 };
-
-export const hiddenSubGroups = ['01320ea0-c06e-4c7d-be5a-14a556209f2a', 'cf8e85a7-f828-4ae0-87d6-67a4959dcf83'];
 
 export const isKollektivMitglied = async (): Promise<boolean> => {
     const user = await getUserSession();

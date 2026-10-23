@@ -53,6 +53,10 @@ export const groupsTable = pgTable('groups', {
     memberGroup: varchar({ length: 255 }),
     adminGroup: varchar({ length: 255 }),
     parentGroup: varchar({ length: 255 }),
+    parentAdminsManage: boolean().notNull().default(false),
+    hidden: boolean().notNull().default(false),
+    status: varchar({ length: 50 }).notNull().default('active'),
+    deletedAt: timestamp(),
 });
 
 export const usersTable = pgTable('users', {

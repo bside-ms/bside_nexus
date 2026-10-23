@@ -11,13 +11,17 @@ import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Separator } from '@/components/ui/separator';
 import getUserSession from '@/lib/auth/getUserSession';
 import {
+    canManageGroup,
+    canViewGroup,
     getGroupAdminStatus,
     getGroupById,
     getGroupMembers,
-    getSubgroups,
+    getVisibleSubgroups,
+    isArchivedGroup,
     isGlobalAdmin as isSystemAdminUser,
-    isGroupAdmin,
+    isLegacySubgroup,
 } from '@/lib/db/groupActions';
+import isNotEmptyString from '@/lib/utils/isNotEmptyString';
 
 interface GroupPageProps {
     params: Promise<{
@@ -29,21 +33,28 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
     const { id: groupId } = await params;
     const group = await getGroupById(groupId);
     const user = await getUserSession();
+    const userId = user?.id ?? '';
 
-    // Handle when the group is not found
-    if (group === null) {
+    // Hidden groups behave like groups that do not exist.
+    if (group === null || !(await canViewGroup(userId, group))) {
         redirect('/portal/groups');
     }
+
+    const parentGroup = group.parentGroup === null ? null : await getGroupById(group.parentGroup);
+    const parent = parentGroup !== null && (await canViewGroup(userId, parentGroup)) ? parentGroup : null;
+
+    // Old subgroups have no category of their own.
+    const categoryName = isNotEmptyString(group.categoryName) ? group.categoryName : (parent?.categoryName ?? '');
 
     const breadCrumbs = [
         {
             title: 'Meine Gruppen',
             url: `/portal/groups`,
         },
-        {
-            title: group.categoryName ?? '',
-            url: `/portal/groups`,
-        },
+        ...(isNotEmptyString(categoryName)
+            ? [{ title: categoryName, url: `/portal/groups`, className: parent === null ? undefined : 'hidden lg:block' }]
+            : []),
+        ...(parent === null ? [] : [{ title: parent.displayName, url: `/portal/groups/${parent.id}` }]),
         {
             title: group.displayName ?? '',
             active: true,
@@ -51,15 +62,11 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
     ];
 
     // ToDo: UseEffect to load the group members.
-    const groupMemberPromise = getGroupMembers(groupId);
-    const subgroupsPromise = getSubgroups(groupId);
-    const isAdminPromise = getGroupAdminStatus(user?.id ?? '', group.id);
-    const isGlobalAdminPromise = isGroupAdmin(user?.id ?? '', group.id, true);
-    const [groupMembers, subgroups, isAdmin, isGlobalAdmin] = await Promise.all([
-        groupMemberPromise,
-        subgroupsPromise,
-        isAdminPromise,
-        isGlobalAdminPromise,
+    const [groupMembers, subgroups, isAdmin, canManage] = await Promise.all([
+        getGroupMembers(groupId),
+        getVisibleSubgroups(groupId, userId),
+        getGroupAdminStatus(userId, group.id),
+        canManageGroup(userId, group),
     ]);
 
     // ToDo: Fetch those values from the database.
@@ -72,7 +79,7 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
             groupId: group.id,
             displayName: member.displayName ?? '-',
             username: member.username ?? '-',
-            email: isAdmin === 'Admin' ? (member.email ?? '-') : '',
+            email: canManage ? (member.email ?? '-') : '',
             status: !member.enabled ? 'disabled' : member.isAdmin ? 'admin' : 'member',
         });
     });
@@ -81,7 +88,13 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
         <div className="">
             <NavbarTop items={breadCrumbs} />
             <div className="space-y-6 px-4 pt-4 pb-16 sm:px-6 sm:pt-6 lg:px-10 lg:pt-10">
-                <GroupDetailsHeader displayName={group.displayName ?? group.name} />
+                <GroupDetailsHeader
+                    displayName={group.displayName ?? group.name}
+                    isPermission={group.groupType === 'permission'}
+                    parent={parent}
+                    isLegacySubgroup={isLegacySubgroup(group)}
+                    isArchived={isArchivedGroup(group)}
+                />
                 <Separator className="my-6" />
 
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -92,11 +105,12 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
                             websiteLink={group.websiteLink ?? ''}
                             description={group.description ?? ''}
                             isAdmin={isAdmin}
-                            isGlobalAdmin={isGlobalAdmin}
+                            canManage={canManage}
                         />
                     </div>
 
-                    <GroupDetailsSubgroups subgroups={subgroups} />
+                    {/* Only one level of subgroups. */}
+                    {group.parentGroup === null && <GroupDetailsSubgroups subgroups={subgroups} />}
                     <GroupDetailsServices services={services ?? []} />
                 </div>
 
@@ -104,11 +118,11 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
 
                 <GroupDetailsMembers
                     groupMembers={members}
-                    isAdmin={isAdmin}
                     groupId={group.id}
-                    isGlobalAdmin={isGlobalAdmin}
-                    isSystemAdmin={isSystemAdminUser(user?.id ?? '')}
-                    currentUserId={user?.id ?? ''}
+                    canManage={canManage}
+                    requiresAdmin={!group.parentAdminsManage}
+                    isSystemAdmin={isSystemAdminUser(userId)}
+                    currentUserId={userId}
                 />
             </div>
 

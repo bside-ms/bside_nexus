@@ -16,12 +16,16 @@ export const getUserGroups = async (): Promise<Array<Group>> => {
     const memberships = await db.select().from(membersTable).where(eq(membersTable.userId, userId));
     const groupIds = memberships.map((membership) => membership.groupId);
 
-    const groups = await db.select().from(groupsTable).where(inArray(groupsTable.id, groupIds));
+    const groups = await db
+        .select()
+        .from(groupsTable)
+        .where(and(inArray(groupsTable.id, groupIds), isNull(groupsTable.deletedAt)));
     return groups ?? [];
 };
 
+// Includes hidden groups, filter them with canViewGroup.
 export const getAllGroups = async (): Promise<Array<Group>> => {
-    const groups = await db.select().from(groupsTable).where(isNull(groupsTable.parentGroup));
+    const groups = await db.select().from(groupsTable).where(isNull(groupsTable.deletedAt));
     return groups ?? [];
 };
 
@@ -103,22 +107,11 @@ export const getGroupAdminStatus = async (userId: string, groupId: string): Prom
     }
 };
 
-export const isSubGroupMember = async (userId: string, groupId: string): Promise<boolean> => {
-    if (isEmpty(userId) || isEmpty(groupId)) {
-        return false;
-    }
-
-    const groupMembers = await db
-        .select()
-        .from(membersTable)
-        .where(and(eq(membersTable.userId, userId), eq(membersTable.groupId, groupId)))
-        .limit(1);
-
-    return groupMembers.length > 0;
-};
-
 export const getSubgroups = async (groupId: string): Promise<Array<Group>> => {
-    const subgroups = await db.select().from(groupsTable).where(eq(groupsTable.parentGroup, groupId));
+    const subgroups = await db
+        .select()
+        .from(groupsTable)
+        .where(and(eq(groupsTable.parentGroup, groupId), isNull(groupsTable.deletedAt)));
     return subgroups ?? [];
 };
 
@@ -139,17 +132,45 @@ export const countOtherActiveGroupAdmins = async (groupId: string, userId: strin
     return result[0]?.count ?? 0;
 };
 
-export const isGroupAdmin = async (userId: string, groupId: string, global: boolean = false): Promise<boolean> => {
-    const groupAdminStatus = await getGroupAdminStatus(userId, groupId);
-    if (groupAdminStatus === 'Admin') {
+// Old subgroups below eingeschränkt/erweitert. They can not be managed in Nexus.
+export const isLegacySubgroup = (group: Group): boolean => group.parentGroup !== null && group.memberGroup === null;
+
+export const isArchivedGroup = (group: Group): boolean => group.status === 'archived';
+
+// With parentAdminsManage, the admins of the parent group may manage the group too.
+export const canManageGroup = async (userId: string, group: Group): Promise<boolean> => {
+    if (isLegacySubgroup(group)) {
+        return false;
+    }
+
+    if (isGlobalAdmin(userId) || (await getGroupAdminStatus(userId, group.id)) === 'Admin') {
         return true;
     }
 
-    return global ? isGlobalAdmin(userId) : false;
+    return group.parentGroup !== null && group.parentAdminsManage && (await getGroupAdminStatus(userId, group.parentGroup)) === 'Admin';
+};
+
+// Hidden groups are only visible for members and for people who may manage them.
+export const canViewGroup = async (userId: string, group: Group): Promise<boolean> => {
+    if (!group.hidden || isGlobalAdmin(userId) || (await getGroupAdminStatus(userId, group.id)) !== 'None') {
+        return true;
+    }
+
+    return canManageGroup(userId, group);
+};
+
+export const getVisibleSubgroups = async (groupId: string, userId: string): Promise<Array<Group>> => {
+    const subgroups = await getSubgroups(groupId);
+    const visible = await Promise.all(subgroups.map((subgroup) => canViewGroup(userId, subgroup)));
+    return subgroups.filter((_, index) => visible[index]);
 };
 
 export const getGroupById = async (groupId: string): Promise<Group | null> => {
-    const group = await db.select().from(groupsTable).where(eq(groupsTable.id, groupId)).limit(1);
+    const group = await db
+        .select()
+        .from(groupsTable)
+        .where(and(eq(groupsTable.id, groupId), isNull(groupsTable.deletedAt)))
+        .limit(1);
     return group[0] ?? null;
 };
 

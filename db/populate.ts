@@ -1,92 +1,106 @@
-import { and, eq, isNull, notInArray, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
 import { isEmpty } from 'lodash-es';
 import 'dotenv/config';
 import { db } from '@/db/index';
 import { groupsTable, membersTable, usersTable } from '@/db/schema';
-import { adminGroupIdentifier, keycloakGetAllGroups, keycloakGetDirectMembers, membersGroupIdentifier } from '@/lib/keycloak/groupActions';
+import type { AugmentedGroupRepresentation } from '@/lib/keycloak/groupActions';
+import { keycloakGetAllGroups, keycloakGetDirectMembers } from '@/lib/keycloak/groupActions';
 import { type AugmentedUserRepresentation, keycloakGetAllUsers } from '@/lib/keycloak/userActions';
+
+const upsertGroup = async (entry: typeof groupsTable.$inferInsert): Promise<void> => {
+    const { id: _, ...values } = entry;
+    await db.insert(groupsTable).values([entry]).onConflictDoUpdate({ target: groupsTable.id, set: values });
+};
+
+const toGroupEntry = (group: AugmentedGroupRepresentation): typeof groupsTable.$inferInsert => ({
+    id: group.id,
+    name: group.name,
+    path: group.path,
+    groupType: group.attributes.groupType ?? '',
+    categoryName: group.attributes.categoryName ?? '',
+    displayName: group.attributes.displayName ?? group.name,
+    description: group.attributes.description ?? null,
+    hidden: group.attributes.hidden,
+    deletedAt: null,
+});
+
+type GroupStatus = 'active' | 'archived';
+
+const getGroupStatus = (group: AugmentedGroupRepresentation): GroupStatus => {
+    const { status } = group.attributes;
+    if (status === undefined || status === 'active' || status === 'archived') {
+        return status ?? 'active';
+    }
+
+    // eslint-disable-next-line no-console
+    console.warn(`${group.path} has the unknown status "${status}" and is treated as active.`);
+    return 'active';
+};
 
 async function populateGroups(): Promise<void> {
     const groups = await keycloakGetAllGroups();
 
-    const entries = Array.from(groups.entries());
-    for (const [parentGroup, subGroups] of entries) {
-        let memberGroup: string | undefined = undefined;
-        let adminGroup: string | undefined = undefined;
+    // Otherwise all groups would be marked as deleted.
+    if (groups.length === 0) {
+        throw new Error('Keycloak returned no groups, aborting.');
+    }
 
-        for (const subgroup of subGroups) {
-            if (subgroup.path.endsWith(membersGroupIdentifier)) {
-                memberGroup = subgroup.id;
-                continue;
-            }
+    const syncedGroupIds = new Set<string>();
+    const ownStatusById = new Map(groups.map(({ group }) => [group.id, getGroupStatus(group)]));
 
-            if (subgroup.path.endsWith(adminGroupIdentifier)) {
-                adminGroup = subgroup.id;
-                continue;
-            }
-
-            if (subgroup.path.includes('eingeschränkt') || subgroup.path.includes('erweitert')) {
-                const subGroupEntry: typeof groupsTable.$inferInsert = {
-                    id: subgroup.id,
-                    name: subgroup.name,
-                    path: subgroup.path,
-                    groupType: subgroup.attributes.groupType ?? '',
-                    categoryName: subgroup.attributes.categoryName ?? '',
-                    displayName: subgroup.attributes.displayName ?? subgroup.name,
-                    description: subgroup.attributes.description,
-                    parentGroup: parentGroup.id,
-                };
-
-                await db
-                    .insert(groupsTable)
-                    .values([subGroupEntry])
-                    .onConflictDoUpdate({
-                        target: groupsTable.id,
-                        set: {
-                            name: subgroup.name,
-                            path: subgroup.path,
-                            groupType: subgroup.attributes.groupType ?? '',
-                            categoryName: subgroup.attributes.categoryName ?? '',
-                            displayName: subgroup.attributes.displayName ?? subgroup.name,
-                            description: subgroup.attributes.description,
-                            parentGroup: parentGroup.id,
-                        },
-                    });
-            }
+    for (const { group, memberGroup, adminGroup, legacySubgroups } of groups) {
+        const parentGroup = group.attributes.parentGroupId ?? null;
+        const status: GroupStatus =
+            ownStatusById.get(group.id) === 'archived' || (parentGroup !== null && ownStatusById.get(parentGroup) === 'archived')
+                ? 'archived'
+                : 'active';
+        if (group.path.startsWith('/untergruppen/') && parentGroup === null) {
+            // eslint-disable-next-line no-console
+            console.warn(`${group.path} has no parent_group_id attribute and is treated as a regular group.`);
         }
 
-        const groupEntry: typeof groupsTable.$inferInsert = {
-            id: parentGroup.id,
-            name: parentGroup.name,
-            path: parentGroup.path,
-            groupType: parentGroup.attributes.groupType ?? '',
-            categoryName: parentGroup.attributes.categoryName ?? '',
-            displayName: parentGroup.attributes.displayName ?? parentGroup.name,
-            description: parentGroup.attributes.description,
-            wikiLink: parentGroup.attributes.wikiLink,
-            websiteLink: parentGroup.attributes.websiteLink,
-            memberGroup,
-            adminGroup,
-        };
+        await upsertGroup({
+            ...toGroupEntry(group),
+            wikiLink: group.attributes.wikiLink ?? null,
+            websiteLink: group.attributes.websiteLink ?? null,
+            memberGroup: memberGroup?.id ?? null,
+            adminGroup: adminGroup?.id ?? null,
+            parentGroup,
+            parentAdminsManage: parentGroup !== null && group.attributes.parentAdminsManage,
+            status,
+        });
+        syncedGroupIds.add(group.id);
 
-        await db
-            .insert(groupsTable)
-            .values([groupEntry])
-            .onConflictDoUpdate({
-                target: groupsTable.id,
-                set: {
-                    name: parentGroup.name,
-                    path: parentGroup.path,
-                    groupType: parentGroup.attributes.groupType ?? '',
-                    categoryName: parentGroup.attributes.categoryName ?? '',
-                    displayName: parentGroup.attributes.displayName ?? parentGroup.name,
-                    description: parentGroup.attributes.description,
-                    wikiLink: parentGroup.attributes.wikiLink,
-                    websiteLink: parentGroup.attributes.websiteLink,
-                    memberGroup,
-                    adminGroup,
-                },
+        // Old subgroups have no member and admin groups.
+        for (const subgroup of legacySubgroups) {
+            await upsertGroup({
+                ...toGroupEntry(subgroup),
+                memberGroup: null,
+                adminGroup: null,
+                parentGroup: group.id,
+                parentAdminsManage: false,
+                status: status === 'archived' ? 'archived' : getGroupStatus(subgroup),
             });
+            syncedGroupIds.add(subgroup.id);
+        }
+    }
+
+    // Soft delete, logs and HRP contracts still reference them.
+    const deletedGroups = await db
+        .select({ id: groupsTable.id, path: groupsTable.path })
+        .from(groupsTable)
+        .where(and(isNull(groupsTable.deletedAt), notInArray(groupsTable.id, [...syncedGroupIds])));
+
+    if (deletedGroups.length > 0) {
+        const deletedGroupIds = deletedGroups.map((group) => group.id);
+
+        await db.transaction(async (tx) => {
+            await tx.update(groupsTable).set({ deletedAt: new Date() }).where(inArray(groupsTable.id, deletedGroupIds));
+            await tx.delete(membersTable).where(inArray(membersTable.groupId, deletedGroupIds));
+        });
+
+        // eslint-disable-next-line no-console
+        console.log(`Marked as deleted: ${deletedGroups.map((group) => group.path).join(', ')}`);
     }
 
     // eslint-disable-next-line no-console
@@ -125,25 +139,23 @@ async function populateUsers(): Promise<void> {
 }
 
 async function populateMembers(): Promise<void> {
-    const groups = await db
-        .select()
-        .from(groupsTable)
-        .where(or(isNull(groupsTable.parentGroup), eq(groupsTable.groupType, 'subgroup')));
+    const groups = await db.select().from(groupsTable).where(isNull(groupsTable.deletedAt));
 
     for (const group of groups) {
         const groupId = group.id;
         const memberGroupId = group.memberGroup;
         const adminGroupId = group.adminGroup;
+        const isLegacySubgroup = group.parentGroup !== null && memberGroupId === null;
 
         let members: Array<AugmentedUserRepresentation> = [];
         let admins: Array<AugmentedUserRepresentation> = [];
 
         // Ohne Quelle in Keycloak lässt sich nichts abgleichen – bestehende Einträge bleiben unangetastet.
-        if (group.groupType !== 'subgroup' && memberGroupId === null && adminGroupId === null) {
+        if (!isLegacySubgroup && memberGroupId === null && adminGroupId === null) {
             continue;
         }
 
-        if (group.groupType === 'subgroup') {
+        if (isLegacySubgroup) {
             members = await keycloakGetDirectMembers(groupId);
         }
 
@@ -207,21 +219,12 @@ async function populateMembers(): Promise<void> {
     console.log('Groupmembers successfully populated.');
 }
 
-async function cleanTables(): Promise<void> {
-    await db.delete(membersTable);
-
-    // eslint-disable-next-line no-console
-    console.log('Tables successfully cleaned.');
-}
-
 async function main(): Promise<void> {
-    // await cleanTables();
     await populateGroups();
     await populateUsers();
     await populateMembers();
 
-    // ToDo: Deleted users and groups are currently not deleted from the database.
-    // I am not sure what problems this might cause. Manually deleting the users and groups from the database is a good idea.
+    // ToDo: Users deleted in Keycloak stay in the database. Only their memberships are removed.
 }
 
 main();

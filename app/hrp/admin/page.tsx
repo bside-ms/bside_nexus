@@ -1,9 +1,9 @@
 import { FileCheck, FileText, SquareChartGantt } from 'lucide-react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import type { ReactElement } from 'react';
+import NavTile from '@/components/common/NavTile';
 import NavbarTop from '@/components/sidebar/NavbarTop';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { canViewPayroll } from '@/lib/db/hrpAdminActions';
 
 const breadCrumbs = [
@@ -63,19 +63,7 @@ export default async function Page(): Promise<ReactElement> {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {navItems.map((item) => (
-                        <Link key={item.href} href={item.href} className="group">
-                            <Card className="h-full transition-all hover:bg-muted/50 hover:border-primary/50 border-2">
-                                <CardHeader className="flex flex-row items-center gap-4 space-y-0 p-4 md:p-6">
-                                    <div className="p-2 bg-primary/10 rounded-lg text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors shrink-0">
-                                        <item.icon className="h-6 w-6" />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <CardTitle className="text-lg group-hover:text-primary transition-colors">{item.title}</CardTitle>
-                                        <CardDescription className="mt-1 line-clamp-2">{item.description}</CardDescription>
-                                    </div>
-                                </CardHeader>
-                            </Card>
-                        </Link>
+                        <NavTile key={item.href} title={item.title} description={item.description} href={item.href} icon={item.icon} />
                     ))}
                 </div>
             </div>

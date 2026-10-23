@@ -19,6 +19,8 @@ interface BreadcrumbItemProps {
         title: string;
         url?: string;
         active?: boolean;
+        // Visibility classes, default is 'hidden md:block'.
+        className?: string;
     }>;
     sidebar?: boolean;
     className?: string;
@@ -45,14 +47,16 @@ export default function NavbarTop(props: BreadcrumbItemProps): ReactElement {
                         <BreadcrumbList>
                             {props.items.map((item, index) => (
                                 <Fragment key={item.title}>
-                                    <BreadcrumbItem className="hidden md:block">
+                                    <BreadcrumbItem className={item.className ?? 'hidden md:block'}>
                                         {item.active === true ? (
                                             <BreadcrumbPage>{item.title}</BreadcrumbPage>
                                         ) : (
                                             <BreadcrumbLink href={item.url}>{item.title}</BreadcrumbLink>
                                         )}
                                     </BreadcrumbItem>
-                                    {breadcrumbLength - 1 !== index && <BreadcrumbSeparator className="hidden md:block" />}
+                                    {breadcrumbLength - 1 !== index && (
+                                        <BreadcrumbSeparator className={item.className ?? 'hidden md:block'} />
+                                    )}
                                 </Fragment>
                             ))}
                         </BreadcrumbList>

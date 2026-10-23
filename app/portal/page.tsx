@@ -4,10 +4,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 import { SiMattermost } from 'react-icons/si';
+import NavTile from '@/components/common/NavTile';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import getUserSession from '@/lib/auth/getUserSession';
 import { MATTERMOST_SUPPORT_CHANNEL_URL, MATTERMOST_SUPPORT_DM_URL } from '@/lib/constants';
 import getSupportEmail from '@/lib/utils/getSupportEmail';
@@ -123,18 +123,8 @@ export default async function Page(): Promise<ReactElement> {
                 <div className="flex flex-col gap-3">
                     <h2 className="text-lg font-semibold">Schnellzugriff</h2>
                     <div className="grid gap-4 sm:grid-cols-2">
-                        {visibleQuickLinks.map(({ title, description, url, icon: Icon }) => (
-                            <Link key={url} href={url} className="group">
-                                <Card className="h-full transition-colors group-hover:bg-zinc-50 dark:group-hover:bg-zinc-900">
-                                    <CardHeader className="flex-row items-center gap-4 space-y-0">
-                                        <Icon className="size-5 shrink-0" />
-                                        <div className="flex flex-col gap-1">
-                                            <CardTitle className="text-base">{title}</CardTitle>
-                                            <CardDescription>{description}</CardDescription>
-                                        </div>
-                                    </CardHeader>
-                                </Card>
-                            </Link>
+                        {visibleQuickLinks.map(({ title, description, url, icon }) => (
+                            <NavTile key={url} title={title} description={description} href={url} icon={icon} />
                         ))}
                     </div>
                 </div>

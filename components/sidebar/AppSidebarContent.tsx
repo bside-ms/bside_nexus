@@ -4,9 +4,9 @@ import { type ReactElement } from 'react';
 import { Key, PieChart, Settings2 } from 'lucide-react';
 import { SidebarContent, SidebarGroup } from '../ui/sidebar';
 import { NavbarSecondary } from './NavbarSecondary';
+import type { SidebarGroupNode } from '@/components/sidebar/NavbarGroups';
 import { NavbarGroups } from '@/components/sidebar/NavbarGroups';
 import { type NavbarItems, NavbarPrimary } from '@/components/sidebar/NavbarPrimary';
-import type { Group } from '@/db/schema';
 
 const baseUpperSidebarData: Array<NavbarItems> = [
     {
@@ -26,7 +26,7 @@ const lowerSidebarData: Array<NavbarItems> = [
 ];
 
 interface AppSidebarContentProps {
-    groups?: Array<Group>;
+    groups?: Array<SidebarGroupNode>;
     hasKeyRole?: boolean;
 }
 

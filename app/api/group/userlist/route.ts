@@ -1,7 +1,7 @@
 import isEmpty from 'lodash-es/isEmpty';
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
-import { isGroupAdmin } from '@/lib/db/groupActions';
+import { canManageGroup, getGroupById } from '@/lib/db/groupActions';
 import { getPossibleGroupMembers } from '@/lib/db/userActions';
 import isNotEmptyString from '@/lib/utils/isNotEmptyString';
 
@@ -19,7 +19,12 @@ export async function POST(req: Request): Promise<NextResponse> {
             return NextResponse.json({ error: 'Die Gruppe konnte nicht identifiziert werden.' }, { status: 400 });
         }
 
-        if (!(await isGroupAdmin(userId, groupId, true))) {
+        const group = await getGroupById(groupId);
+        if (group === null) {
+            return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
+        }
+
+        if (!(await canManageGroup(userId, group))) {
             return NextResponse.json({ error: 'Dir fehlen die erforderlichen Rechte, um diese Aktion durchzuführen.' }, { status: 403 });
         }
 

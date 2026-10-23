@@ -10,13 +10,17 @@ import isEmptyString from '@/lib/utils/isEmptyString';
 export type AugmentedGroupRepresentation = GroupRepresentation &
     Required<Pick<GroupRepresentation, 'id' | 'name' | 'path'>> & {
         attributes: {
-            groupType?: 'koerperschaft' | 'kreis';
+            groupType?: 'koerperschaft' | 'kreis' | 'permission';
             categoryName?: string;
             displayName?: string;
             shortName?: string;
             description?: string;
             wikiLink?: string;
             websiteLink?: string;
+            parentGroupId?: string;
+            parentAdminsManage: boolean;
+            hidden: boolean;
+            status?: string;
         };
     };
 
@@ -38,31 +42,25 @@ const augmentGroup = (group: GroupRepresentation): AugmentedGroupRepresentation 
             description: Array.isArray(group.attributes?.description) ? group.attributes.description[0] : undefined,
             wikiLink: Array.isArray(group.attributes?.wikiLink) ? group.attributes.wikiLink[0] : undefined,
             websiteLink: Array.isArray(group.attributes?.websiteLink) ? group.attributes.websiteLink[0] : undefined,
+            parentGroupId: Array.isArray(group.attributes?.parent_group_id) ? group.attributes.parent_group_id[0] : undefined,
+            parentAdminsManage:
+                Array.isArray(group.attributes?.parent_admins_manage) && group.attributes.parent_admins_manage[0] === 'true',
+            hidden: Array.isArray(group.attributes?.visibility) && group.attributes.visibility[0] === 'hidden',
+            status: Array.isArray(group.attributes?.status) ? group.attributes.status[0] : undefined,
         },
     };
 };
 
-const getSubGroups = async (parentGroupId: string): Promise<Array<AugmentedGroupRepresentation>> => {
-    try {
-        return (
-            await (await getClient()).groups.listSubGroups({ parentId: parentGroupId, briefRepresentation: false, first: 0, max: 9999 })
-        )
-            .map(augmentGroup)
-            .filter((group): group is AugmentedGroupRepresentation => group !== null);
-    } catch {
-        return [];
-    }
-};
+// Not caught, with an incomplete tree the sync would mark the missing groups as deleted.
+const getSubGroups = async (parentGroupId: string): Promise<Array<AugmentedGroupRepresentation>> =>
+    (await (await getClient()).groups.listSubGroups({ parentId: parentGroupId, briefRepresentation: false, first: 0, max: 9999 }))
+        .map(augmentGroup)
+        .filter((group): group is AugmentedGroupRepresentation => group !== null);
 
-const getParentGroups = async (): Promise<Array<AugmentedGroupRepresentation>> => {
-    try {
-        return (await (await getClient()).groups.find({ briefRepresentation: false, first: 0, max: 9999 }))
-            .map(augmentGroup)
-            .filter((group): group is AugmentedGroupRepresentation => group !== null);
-    } catch {
-        return [];
-    }
-};
+const getParentGroups = async (): Promise<Array<AugmentedGroupRepresentation>> =>
+    (await (await getClient()).groups.find({ briefRepresentation: false, first: 0, max: 9999 }))
+        .map(augmentGroup)
+        .filter((group): group is AugmentedGroupRepresentation => group !== null);
 
 export const keycloakGetGroupById = async (groupId: string): Promise<AugmentedGroupRepresentation | null> => {
     try {
@@ -92,51 +90,41 @@ const getAllGroupsFlat = async (): Promise<Array<AugmentedGroupRepresentation>> 
 
 export const membersGroupIdentifier = 'mitglieder';
 export const adminGroupIdentifier = 'admin';
-const ignoredSubgroups = ['eingeschränkt', 'erweitert'];
-const relevantParentGroups = ['koerperschaften', 'kreise', 'status', 'permission'];
-
-export const getSubGroupsByGroup = async (group: AugmentedGroupRepresentation): Promise<Array<AugmentedGroupRepresentation>> =>
-    (await getAllGroupsFlat()).filter(({ path }) => path !== group.path && path.startsWith(group.path));
-
-export const keycloakGetGroupMembers = async (
-    group: AugmentedGroupRepresentation,
-): Promise<[group: AugmentedGroupRepresentation | null, Array<AugmentedUserRepresentation>]> => {
-    const membersGroup = group.path.endsWith(membersGroupIdentifier)
-        ? group
-        : (await getSubGroupsByGroup(group)).find(({ path }) => path.endsWith(membersGroupIdentifier));
-
-    if (isNil(membersGroup)) {
-        return [null, []];
-    }
-
-    const groupMembers = await (await getClient()).groups.listMembers({ id: membersGroup.id, first: 0, max: 9999 });
-
-    return [membersGroup, groupMembers.map(augmentUser).filter((user): user is AugmentedUserRepresentation => user !== null)];
-};
+// Folders of the old subgroups.
+const legacySubgroupFolders = ['eingeschränkt', 'erweitert'];
+const relevantCategories = ['koerperschaften', 'kreise', 'status', 'untergruppen'];
 
 /*
  * Population Methods.
  */
 
-export const keycloakGetAllGroups = async (): Promise<Map<AugmentedGroupRepresentation, Array<AugmentedGroupRepresentation>>> => {
+export interface KeycloakGroupWithChildren {
+    group: AugmentedGroupRepresentation;
+    memberGroup: AugmentedGroupRepresentation | undefined;
+    adminGroup: AugmentedGroupRepresentation | undefined;
+    legacySubgroups: Array<AugmentedGroupRepresentation>;
+}
+
+export const keycloakGetAllGroups = async (): Promise<Array<KeycloakGroupWithChildren>> => {
     const allGroups = await getAllGroupsFlat();
+    const childrenOf = (parent: AugmentedGroupRepresentation): Array<AugmentedGroupRepresentation> =>
+        allGroups.filter((group) => group.path.startsWith(`${parent.path}/`) && !group.path.slice(parent.path.length + 1).includes('/'));
 
-    // ignore everything except for koerperschaft and kreis
-    const filteredGroups = allGroups
-        .filter((group) => !ignoredSubgroups.some((ignoredSubgroup) => group.path.endsWith(ignoredSubgroup)))
-        .filter((group) => relevantParentGroups.some((parentGroup) => group.path.includes(parentGroup)))
-        .filter((group) => group.path.split('/').length > 1);
+    return allGroups
+        .filter((group) => {
+            const [, category, name, ...rest] = group.path.split('/');
+            return relevantCategories.includes(category ?? '') && name !== undefined && rest.length === 0;
+        })
+        .map((group) => {
+            const children = childrenOf(group);
 
-    const parentGroups = filteredGroups.filter((group) => group.path.split('/').length === 3);
-    const childrenGroups = filteredGroups.filter((group) => group.path.split('/').length > 3);
-
-    const groupMap = new Map<AugmentedGroupRepresentation, Array<AugmentedGroupRepresentation>>();
-    parentGroups.forEach((parent) => {
-        const children = childrenGroups.filter((child) => child.path.startsWith(`${parent.path}/`));
-        groupMap.set(parent, children);
-    });
-
-    return groupMap;
+            return {
+                group,
+                memberGroup: children.find((child) => child.name === membersGroupIdentifier),
+                adminGroup: children.find((child) => child.name === adminGroupIdentifier),
+                legacySubgroups: children.filter((child) => legacySubgroupFolders.includes(child.name)).flatMap(childrenOf),
+            };
+        });
 };
 
 export const keycloakGetDirectMembers = async (groupId: string): Promise<Array<AugmentedUserRepresentation>> => {
