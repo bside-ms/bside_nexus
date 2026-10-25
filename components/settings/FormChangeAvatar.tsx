@@ -21,7 +21,7 @@ export default function FormChangeAvatar({ username }: { username: string }): Re
             </CardHeader>
             <CardContent className="flex grid-cols-2">
                 <Avatar className="mx-2 mt-2">
-                    <AvatarImage src={!isEmpty(username) ? `/api/mattermost/${username}` : ''} alt="shadcn" />
+                    <AvatarImage src={!isEmpty(username) ? `/api/mattermost/${username}?fallback=none` : ''} alt="shadcn" />
                     <AvatarFallback>{username.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="mx-2 grid w-full max-w-sm items-center gap-1.5">

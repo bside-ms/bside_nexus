@@ -1,62 +1,50 @@
-import axios, { AxiosError } from 'axios';
 import type { NextRequest } from 'next/server';
-import getMattermostClient from '@/lib/mattermost/getMattermostClient';
+import type { MattermostAvatar } from '@/lib/mattermost/avatarCache';
+import { getDefaultAvatar, getMattermostAvatar } from '@/lib/mattermost/avatarCache';
+
+// The browser keeps an avatar for an hour. After that it asks again with the ETag and mostly gets a 304 from the server cache.
+const CACHE_CONTROL = 'public, max-age=3600';
+// After a Mattermost error the default picture must not stick, so the next load tries again.
+const CACHE_CONTROL_ON_ERROR = 'no-store';
+
+const imageResponse = (req: NextRequest, avatar: MattermostAvatar, cacheControl: string): Response => {
+    const headers = { 'Cache-Control': cacheControl, ETag: avatar.etag };
+
+    if (req.headers.get('if-none-match') === avatar.etag) {
+        return new Response(null, { status: 304, headers });
+    }
+
+    return new Response(new Uint8Array(avatar.image), {
+        status: 200,
+        headers: { ...headers, 'Content-Type': avatar.contentType },
+    });
+};
 
 export async function GET(req: NextRequest, props: { params: Promise<{ username: Array<string> }> }): Promise<Response> {
     const params = await props.params;
     const username = params.username.join('/');
 
-    if (!username) {
-        return new Response(JSON.stringify({ error: 'Username is required' }), { status: 400 });
-    }
-
     // replace spaces and german special characters with dashes
     const fixedUsername = username.replace(/\s/g, '-').replace(/[äöüß()/]/g, '-');
 
+    const withoutDefault = req.nextUrl.searchParams.get('fallback') === 'none';
+
     try {
-        const userid = (await getMattermostClient().getUserByUsername(fixedUsername)).id;
+        const avatar = fixedUsername ? await getMattermostAvatar(fixedUsername) : null;
 
-        if (!userid) {
-            return new Response(JSON.stringify({ error: 'User ID is required' }), { status: 400 });
+        if (avatar !== null) {
+            return imageResponse(req, avatar, CACHE_CONTROL);
         }
 
-        const mattermostUrl = `${process.env.MATTERMOST_URL}/api/v4/users/${userid}/image`;
-        const authToken = process.env.MATTERMOST_AUTH_TOKEN;
+        return withoutDefault
+            ? new Response(null, { status: 404, headers: { 'Cache-Control': CACHE_CONTROL } })
+            : imageResponse(req, await getDefaultAvatar(), CACHE_CONTROL);
+    } catch (error: unknown) {
+        // eslint-disable-next-line no-console
+        console.error('[api/mattermost]', error);
 
-        if (!authToken) {
-            return new Response(JSON.stringify({ error: 'Server misconfiguration: Missing authorization token' }), {
-                status: 500,
-            });
-        }
-
-        try {
-            const response = await axios.get(mattermostUrl, {
-                headers: {
-                    Authorization: `Bearer ${authToken}`,
-                },
-                responseType: 'arraybuffer', // Ensures the image data is fetched as a binary buffer
-            });
-
-            return new Response(response.data, {
-                headers: {
-                    'Content-Type': String(response.headers['content-type'] ?? 'image/png'),
-                    'Cache-Control': 'public, max-age=2592000, immutable', // cache for 30 days
-                },
-                status: 200,
-            });
-        } catch (error: unknown) {
-            return new Response(
-                JSON.stringify({
-                    error: 'Failed to fetch avatar from Mattermost',
-                }),
-                {
-                    status: error instanceof AxiosError ? error.response?.status : 500,
-                },
-            );
-        }
-    } catch {
-        return new Response(JSON.stringify(''), {
-            status: 200,
-        });
+        return withoutDefault
+            ? new Response(null, { status: 502, headers: { 'Cache-Control': CACHE_CONTROL_ON_ERROR } })
+            : imageResponse(req, await getDefaultAvatar(), CACHE_CONTROL_ON_ERROR);
     }
 }

@@ -2,7 +2,7 @@
 
 /* eslint-disable react/jsx-no-bind */
 
-import { Fragment } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { ColumnDef } from '@tanstack/react-table';
 import { ChevronRight, Copy } from 'lucide-react';
 import type { MouseEvent, ReactElement } from 'react';
@@ -51,10 +51,31 @@ interface GroupMemberAvatarProps {
     className?: string;
 }
 
+// Load the avatar images once the avatar is in view.
 export function GroupMemberAvatar({ username, className }: GroupMemberAvatarProps): ReactElement {
+    const avatarRef = useRef<HTMLSpanElement>(null);
+    const [isVisible, setIsVisible] = useState(false);
+
+    useEffect((): (() => void) | undefined => {
+        const element = avatarRef.current;
+        if (isVisible || element === null) {
+            return undefined;
+        }
+
+        const observer = new IntersectionObserver((entries) => {
+            if (entries.some((entry) => entry.isIntersecting)) {
+                setIsVisible(true);
+                observer.disconnect();
+            }
+        });
+        observer.observe(element);
+
+        return (): void => observer.disconnect();
+    }, [isVisible]);
+
     return (
-        <Avatar className={cn('size-8 rounded-lg', className)}>
-            <AvatarImage src={`/api/mattermost/${username}`} alt={`Avatar von ${username}`} />
+        <Avatar ref={avatarRef} className={cn('size-8 rounded-lg', className)}>
+            {isVisible && <AvatarImage src={`/api/mattermost/${username}?fallback=none`} alt={`Avatar von ${username}`} />}
             <AvatarFallback className="rounded-lg">{username.charAt(0).toUpperCase()}</AvatarFallback>
         </Avatar>
     );

@@ -32,7 +32,7 @@ export async function AppSidebar({ ...props }: React.ComponentProps<typeof Sideb
                     user={{
                         name: user.name,
                         email: user.email,
-                        avatar: !isEmpty(user.username) ? `/api/mattermost/${user.username}` : '',
+                        avatar: !isEmpty(user.username) ? `/api/mattermost/${user.username}?fallback=none` : '',
                     }}
                 />
             )}
