@@ -51,6 +51,11 @@ const GroupRow = ({ entry }: { entry: GroupOverviewEntry }): ReactElement => {
                         <Users className="size-3" />
                         <span>{memberCount}</span>
                     </Badge>
+                    {group.hidden && (
+                        <Badge variant="outline" className="order-1 sm:order-none" title="Nur Mitglieder dieser Gruppe sehen sie in Nexus.">
+                            Vertraulich
+                        </Badge>
+                    )}
                     <GroupStatusBadge status={status} />
                 </div>
             </div>
