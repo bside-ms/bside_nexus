@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { Fragment, useCallback, useMemo, useState } from 'react';
 import type { Row } from '@tanstack/react-table';
 import { PlusCircle } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { ReactElement } from 'react';
 import type { GroupMemberActionContext } from '@/components/group/details/members/GroupMemberActions';
@@ -24,6 +25,7 @@ interface GroupMembersProps {
     isSystemAdmin: boolean;
     currentUserId: string;
     groupId: string;
+    includedGroups: Array<{ id: string; displayName: string }>;
 }
 
 export function GroupDetailsMembers({
@@ -33,18 +35,20 @@ export function GroupDetailsMembers({
     requiresAdmin,
     isSystemAdmin,
     currentUserId,
+    includedGroups,
 }: GroupMembersProps): ReactElement {
     const router = useRouter();
 
     // Re-render the server page after a member change, so the table gets the new member list.
     const onMembersChanged = useCallback(() => router.refresh(), [router]);
 
-    // Admins first, then alphabetically.
+    // Admins first, members of included groups last, alphabetically within.
     const sortedMembers = useMemo(
         () =>
             [...groupMembers].sort(
                 (a, b) =>
                     Number(b.status === 'admin') - Number(a.status === 'admin') ||
+                    Number(a.viaGroup !== undefined) - Number(b.viaGroup !== undefined) ||
                     a.displayName.localeCompare(b.displayName, 'de', { sensitivity: 'base' }),
             ),
         [groupMembers],
@@ -93,6 +97,20 @@ export function GroupDetailsMembers({
                 )}
             </CardHeader>
             <CardContent>
+                {includedGroups.length > 0 && (
+                    <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+                        Enthält außerdem die Mitglieder von{' '}
+                        {includedGroups.map((includedGroup, index) => (
+                            <Fragment key={includedGroup.id}>
+                                {index > 0 && ', '}
+                                <Link href={`/portal/groups/${includedGroup.id}`} className="underline underline-offset-4">
+                                    {includedGroup.displayName}
+                                </Link>
+                            </Fragment>
+                        ))}
+                        . Sie lassen sich nur dort ändern.
+                    </p>
+                )}
                 {groupMembers.length > 0 && (
                     <DataTable columns={columns} data={sortedMembers} renderMobileRow={renderMobileRow} onRowClick={handleRowClick} />
                 )}

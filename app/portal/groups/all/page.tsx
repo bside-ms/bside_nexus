@@ -3,11 +3,12 @@ import { redirect } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { Toaster } from 'sonner';
 import ArchivedGroups from '@/components/group/overview/ArchivedGroups';
+import CreateGroupDialog from '@/components/group/overview/CreateGroupDialog';
 import GroupList from '@/components/group/overview/GroupList';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Separator } from '@/components/ui/separator';
 import getUserSession from '@/lib/auth/getUserSession';
-import { canViewGroup, getAllGroups } from '@/lib/db/groupActions';
+import { canViewGroup, getAllGroups, getGroupCategories, isGlobalAdmin } from '@/lib/db/groupActions';
 import { buildGroupOverview } from '@/lib/groupOverview';
 
 const breadCrumbs = [
@@ -31,11 +32,12 @@ export const metadata: Metadata = {
 
 export default async function Page(): Promise<ReactElement> {
     const user = await getUserSession();
-    if (user?.members?.includes('/koerperschaften/kollektiv/mitglieder') !== true) {
+    const userId = user?.id ?? '';
+    const isSystemAdmin = isGlobalAdmin(userId);
+    if (user?.members?.includes('/koerperschaften/kollektiv/mitglieder') !== true && !isSystemAdmin) {
         redirect('/portal');
     }
 
-    const userId = user?.id ?? '';
     const allGroups = await getAllGroups();
     const isVisible = await Promise.all(allGroups.map((group) => canViewGroup(userId, group)));
     const { bodies, groups, archived } = await buildGroupOverview(
@@ -58,9 +60,12 @@ export default async function Page(): Promise<ReactElement> {
 
                 <Separator className="my-6" />
 
-                <div className="space-y-0.5">
-                    <h2 className="text-2xl font-bold tracking-tight">Alle Gruppen</h2>
-                    <p>Hier findest du eine Übersicht über alle Gruppen der B-Side.</p>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="space-y-0.5">
+                        <h2 className="text-2xl font-bold tracking-tight">Alle Gruppen</h2>
+                        <p>Hier findest du eine Übersicht über alle Gruppen der B-Side.</p>
+                    </div>
+                    {isSystemAdmin && <CreateGroupDialog categories={await getGroupCategories()} />}
                 </div>
 
                 <Separator className="my-6" />

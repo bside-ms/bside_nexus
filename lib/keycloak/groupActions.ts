@@ -21,6 +21,7 @@ export type AugmentedGroupRepresentation = GroupRepresentation &
             parentAdminsManage: boolean;
             hidden: boolean;
             status?: string;
+            includedGroupIds: Array<string>;
         };
     };
 
@@ -47,6 +48,7 @@ const augmentGroup = (group: GroupRepresentation): AugmentedGroupRepresentation 
                 Array.isArray(group.attributes?.parent_admins_manage) && group.attributes.parent_admins_manage[0] === 'true',
             hidden: Array.isArray(group.attributes?.visibility) && group.attributes.visibility[0] === 'hidden',
             status: Array.isArray(group.attributes?.status) ? group.attributes.status[0] : undefined,
+            includedGroupIds: Array.isArray(group.attributes?.included_group_ids) ? group.attributes.included_group_ids : [],
         },
     };
 };
@@ -90,8 +92,6 @@ const getAllGroupsFlat = async (): Promise<Array<AugmentedGroupRepresentation>> 
 
 export const membersGroupIdentifier = 'mitglieder';
 export const adminGroupIdentifier = 'admin';
-// Folders of the old subgroups.
-const legacySubgroupFolders = ['eingeschränkt', 'erweitert'];
 const relevantCategories = ['koerperschaften', 'kreise', 'status', 'untergruppen'];
 
 /*
@@ -102,7 +102,6 @@ export interface KeycloakGroupWithChildren {
     group: AugmentedGroupRepresentation;
     memberGroup: AugmentedGroupRepresentation | undefined;
     adminGroup: AugmentedGroupRepresentation | undefined;
-    legacySubgroups: Array<AugmentedGroupRepresentation>;
 }
 
 export const keycloakGetAllGroups = async (): Promise<Array<KeycloakGroupWithChildren>> => {
@@ -122,7 +121,6 @@ export const keycloakGetAllGroups = async (): Promise<Array<KeycloakGroupWithChi
                 group,
                 memberGroup: children.find((child) => child.name === membersGroupIdentifier),
                 adminGroup: children.find((child) => child.name === adminGroupIdentifier),
-                legacySubgroups: children.filter((child) => legacySubgroupFolders.includes(child.name)).flatMap(childrenOf),
             };
         });
 };
@@ -165,4 +163,67 @@ export const keycloakUpdateGroupAttributes = async ({
     }
 
     await client.groups.update({ id: groupId, realm: process.env.KEYCLOAK_REALM }, group);
+};
+
+// null or an empty list removes the attribute.
+export const keycloakSetGroupAttributes = async (
+    groupId: string,
+    attributes: Record<string, string | Array<string> | null>,
+): Promise<void> => {
+    const client = await getKeycloakClient();
+    const group = await client.groups.findOne({ id: groupId });
+
+    if (group === undefined) {
+        throw new Error('Group not found');
+    }
+
+    const changed = Object.fromEntries(
+        Object.entries(attributes).map(([key, value]) => {
+            const values = value === null ? [] : Array.isArray(value) ? value : [value];
+            return [key, values.length === 0 ? undefined : values];
+        }),
+    );
+    group.attributes = Object.fromEntries(Object.entries({ ...group.attributes, ...changed }).filter(([, value]) => value !== undefined));
+
+    await client.groups.update({ id: groupId, realm: process.env.KEYCLOAK_REALM }, group);
+};
+
+export interface KeycloakCreatedGroup {
+    id: string;
+    memberGroupId: string;
+    adminGroupId: string;
+}
+
+// Creates /<folder>/<slug> with its member and admin groups. Returns null if the slug is taken.
+export const keycloakCreateGroup = async (
+    folder: 'kreise' | 'untergruppen',
+    slug: string,
+    attributes: Record<string, string>,
+): Promise<KeycloakCreatedGroup | null> => {
+    const client = await getKeycloakClient();
+    const parentFolder = (await getParentGroups()).find((group) => group.path === `/${folder}`);
+
+    if (parentFolder === undefined) {
+        throw new Error(`Group /${folder} not found`);
+    }
+
+    if ((await getSubGroups(parentFolder.id)).some((group) => group.name === slug)) {
+        return null;
+    }
+
+    const { id } = await client.groups.createChildGroup(
+        { id: parentFolder.id },
+        { name: slug, attributes: Object.fromEntries(Object.entries(attributes).map(([key, value]) => [key, [value]])) },
+    );
+
+    try {
+        const memberGroup = await client.groups.createChildGroup({ id }, { name: membersGroupIdentifier });
+        const adminGroup = await client.groups.createChildGroup({ id }, { name: adminGroupIdentifier });
+
+        return { id, memberGroupId: memberGroup.id, adminGroupId: adminGroup.id };
+    } catch (error: unknown) {
+        // A group without member and admin groups can not be managed.
+        await client.groups.del({ id });
+        throw error;
+    }
 };

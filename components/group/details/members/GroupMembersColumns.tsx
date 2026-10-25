@@ -20,6 +20,7 @@ export interface GroupMember {
     username: string;
     email: string;
     status: 'invited' | 'member' | 'disabled' | 'admin';
+    viaGroup?: { id: string; displayName: string };
 }
 
 export const formatMemberStatus = (status: string): string => {
@@ -35,8 +36,15 @@ export const formatMemberStatus = (status: string): string => {
     }
 };
 
-export const getMemberStatusBadgeVariant = (status: GroupMember['status']): BadgeProps['variant'] => {
-    switch (status) {
+export const formatMemberLabel = (member: GroupMember): string =>
+    member.viaGroup === undefined ? formatMemberStatus(member.status) : `Über ${member.viaGroup.displayName}`;
+
+export const getMemberStatusBadgeVariant = (member: GroupMember): BadgeProps['variant'] => {
+    if (member.viaGroup !== undefined) {
+        return 'outline';
+    }
+
+    switch (member.status) {
         case 'admin':
             return 'default';
         case 'member':
@@ -174,7 +182,7 @@ export const getGroupMembersColumns = (showEmail: boolean, onOpenMember: (member
         enableGlobalFilter: false,
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
         cell: ({ row }): ReactElement => {
-            return <Fragment>{formatMemberStatus(row.getValue('Status'))}</Fragment>;
+            return <Fragment>{formatMemberLabel(row.original)}</Fragment>;
         },
     },
     {

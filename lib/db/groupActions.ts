@@ -132,17 +132,10 @@ export const countOtherActiveGroupAdmins = async (groupId: string, userId: strin
     return result[0]?.count ?? 0;
 };
 
-// Old subgroups below eingeschränkt/erweitert. They can not be managed in Nexus.
-export const isLegacySubgroup = (group: Group): boolean => group.parentGroup !== null && group.memberGroup === null;
-
 export const isArchivedGroup = (group: Group): boolean => group.status === 'archived';
 
 // With parentAdminsManage, the admins of the parent group may manage the group too.
 export const canManageGroup = async (userId: string, group: Group): Promise<boolean> => {
-    if (isLegacySubgroup(group)) {
-        return false;
-    }
-
     if (isGlobalAdmin(userId) || (await getGroupAdminStatus(userId, group.id)) === 'Admin') {
         return true;
     }
@@ -272,3 +265,59 @@ export const getGroupsWithMembers = async (groupIds: Array<string>): Promise<Arr
 
     return results;
 };
+
+export const insertGroup = async (entry: typeof groupsTable.$inferInsert): Promise<void> => {
+    await db.insert(groupsTable).values(entry);
+};
+
+export const updateGroupSettings = async (
+    groupId: string,
+    settings: Partial<Pick<Group, 'categoryName' | 'displayName' | 'hidden' | 'includedGroups' | 'parentAdminsManage' | 'status'>>,
+): Promise<number> => {
+    const result = await db.update(groupsTable).set(settings).where(eq(groupsTable.id, groupId)).returning();
+    return result.length;
+};
+
+// Categories of the groups without a parent, subgroups have none of their own.
+export const getGroupCategories = async (): Promise<Array<string>> => {
+    const rows = await db
+        .selectDistinct({ categoryName: groupsTable.categoryName })
+        .from(groupsTable)
+        .where(and(isNull(groupsTable.deletedAt), isNull(groupsTable.parentGroup), ne(groupsTable.categoryName, '')))
+        .orderBy(groupsTable.categoryName);
+    return rows.map((row) => row.categoryName);
+};
+
+export interface IncludedGroupMember extends GroupMember {
+    viaGroup: Group;
+}
+
+// Included groups that were deleted in the meantime are skipped.
+export const getIncludedGroups = async (group: Group): Promise<Array<Group>> =>
+    (await Promise.all(group.includedGroups.map(getGroupById))).filter((includedGroup): includedGroup is Group => includedGroup !== null);
+
+// Members of the included groups who are not members themselves. A person in several included groups is listed once.
+export const getIncludedGroupMembers = async (
+    directMembers: Array<GroupMember>,
+    includedGroups: Array<Group>,
+): Promise<Array<IncludedGroupMember>> => {
+    const memberIds = new Set(directMembers.map((member) => member.id));
+    const result: Array<IncludedGroupMember> = [];
+
+    for (const includedGroup of includedGroups) {
+        for (const member of await getGroupMembers(includedGroup.id)) {
+            if (!memberIds.has(member.id)) {
+                memberIds.add(member.id);
+                result.push({ ...member, viaGroup: includedGroup });
+            }
+        }
+    }
+
+    return result;
+};
+
+export const getIncludableGroups = async (groupId: string): Promise<Array<{ id: string; displayName: string }>> =>
+    (await getAllGroups())
+        .filter((group) => group.id !== groupId)
+        .map(({ id, displayName }) => ({ id, displayName }))
+        .sort((a, b) => a.displayName.localeCompare(b.displayName, 'de'));

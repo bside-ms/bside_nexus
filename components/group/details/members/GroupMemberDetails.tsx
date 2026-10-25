@@ -4,6 +4,7 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import Link from 'next/link';
 import type { ReactElement } from 'react';
 import type { GroupMemberAction, GroupMemberActionContext } from '@/components/group/details/members/GroupMemberActions';
 import { getGroupMemberActions, hasMemberEmail } from '@/components/group/details/members/GroupMemberActions';
@@ -110,6 +111,16 @@ export function GroupMemberDetails({ member, actionContext, onClose, className }
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
                 <dt className="text-zinc-500 dark:text-zinc-400">Status</dt>
                 <dd>{formatMemberStatus(member.status)}</dd>
+                {member.viaGroup !== undefined && (
+                    <Fragment>
+                        <dt className="text-zinc-500 dark:text-zinc-400">Über</dt>
+                        <dd>
+                            <Link href={`/portal/groups/${member.viaGroup.id}`} className="underline underline-offset-4">
+                                {member.viaGroup.displayName}
+                            </Link>
+                        </dd>
+                    </Fragment>
+                )}
                 {hasMemberEmail(member) && (
                     <Fragment>
                         <dt className="text-zinc-500 dark:text-zinc-400">E-Mail</dt>
@@ -117,6 +128,12 @@ export function GroupMemberDetails({ member, actionContext, onClose, className }
                     </Fragment>
                 )}
             </dl>
+            {member.viaGroup !== undefined && (
+                <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    {member.displayName} ist Mitglied von {member.viaGroup.displayName} und steht deshalb auch in dieser Gruppe. Die
+                    Mitgliedschaft lässt sich nur dort ändern.
+                </p>
+            )}
             <div className="flex flex-col gap-2">
                 {adminActions.length > 0 && (
                     <Fragment>

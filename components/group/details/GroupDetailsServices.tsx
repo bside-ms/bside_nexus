@@ -1,5 +1,6 @@
 import { Cloud, Key, PlusCircle, Trello } from 'lucide-react';
 import type { ReactElement } from 'react';
+import GroupRolesOverview from '@/components/group/details/admin/GroupRolesOverview';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -11,7 +12,9 @@ export interface Service {
 }
 
 interface GroupServicesCardProps {
+    groupId: string;
     services: Array<Service>;
+    canEditRoles: boolean;
 }
 
 const serviceIcons = {
@@ -21,7 +24,7 @@ const serviceIcons = {
     other: PlusCircle,
 };
 
-export function GroupDetailsServices({ services }: GroupServicesCardProps): ReactElement {
+export function GroupDetailsServices({ groupId, services, canEditRoles }: GroupServicesCardProps): ReactElement {
     return (
         <Card>
             <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
@@ -29,6 +32,7 @@ export function GroupDetailsServices({ services }: GroupServicesCardProps): Reac
             </CardHeader>
             <CardContent>
                 <CardDescription className="mb-4">Dienste und Ressourcen, auf die diese Gruppe Zugriff hat</CardDescription>
+                {canEditRoles && <GroupRolesOverview groupId={groupId} />}
                 <div className="grid gap-2">
                     {services.map((service) => {
                         const Icon = serviceIcons[service.type];

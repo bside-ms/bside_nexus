@@ -10,7 +10,6 @@ import {
     getGroupAdminStatus,
     getGroupById,
     isGlobalAdmin,
-    isLegacySubgroup,
     removeAdminFromDbGroup,
     removeUserFromDbGroup,
     updateDescription,
@@ -27,13 +26,6 @@ const getManageableGroup = async (groupId: string, executingUserId: string): Pro
     const group = await getGroupById(groupId);
     if (group === null) {
         return NextResponse.json({ error: 'Die Gruppe konnte nicht gefunden werden.' }, { status: 400 });
-    }
-
-    if (isLegacySubgroup(group)) {
-        return NextResponse.json(
-            { error: 'Diese Untergruppe wird noch zentral verwaltet und kann hier nicht geändert werden.' },
-            { status: 400 },
-        );
     }
 
     if (!(await canManageGroup(executingUserId, group))) {

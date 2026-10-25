@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { Toaster } from 'sonner';
+import GroupSystemSettingsDialog from '@/components/group/details/admin/GroupSystemSettingsDialog';
 import { GroupDetailsDescription } from '@/components/group/details/GroupDetailsDescription';
 import { GroupDetailsHeader } from '@/components/group/details/GroupDetailsHeader';
 import { GroupDetailsServices } from '@/components/group/details/GroupDetailsServices';
@@ -15,11 +16,14 @@ import {
     canViewGroup,
     getGroupAdminStatus,
     getGroupById,
+    getGroupCategories,
     getGroupMembers,
+    getIncludableGroups,
+    getIncludedGroupMembers,
+    getIncludedGroups,
     getVisibleSubgroups,
     isArchivedGroup,
     isGlobalAdmin as isSystemAdminUser,
-    isLegacySubgroup,
 } from '@/lib/db/groupActions';
 import isNotEmptyString from '@/lib/utils/isNotEmptyString';
 
@@ -62,6 +66,8 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
     ];
 
     // ToDo: UseEffect to load the group members.
+    const isSystemAdmin = isSystemAdminUser(userId);
+    const isArchived = isArchivedGroup(group);
     const [groupMembers, subgroups, isAdmin, canManage] = await Promise.all([
         getGroupMembers(groupId),
         getVisibleSubgroups(groupId, userId),
@@ -71,6 +77,9 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
 
     // ToDo: Fetch those values from the database.
     const [services] = [[]];
+
+    const includedGroups = await getIncludedGroups(group);
+    const includedGroupMembers = await getIncludedGroupMembers(groupMembers, includedGroups);
 
     const members: Array<GroupMember> = [];
     groupMembers.forEach((member) => {
@@ -83,6 +92,18 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
             status: !member.enabled ? 'disabled' : member.isAdmin ? 'admin' : 'member',
         });
     });
+    // Admins of an included group are no admins here.
+    includedGroupMembers.forEach((member) => {
+        members.push({
+            userId: member.id,
+            groupId: group.id,
+            displayName: member.displayName ?? '-',
+            username: member.username ?? '-',
+            email: canManage ? (member.email ?? '-') : '',
+            status: member.enabled ? 'member' : 'disabled',
+            viaGroup: { id: member.viaGroup.id, displayName: member.viaGroup.displayName },
+        });
+    });
 
     return (
         <div className="">
@@ -92,8 +113,26 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
                     displayName={group.displayName ?? group.name}
                     isPermission={group.groupType === 'permission'}
                     parent={parent}
-                    isLegacySubgroup={isLegacySubgroup(group)}
-                    isArchived={isArchivedGroup(group)}
+                    isArchived={isArchived}
+                    actions={
+                        isSystemAdmin && (
+                            <GroupSystemSettingsDialog
+                                groupId={group.id}
+                                displayName={group.displayName}
+                                categoryName={group.categoryName}
+                                categories={isSystemAdmin && group.parentGroup === null ? await getGroupCategories() : []}
+                                includedGroupIds={includedGroups.map((includedGroup) => includedGroup.id)}
+                                groupOptions={isSystemAdmin ? await getIncludableGroups(group.id) : []}
+                                hidden={group.hidden}
+                                parentAdminsManage={group.parentAdminsManage}
+                                isSubgroup={group.parentGroup !== null}
+                                isArchived={isArchived}
+                                parentArchived={parentGroup !== null && isArchivedGroup(parentGroup)}
+                                subgroupCount={subgroups.length}
+                                adminCount={members.filter((member) => member.status === 'admin').length}
+                            />
+                        )
+                    }
                 />
                 <Separator className="my-6" />
 
@@ -110,8 +149,10 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
                     </div>
 
                     {/* Only one level of subgroups. */}
-                    {group.parentGroup === null && <GroupDetailsSubgroups subgroups={subgroups} />}
-                    <GroupDetailsServices services={services ?? []} />
+                    {group.parentGroup === null && (
+                        <GroupDetailsSubgroups groupId={group.id} subgroups={subgroups} canCreate={isSystemAdmin && !isArchived} />
+                    )}
+                    <GroupDetailsServices groupId={group.id} services={services ?? []} canEditRoles={isSystemAdmin} />
                 </div>
 
                 <Separator className="my-6" />
@@ -121,8 +162,9 @@ const Group = async ({ params }: GroupPageProps): Promise<ReactElement> => {
                     groupId={group.id}
                     canManage={canManage}
                     requiresAdmin={!group.parentAdminsManage}
-                    isSystemAdmin={isSystemAdminUser(userId)}
+                    isSystemAdmin={isSystemAdmin}
                     currentUserId={userId}
+                    includedGroups={includedGroups.map(({ id, displayName }) => ({ id, displayName }))}
                 />
             </div>
 

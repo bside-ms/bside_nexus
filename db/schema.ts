@@ -56,6 +56,10 @@ export const groupsTable = pgTable('groups', {
     parentAdminsManage: boolean().notNull().default(false),
     hidden: boolean().notNull().default(false),
     status: varchar({ length: 50 }).notNull().default('active'),
+    includedGroups: varchar({ length: 255 })
+        .array()
+        .notNull()
+        .default(sql`'{}'`),
     deletedAt: timestamp(),
 });
 

@@ -5,7 +5,7 @@
 import { ChevronRight } from 'lucide-react';
 import type { ReactElement } from 'react';
 import type { GroupMember } from '@/components/group/details/members/GroupMembersColumns';
-import { formatMemberStatus, getMemberStatusBadgeVariant, GroupMemberAvatar } from '@/components/group/details/members/GroupMembersColumns';
+import { formatMemberLabel, getMemberStatusBadgeVariant, GroupMemberAvatar } from '@/components/group/details/members/GroupMembersColumns';
 import { Badge } from '@/components/ui/badge';
 
 interface GroupMemberMobileRowProps {
@@ -21,8 +21,8 @@ export function GroupMemberMobileRow({ member, onOpen }: GroupMemberMobileRowPro
                 <p className="truncate font-medium">{member.displayName}</p>
                 <p className="truncate text-sm text-zinc-500 dark:text-zinc-400">@{member.username}</p>
             </div>
-            <Badge variant={getMemberStatusBadgeVariant(member.status)} className="shrink-0">
-                {formatMemberStatus(member.status)}
+            <Badge variant={getMemberStatusBadgeVariant(member)} className="max-w-[40%] shrink-0 truncate">
+                {formatMemberLabel(member)}
             </Badge>
             <ChevronRight className="size-4 shrink-0 text-zinc-500 dark:text-zinc-400" />
         </button>

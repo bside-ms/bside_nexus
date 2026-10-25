@@ -48,7 +48,7 @@ async function populateGroups(): Promise<void> {
     const syncedGroupIds = new Set<string>();
     const ownStatusById = new Map(groups.map(({ group }) => [group.id, getGroupStatus(group)]));
 
-    for (const { group, memberGroup, adminGroup, legacySubgroups } of groups) {
+    for (const { group, memberGroup, adminGroup } of groups) {
         const parentGroup = group.attributes.parentGroupId ?? null;
         const status: GroupStatus =
             ownStatusById.get(group.id) === 'archived' || (parentGroup !== null && ownStatusById.get(parentGroup) === 'archived')
@@ -67,22 +67,10 @@ async function populateGroups(): Promise<void> {
             adminGroup: adminGroup?.id ?? null,
             parentGroup,
             parentAdminsManage: parentGroup !== null && group.attributes.parentAdminsManage,
+            includedGroups: group.attributes.includedGroupIds,
             status,
         });
         syncedGroupIds.add(group.id);
-
-        // Old subgroups have no member and admin groups.
-        for (const subgroup of legacySubgroups) {
-            await upsertGroup({
-                ...toGroupEntry(subgroup),
-                memberGroup: null,
-                adminGroup: null,
-                parentGroup: group.id,
-                parentAdminsManage: false,
-                status: status === 'archived' ? 'archived' : getGroupStatus(subgroup),
-            });
-            syncedGroupIds.add(subgroup.id);
-        }
     }
 
     // Soft delete, logs and HRP contracts still reference them.
@@ -145,18 +133,13 @@ async function populateMembers(): Promise<void> {
         const groupId = group.id;
         const memberGroupId = group.memberGroup;
         const adminGroupId = group.adminGroup;
-        const isLegacySubgroup = group.parentGroup !== null && memberGroupId === null;
 
         let members: Array<AugmentedUserRepresentation> = [];
         let admins: Array<AugmentedUserRepresentation> = [];
 
         // Ohne Quelle in Keycloak lässt sich nichts abgleichen – bestehende Einträge bleiben unangetastet.
-        if (!isLegacySubgroup && memberGroupId === null && adminGroupId === null) {
+        if (memberGroupId === null && adminGroupId === null) {
             continue;
-        }
-
-        if (isLegacySubgroup) {
-            members = await keycloakGetDirectMembers(groupId);
         }
 
         if (memberGroupId !== null) {

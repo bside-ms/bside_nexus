@@ -1,21 +1,24 @@
-import { PlusCircle, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
+import CreateSubgroupDialog from '@/components/group/details/admin/CreateSubgroupDialog';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Group } from '@/db/schema';
 
-// Expects only visible subgroups (getVisibleSubgroups).
-export function GroupDetailsSubgroups({ subgroups }: { subgroups: Array<Group> }): ReactElement {
+interface GroupDetailsSubgroupsProps {
+    groupId: string;
+    // Expects only visible subgroups (getVisibleSubgroups).
+    subgroups: Array<Group>;
+    canCreate: boolean;
+}
+
+export function GroupDetailsSubgroups({ groupId, subgroups, canCreate }: GroupDetailsSubgroupsProps): ReactElement {
     return (
         <Card>
             <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle>Untergruppen</CardTitle>
-                <Button size="sm" variant="outline" disabled={true}>
-                    <PlusCircle className="mr-2 size-4" />
-                    Untergruppe erstellen
-                </Button>
+                {canCreate && <CreateSubgroupDialog parentGroupId={groupId} />}
             </CardHeader>
             <CardContent>
                 <CardDescription className="mb-4">Liste der Untergruppen innerhalb dieser Gruppe</CardDescription>

@@ -1,0 +1,1 @@
+ALTER TABLE "groups" ADD COLUMN "includedGroups" varchar(255)[] DEFAULT '{}' NOT NULL;
