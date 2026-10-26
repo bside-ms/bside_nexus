@@ -62,11 +62,11 @@ ENV PDF_TIMEOUT_MS=$PDF_TIMEOUT_MS
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build && mkdir -p /app/.next/cache
+RUN npm run build && rm -rf /app/.next/cache
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
-RUN mkdir -p /home/nextjs && chown nextjs:nodejs /home/nextjs
+RUN mkdir -p /home/nextjs /app/.next/cache && chown nextjs:nodejs /home/nextjs /app/.next/cache
 ENV HOME=/home/nextjs
 
 USER nextjs

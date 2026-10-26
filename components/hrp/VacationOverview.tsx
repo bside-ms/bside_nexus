@@ -28,9 +28,10 @@ interface VacationOverviewProps {
     showDatePicker?: boolean;
     initialDate?: Date;
     userId?: string;
+    refreshKey?: number;
 }
 
-export default function VacationOverview({ showDatePicker = true, initialDate, userId }: VacationOverviewProps): ReactElement {
+export default function VacationOverview({ showDatePicker = true, initialDate, userId, refreshKey }: VacationOverviewProps): ReactElement {
     const [date, setDate] = useState<Date>(initialDate || new Date());
     const [details, setDetails] = useState<VacationDetails | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -65,7 +66,7 @@ export default function VacationOverview({ showDatePicker = true, initialDate, u
         };
 
         fetchDetails();
-    }, [date, userId]);
+    }, [date, userId, refreshKey]);
 
     const year = date.getFullYear();
 

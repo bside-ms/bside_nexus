@@ -34,7 +34,12 @@ const formSchema = z.object({
     ),
 });
 
-export default function AbsenceEntry({ contracts }: { contracts: Array<HrpContract> }): ReactElement {
+interface AbsenceEntryProps {
+    contracts: Array<HrpContract>;
+    onSaved?: () => void;
+}
+
+export default function AbsenceEntry({ contracts, onSaved }: AbsenceEntryProps): ReactElement {
     const [isLoading, setIsLoading] = useState(false);
     const [success, setSuccess] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -76,6 +81,7 @@ export default function AbsenceEntry({ contracts }: { contracts: Array<HrpContra
                     ...values,
                     dateRange: { from: new Date(), to: new Date() },
                 });
+                onSaved?.();
             } else {
                 setError(data.message || 'Fehler beim Speichern.');
             }

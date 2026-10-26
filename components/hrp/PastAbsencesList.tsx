@@ -18,7 +18,11 @@ const ABSENCE_TYPE_MAP = {
     holiday: 'Feiertag',
 };
 
-export default function PastAbsencesList(): ReactElement {
+interface PastAbsencesListProps {
+    refreshKey?: number;
+}
+
+export default function PastAbsencesList({ refreshKey }: PastAbsencesListProps): ReactElement {
     const [absences, setAbsences] = useState<Array<HrpAbsenceEntry>>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [filters, setFilters] = useState({
@@ -44,7 +48,7 @@ export default function PastAbsencesList(): ReactElement {
         };
 
         fetchPastAbsences();
-    }, []);
+    }, [refreshKey]);
 
     const handleFilterChange = (filterName: keyof typeof filters) => {
         setFilters((prev) => ({ ...prev, [filterName]: !prev[filterName] }));

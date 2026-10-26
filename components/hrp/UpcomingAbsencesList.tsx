@@ -9,7 +9,12 @@ import type { HrpAbsenceEntry } from '@/db/schema';
 import { format, parseISO } from 'date-fns';
 import { de } from 'date-fns/locale';
 
-export default function UpcomingAbsencesList(): ReactElement {
+interface UpcomingAbsencesListProps {
+    refreshKey?: number;
+    onChanged?: () => void;
+}
+
+export default function UpcomingAbsencesList({ refreshKey, onChanged }: UpcomingAbsencesListProps): ReactElement {
     const [upcoming, setUpcoming] = useState<Array<HrpAbsenceEntry>>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -29,7 +34,7 @@ export default function UpcomingAbsencesList(): ReactElement {
 
     useEffect(() => {
         fetchUpcoming();
-    }, []);
+    }, [refreshKey]);
 
     const handleDeleteGroup = async (date: string) => {
         // Find consecutive dates in the 'upcoming' list that include 'date'.
@@ -88,7 +93,12 @@ export default function UpcomingAbsencesList(): ReactElement {
                 body: JSON.stringify({ ids: idsToDelete, reason: 'Bulk delete from overview' }),
             });
             if (res.ok) {
-                await fetchUpcoming();
+                // With a parent, the bumped refreshKey reloads this list together with the others.
+                if (onChanged) {
+                    onChanged();
+                } else {
+                    await fetchUpcoming();
+                }
             }
         } finally {
             setIsDeleting(null);

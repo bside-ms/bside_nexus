@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
-import AbsenceEntry from '@/components/hrp/AbsenceEntry';
-import PastAbsencesList from '@/components/hrp/PastAbsencesList';
-import UpcomingAbsencesList from '@/components/hrp/UpcomingAbsencesList';
-import VacationOverview from '@/components/hrp/VacationOverview';
+import AbsencesPageContent from '@/components/hrp/AbsencesPageContent';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getActiveContractsForUser } from '@/lib/db/contractActions';
@@ -33,10 +30,7 @@ export default async function Page(): Promise<ReactElement> {
         <div className="">
             <NavbarTop items={breadCrumbs} sidebar={true} />
             <div className="flex flex-1 flex-col gap-8 p-4 max-w-2xl mx-auto">
-                <VacationOverview />
-                <AbsenceEntry contracts={contracts} />
-                <UpcomingAbsencesList />
-                <PastAbsencesList />
+                <AbsencesPageContent contracts={contracts} />
             </div>
         </div>
     );
