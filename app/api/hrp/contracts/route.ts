@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/db';
-import { hrpContractsTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
-import { getActiveContractsForUser } from '@/lib/db/contractActions';
+import { createContract, getActiveContractsForUser } from '@/lib/db/contractActions';
 import { isGlobalAdmin } from '@/lib/db/groupActions';
-import { v4 as uuidv4 } from 'uuid';
+import { contractCreateSchema } from '@/lib/validation/hrpSchemas';
+import { parseOrError } from '@/lib/validation/keySchemas';
 
 export async function GET(): Promise<NextResponse> {
     const session = await getUserSession();
@@ -46,21 +45,15 @@ export async function POST(req: Request): Promise<NextResponse> {
         return NextResponse.json({ message: 'Nur Systemadministrator*innen dürfen Verträge anlegen.' }, { status: 403 });
     }
 
-    const body = await req.json();
+    const parsed = parseOrError(contractCreateSchema, await req.json());
+    if (!parsed.ok) {
+        const message = parsed.error.issues?.[0]?.message ?? 'Ungültige Eingaben.';
+        return NextResponse.json({ success: false, message, ...parsed.error }, { status: 400 });
+    }
 
-    // Vertrag erstellen
-    await db.insert(hrpContractsTable).values({
-        id: uuidv4(),
-        userId: body.userId,
-        employerGroupId: body.employerGroupId,
-        type: body.type, // 'fixed_salary' | 'hourly'
-        weeklyHours: body.weeklyHours || 0,
-        hourlyRate: body.hourlyRate || '0.00',
-        vacationDaysPerYear: body.vacationDaysPerYear || 0,
-        workingDays: body.workingDays || [1, 2, 3, 4, 5], // Default Mo-Fr
-        validFrom: new Date(body.validFrom),
-        validTo: body.validTo ? new Date(body.validTo) : null,
-    });
+    const { hourlyRate, ...values } = parsed.data;
 
-    return NextResponse.json({ success: true });
+    const id = await createContract({ ...values, hourlyRate: hourlyRate.toFixed(2) });
+
+    return NextResponse.json({ success: true, id }, { status: 201 });
 }

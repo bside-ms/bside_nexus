@@ -1,6 +1,6 @@
 'use server';
 
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { getAbsences } from './hrpAbsenceActions';
 import { db } from '@/db';
 import type {
@@ -30,7 +30,7 @@ import {
 } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { HRP_EMPLOYER_GROUP_IDS } from '@/lib/constants';
-import { getContractAtDate } from '@/lib/db/contractActions';
+import { getContractAtDate, getContractChainIds } from '@/lib/db/contractActions';
 import { isGlobalAdmin } from '@/lib/db/groupActions';
 import { computeDayStats, type DayEntries, groupEntriesByWorkday } from '@/lib/hrp/hrpLogic';
 import { format } from 'date-fns';
@@ -363,55 +363,6 @@ export async function upsertForecast(data: {
     return result;
 }
 
-/**
- * Vertrag aktualisieren:
- * 1. Aktuellen Vertrag zum Stichtag beenden (validTo setzen)
- * 2. Neuen Vertrag ab dem Folgetag anlegen
- */
-export async function updateContract(
-    oldContractId: string,
-    newValues: {
-        type: string;
-        weeklyHours: number;
-        hourlyRate: string;
-        vacationDaysPerYear: number;
-        workingDays: Array<number>;
-    },
-    changeDate: Date,
-): Promise<string> {
-    // 1. Alten Vertrag holen
-    const oldContract = await db.query.hrpContractsTable.findFirst({
-        where: eq(hrpContractsTable.id, oldContractId),
-    });
-
-    if (!oldContract) {
-        throw new Error('Vertrag nicht gefunden');
-    }
-
-    // 2. Alten Vertrag beenden
-    await db.update(hrpContractsTable).set({ validTo: changeDate }).where(eq(hrpContractsTable.id, oldContractId));
-
-    // 3. Neuen Vertrag anlegen (Stichtag + 1 Tag)
-    const validFrom = new Date(changeDate);
-    validFrom.setDate(validFrom.getDate() + 1);
-
-    const newId = uuidv4();
-    await db.insert(hrpContractsTable).values({
-        id: newId,
-        userId: oldContract.userId,
-        employerGroupId: oldContract.employerGroupId,
-        type: newValues.type,
-        weeklyHours: newValues.weeklyHours,
-        hourlyRate: newValues.hourlyRate,
-        vacationDaysPerYear: newValues.vacationDaysPerYear,
-        workingDays: newValues.workingDays,
-        validFrom,
-        validTo: oldContract.validTo, // Behalte das ursprüngliche Enddatum bei (falls vorhanden)
-    });
-
-    return newId;
-}
-
 export async function createPayrollHourly(data: {
     contractId: string;
     year: number;
@@ -479,19 +430,30 @@ export async function getPreviousPayrollHourly(contractId: string, year: number,
         prevYear -= 1;
     }
 
+    const contract = await db.query.hrpContractsTable.findFirst({
+        where: eq(hrpContractsTable.id, contractId),
+    });
+    if (!contract) {
+        return null;
+    }
+
+    // Nach einer Vertragsänderung liegt die Vormonatsabrechnung an der vorherigen Fassung des Vertrags.
     const result = await db
-        .select()
+        .select({ payroll: hrpPayrollHourlyTable })
         .from(hrpPayrollHourlyTable)
+        .innerJoin(hrpContractsTable, eq(hrpPayrollHourlyTable.contractId, hrpContractsTable.id))
         .where(
             and(
-                eq(hrpPayrollHourlyTable.contractId, contractId),
+                eq(hrpContractsTable.userId, contract.userId),
+                eq(hrpContractsTable.employerGroupId, contract.employerGroupId),
                 eq(hrpPayrollHourlyTable.year, prevYear),
                 eq(hrpPayrollHourlyTable.month, prevMonth),
             ),
         )
+        .orderBy(desc(hrpPayrollHourlyTable.finalizedAt))
         .limit(1);
 
-    return result[0] ?? null;
+    return result[0]?.payroll ?? null;
 }
 
 export async function getCurrentPayrollHourly(contractId: string, year: number, month: number): Promise<HrpMonthlyPayrollEntry | null> {
@@ -567,7 +529,25 @@ export async function getUnbilledAbsencesForUser(userId: string, upToDate: Date)
     return results.map((r) => r.absence);
 }
 
-export async function getUnbilledLogs(userId: string, contractId: string, upToDate: Date): Promise<Array<HrpEventLogEntry>> {
+export async function getUnbilledLogs(
+    userId: string,
+    contractId: string,
+    upToDate: Date,
+    previousVersionsSince: Date,
+): Promise<Array<HrpEventLogEntry>> {
+    // Auch offene Buchungen früherer Fassungen des Vertrags prüfen, da sie sonst nach einer Änderung nie abgerechnet werden würden.
+    const previousVersionIds = (await getContractChainIds(contractId)).filter((id) => id !== contractId);
+    const contractCondition =
+        previousVersionIds.length > 0
+            ? or(
+                  eq(hrpEventLogTable.contractId, contractId),
+                  and(
+                      inArray(hrpEventLogTable.contractId, previousVersionIds),
+                      gte(hrpEventLogTable.loggedTimestamp, previousVersionsSince),
+                  ),
+              )
+            : eq(hrpEventLogTable.contractId, contractId);
+
     // eslint-disable-next-line no-return-await
     return await db
         .select()
@@ -575,7 +555,7 @@ export async function getUnbilledLogs(userId: string, contractId: string, upToDa
         .where(
             and(
                 eq(hrpEventLogTable.userId, userId),
-                eq(hrpEventLogTable.contractId, contractId),
+                contractCondition,
                 eq(hrpEventLogTable.abgerechnet, false),
                 isNull(hrpEventLogTable.abgerechnet_date),
                 isNull(hrpEventLogTable.deletedAt),

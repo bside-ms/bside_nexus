@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { BiEdit, BiPlus, BiTrash } from 'react-icons/bi';
 import { toast } from 'sonner';
+import WorkingDaysSelect, { formatWorkingDays } from '@/components/hrp/WorkingDaysSelect';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -14,7 +15,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { HrpYearlyEntry } from '@/db/schema';
+import type { ContractChangePreview } from '@/lib/db/contractChangeActions';
 import type { ContractDetails } from '@/lib/db/hrpAdminActions';
+import { format, parseISO, subDays } from 'date-fns';
 
 // Hilfsfunktion für Monatsende-Daten
 const getEndOfMonth = (offsetMonths: number): string => {
@@ -22,6 +25,35 @@ const getEndOfMonth = (offsetMonths: number): string => {
     d.setMonth(d.getMonth() + offsetMonths + 1);
     d.setDate(0);
     return d.toISOString().split('T')[0]!;
+};
+
+const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
+
+const toDateString = (date: Date | string): string => new Date(date).toISOString().slice(0, 10);
+
+const formatDate = (date: string): string => format(parseISO(date), 'dd.MM.yyyy');
+
+// Stichtage für Vertragsänderungen: Monatserster.
+const getEffectiveFromOptions = (validFrom: Date | string, validTo: Date | string | null): Array<string> => {
+    const now = new Date();
+    const validFromString = toDateString(validFrom);
+    const validToString = validTo ? toDateString(validTo) : null;
+    const options: Array<string> = [];
+
+    for (let offset = 3; offset >= -12; offset--) {
+        const option = format(new Date(now.getFullYear(), now.getMonth() + offset, 1), 'yyyy-MM-dd');
+        if (option > validFromString && (validToString === null || option <= validToString)) {
+            options.push(option);
+        }
+    }
+
+    return options;
+};
+
+const getDefaultEffectiveFrom = (options: Array<string>): string => {
+    const now = new Date();
+    const firstOfNextMonth = format(new Date(now.getFullYear(), now.getMonth() + 1, 1), 'yyyy-MM-dd');
+    return options.includes(firstOfNextMonth) ? firstOfNextMonth : (options[0] ?? '');
 };
 
 export default function ContractDetailPage(): ReactElement {
@@ -43,8 +75,11 @@ export default function ContractDetailPage(): ReactElement {
         weeklyHours: 0,
         hourlyRate: '0.00',
         vacationDaysPerYear: 0,
-        changeDate: '',
+        workingDays: DEFAULT_WORKING_DAYS,
+        effectiveFrom: '',
     });
+    const [changePreview, setChangePreview] = useState<ContractChangePreview | null>(null);
+    const [previewError, setPreviewError] = useState<string | null>(null);
 
     // Dialog State für Vertrag löschen
     const [isTerminateDialogOpen, setIsTerminateDialogOpen] = useState(false);
@@ -61,7 +96,10 @@ export default function ContractDetailPage(): ReactElement {
                     weeklyHours: result.data.contract.weeklyHours,
                     hourlyRate: result.data.contract.hourlyRate || '0.00',
                     vacationDaysPerYear: result.data.contract.vacationDaysPerYear,
-                    changeDate: getEndOfMonth(0), // Default: Ende diesen Monats
+                    workingDays: result.data.contract.workingDays ?? DEFAULT_WORKING_DAYS,
+                    effectiveFrom: getDefaultEffectiveFrom(
+                        getEffectiveFromOptions(result.data.contract.validFrom, result.data.contract.validTo),
+                    ),
                 });
                 setTerminationDate(getEndOfMonth(0));
             } else {
@@ -80,15 +118,49 @@ export default function ContractDetailPage(): ReactElement {
         }
     }, [contractId]);
 
+    // Vorschau: was ab dem Stichtag an den neuen Vertrag übergeht und ob die Änderung zulässig ist.
+    const workingDaysKey = contractFormData.workingDays.join(',');
+    useEffect(() => {
+        if (!isContractDialogOpen || contractFormData.effectiveFrom === '' || contractFormData.workingDays.length === 0) {
+            setChangePreview(null);
+            setPreviewError(null);
+            return;
+        }
+
+        let ignore = false;
+        setChangePreview(null);
+        setPreviewError(null);
+        const loadPreview = async () => {
+            try {
+                const res = await fetch(`/api/hrp/contracts/${contractId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ ...contractFormData, dryRun: true }),
+                });
+                const result = await res.json();
+                if (!ignore) {
+                    setChangePreview(result.success ? result.preview : null);
+                    setPreviewError(result.success ? null : (result.message ?? 'Die Vorschau konnte nicht geladen werden.'));
+                }
+            } catch {
+                if (!ignore) {
+                    setChangePreview(null);
+                    setPreviewError('Die Vorschau konnte nicht geladen werden.');
+                }
+            }
+        };
+        loadPreview();
+
+        return () => {
+            ignore = true;
+        };
+    }, [isContractDialogOpen, contractId, contractFormData.effectiveFrom, contractFormData.type, workingDaysKey]);
+
     const handleContractUpdate = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             const res = await fetch(`/api/hrp/contracts/${contractId}`, {
                 method: 'PUT',
-                body: JSON.stringify({
-                    ...contractFormData,
-                    workingDays: data?.contract.workingDays || [1, 2, 3, 4, 5],
-                }),
+                body: JSON.stringify(contractFormData),
             });
             const result = await res.json();
             if (result.success) {
@@ -203,6 +275,8 @@ export default function ContractDetailPage(): ReactElement {
 
     // Nur Systemadmins dürfen Verträge und Jahresabschlüsse ändern.
     const { contract, leaveAccounts, canEdit } = data;
+    const effectiveFromOptions = getEffectiveFromOptions(contract.validFrom, contract.validTo);
+    const hasChangeErrors = changePreview === null || changePreview.errors.length > 0;
 
     return (
         <div>
@@ -247,6 +321,10 @@ export default function ContractDetailPage(): ReactElement {
                         <div>
                             <p className="text-xs text-zinc-500 uppercase">Urlaub/Jahr</p>
                             <p className="font-medium">{contract.vacationDaysPerYear} Tage</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-zinc-500 uppercase">Arbeitstage</p>
+                            <p className="font-medium">{formatWorkingDays(contract.workingDays)}</p>
                         </div>
                         <div>
                             <p className="text-xs text-zinc-500 uppercase">Gültig ab</p>
@@ -448,31 +526,96 @@ export default function ContractDetailPage(): ReactElement {
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="change-date">Änderung zum Ende von</Label>
+                                <Label htmlFor="effective-from">Gültig ab</Label>
                                 <Select
-                                    value={contractFormData.changeDate}
-                                    onValueChange={(v) => setContractFormData({ ...contractFormData, changeDate: v })}
+                                    value={contractFormData.effectiveFrom}
+                                    onValueChange={(v) => setContractFormData({ ...contractFormData, effectiveFrom: v })}
                                 >
-                                    <SelectTrigger id="change-date">
-                                        <SelectValue />
+                                    <SelectTrigger id="effective-from">
+                                        <SelectValue placeholder="Kein Stichtag möglich" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value={getEndOfMonth(-1)}>Letzter Monat ({getEndOfMonth(-1)})</SelectItem>
-                                        <SelectItem value={getEndOfMonth(0)}>Dieser Monat ({getEndOfMonth(0)})</SelectItem>
-                                        <SelectItem value={getEndOfMonth(1)}>Nächster Monat ({getEndOfMonth(1)})</SelectItem>
+                                        {effectiveFromOptions.map((option) => (
+                                            <SelectItem key={option} value={option}>
+                                                {formatDate(option)}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
                         </div>
-                        <p className="text-xs text-zinc-500 italic">
-                            Hinweis: Der aktuelle Vertrag wird zum gewählten Datum beendet. Ein neuer Vertrag mit den geänderten Daten wird
-                            am Folgetag gültig.
-                        </p>
+                        <div className="space-y-2">
+                            <Label htmlFor="working-days">Arbeitstage</Label>
+                            <WorkingDaysSelect
+                                id="working-days"
+                                value={contractFormData.workingDays}
+                                onChange={(workingDays) => setContractFormData({ ...contractFormData, workingDays })}
+                            />
+                            {contractFormData.workingDays.length === 0 && (
+                                <p className="text-sm text-red-600">Bitte wähle mindestens einen Arbeitstag.</p>
+                            )}
+                        </div>
+                        {previewError !== null && <p className="text-sm text-red-600">{previewError}</p>}
+                        {changePreview !== null && changePreview.errors.length > 0 && (
+                            <ul className="list-disc space-y-1 pl-5 text-sm text-red-600">
+                                {changePreview.errors.map((error) => (
+                                    <li key={error}>{error}</li>
+                                ))}
+                            </ul>
+                        )}
+                        {changePreview !== null && changePreview.errors.length === 0 && (
+                            <div className="space-y-2 rounded-md border p-3 text-sm text-zinc-600 dark:text-zinc-300">
+                                <p>
+                                    Der bisherige Vertrag endet am{' '}
+                                    {formatDate(format(subDays(parseISO(changePreview.effectiveFrom), 1), 'yyyy-MM-dd'))}. Ab dem{' '}
+                                    {formatDate(changePreview.effectiveFrom)} gilt ein neuer Vertrag mit den geänderten Daten.
+                                </p>
+                                {changePreview.isRetroactive && (
+                                    <p className="font-medium text-amber-600">
+                                        Die Änderung ist rückwirkend. Soll und Gleitzeitsaldo ab dem Stichtag werden neu berechnet.
+                                    </p>
+                                )}
+                                <p>
+                                    Übernommen werden {changePreview.eventLogCount} Buchungen, {changePreview.absenceCount} Abwesenheiten
+                                    (davon {changePreview.futureAbsenceCount} künftige) und {changePreview.holidayConfigCount}{' '}
+                                    Feiertagsregeln
+                                    {changePreview.leaveAccountYears.length > 0 &&
+                                        `, außerdem die Jahreskonten ${changePreview.leaveAccountYears.join(', ')}`}
+                                    . Die Stunden der Abwesenheiten werden aus den neuen Wochenstunden und Arbeitstagen berechnet.
+                                </p>
+                                {changePreview.removedAbsenceCount > 0 && (
+                                    <p className="font-medium text-amber-600">
+                                        {changePreview.removedAbsenceCount} Urlaubs- oder Krankheitstage fallen auf Tage, die keine
+                                        Arbeitstage mehr sind. Sie werden gelöscht, Urlaubstage werden dadurch wieder frei.
+                                    </p>
+                                )}
+                                {changePreview.uncoveredDates.length > 0 && (
+                                    <p className="font-medium text-amber-600">
+                                        Neue Arbeitstage direkt neben gebuchtem Urlaub, für die kein Urlaub gebucht ist:{' '}
+                                        {changePreview.uncoveredDates.map(formatDate).join(', ')}. Hat die Person dort frei, muss der Urlaub
+                                        nachgetragen werden.
+                                    </p>
+                                )}
+                                <p>
+                                    Jahreskonten bis {subDays(parseISO(changePreview.effectiveFrom), 1).getFullYear()} bleiben am bisherigen
+                                    Vertrag und gelten weiter. Lege für diese Jahre kein zweites Jahreskonto am neuen Vertrag an, sonst
+                                    zählt der Urlaub doppelt.
+                                </p>
+                                {contractFormData.vacationDaysPerYear !== contract.vacationDaysPerYear && (
+                                    <p className="font-medium text-amber-600">
+                                        Der Urlaubsanspruch im Jahreskonto wird nicht automatisch angepasst. Passe ihn bei Bedarf im
+                                        Jahreskonto des bisherigen Vertrags an.
+                                    </p>
+                                )}
+                            </div>
+                        )}
                         <DialogFooter>
                             <Button type="button" variant="outline" onClick={() => setIsContractDialogOpen(false)}>
                                 Abbrechen
                             </Button>
-                            <Button type="submit">Änderung speichern</Button>
+                            <Button type="submit" disabled={hasChangeErrors}>
+                                Änderung speichern
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>

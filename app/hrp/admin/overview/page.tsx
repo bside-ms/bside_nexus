@@ -14,7 +14,7 @@ import { db } from '@/db';
 import type { HrpAbsenceEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
 import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
-import { getContractAtDate, getContractsForUser } from '@/lib/db/contractActions';
+import { getContractAtDate, getContractChainIds, getContractsForUser } from '@/lib/db/contractActions';
 import {
     canViewPayroll,
     getCurrentPayrollHourly,
@@ -271,10 +271,13 @@ export default async function Page({
     let currentPayroll: HrpMonthlyPayrollEntry | null = null;
     let forecast: string | undefined = undefined;
 
+    const contextWindowStart = new Date();
+    contextWindowStart.setDate(contextWindowStart.getDate() - 70);
+
     if (selectedUserId && selectedContractId && showPayrollHourly) {
         const edge = new Date(year, month, 23, 0, 0, 0, 0); // Ende des aktuellen Zeitraums (22. 23:59:59)
         // Wir laden unbilled logs ohne Zeitbeschränkung nach hinten, um ALLES zu erfassen
-        unbilledLogs = await getUnbilledLogs(selectedUserId, selectedContractId, edge);
+        unbilledLogs = await getUnbilledLogs(selectedUserId, selectedContractId, edge, contextWindowStart);
         unbilledAbsences = await getUnbilledAbsencesForUser(selectedUserId, edge);
         previousPayroll = await getPreviousPayrollHourly(selectedContractId, year, month);
         currentPayroll = await getCurrentPayrollHourly(selectedContractId, year, month);
@@ -285,17 +288,16 @@ export default async function Page({
     // Für die korrekte Gruppierung brauchen wir auch bereits abgerechnete Logs als Kontext
     let contextLogs: Array<HrpEventLogEntry> = [];
     if (selectedUserId && selectedContractId && showPayrollHourly) {
-        // Lade alle Logs der letzten 60 Tage als Kontext (sollte für Schichtübergänge reichen)
-        const sixtyDaysAgo = new Date();
-        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        // Lade alle Logs im Kontextfenster, auch von früheren Fassungen des Vertrags.
+        const contractChainIds = await getContractChainIds(selectedContractId);
         contextLogs = await db
             .select()
             .from(hrpEventLogTable)
             .where(
                 and(
                     eq(hrpEventLogTable.userId, selectedUserId),
-                    eq(hrpEventLogTable.contractId, selectedContractId),
-                    gte(hrpEventLogTable.loggedTimestamp, sixtyDaysAgo),
+                    inArray(hrpEventLogTable.contractId, contractChainIds),
+                    gte(hrpEventLogTable.loggedTimestamp, contextWindowStart),
                     isNull(hrpEventLogTable.deletedAt),
                 ),
             )

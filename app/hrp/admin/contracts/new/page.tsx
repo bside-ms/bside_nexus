@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { toast } from 'sonner';
+import WorkingDaysSelect from '@/components/hrp/WorkingDaysSelect';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -31,7 +32,8 @@ export default function NewContractPage(): ReactElement {
         type: 'fixed_salary',
         weeklyHours: 40,
         hourlyRate: '0.00',
-        vacationDaysPerYear: 30,
+        vacationDaysPerYear: '', // Kein Vorschlag, wird von Hand eingetragen.
+        workingDays: [1, 2, 3, 4, 5],
         validFrom: '',
     });
 
@@ -68,6 +70,15 @@ export default function NewContractPage(): ReactElement {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (formData.workingDays.length === 0) {
+            toast.error('Bitte wähle mindestens einen Arbeitstag.');
+            return;
+        }
+        if (formData.vacationDaysPerYear === '') {
+            toast.error('Bitte gib die Urlaubstage pro Jahr an.');
+            return;
+        }
+
         const res = await fetch('/api/hrp/contracts', {
             method: 'POST',
             body: JSON.stringify(formData),
@@ -77,7 +88,8 @@ export default function NewContractPage(): ReactElement {
             toast.success('Vertrag angelegt');
             router.push('/hrp/admin/contracts');
         } else {
-            toast.error('Fehler beim Speichern');
+            const result = await res.json().catch(() => null);
+            toast.error(result?.message ?? 'Fehler beim Speichern');
         }
     };
 
@@ -181,6 +193,39 @@ export default function NewContractPage(): ReactElement {
                                 />
                             </div>
                         )}
+
+                        <div className="space-y-2">
+                            <label htmlFor="working-days" className="text-sm font-medium">
+                                Arbeitstage
+                            </label>
+                            <WorkingDaysSelect
+                                id="working-days"
+                                value={formData.workingDays}
+                                onChange={(workingDays) => setFormData({ ...formData, workingDays })}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                An diesen Tagen fällt Soll an. Urlaub und Krankheit werden nur an diesen Tagen gebucht.
+                            </p>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label htmlFor="vacation-days" className="text-sm font-medium">
+                                Urlaubstage / Jahr
+                            </label>
+                            <Input
+                                id="vacation-days"
+                                type="number"
+                                min={0}
+                                max={60}
+                                step={1}
+                                value={formData.vacationDaysPerYear}
+                                onChange={(e) => setFormData({ ...formData, vacationDaysPerYear: e.target.value })}
+                                required
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Den Urlaubsanspruch für das Startjahr legst du danach im Jahreskonto des Vertrags an.
+                            </p>
+                        </div>
 
                         <div className="space-y-2">
                             <label htmlFor="date-from" className="text-sm font-medium">

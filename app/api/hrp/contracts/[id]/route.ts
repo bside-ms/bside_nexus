@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
+import { changeContract, previewContractChange } from '@/lib/db/contractChangeActions';
 import { isGlobalAdmin } from '@/lib/db/groupActions';
-import { getContractById, getLeaveAccounts, terminateContract, updateContract } from '@/lib/db/hrpAdminActions';
+import { getContractById, getLeaveAccounts, terminateContract } from '@/lib/db/hrpAdminActions';
+import { getClientIP } from '@/lib/utils/getClientIP';
 import getSupportEmail from '@/lib/utils/getSupportEmail';
+import { contractChangeSchema } from '@/lib/validation/hrpSchemas';
+import { parseOrError } from '@/lib/validation/keySchemas';
 
 const getErrorMessage = (): string => {
     const supportEmail = getSupportEmail();
@@ -54,22 +58,27 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const { id } = await params;
 
     try {
-        const body = await req.json();
-        const { type, weeklyHours, hourlyRate, vacationDaysPerYear, workingDays, changeDate } = body;
+        const parsed = parseOrError(contractChangeSchema, await req.json());
+        if (!parsed.ok) {
+            return NextResponse.json({ success: false, message: 'Ungültige Eingaben.', ...parsed.error }, { status: 400 });
+        }
 
-        const newId = await updateContract(
-            id,
-            {
-                type,
-                weeklyHours,
-                hourlyRate,
-                vacationDaysPerYear,
-                workingDays,
-            },
-            new Date(changeDate),
-        );
+        const { dryRun, effectiveFrom, hourlyRate, ...values } = parsed.data;
 
-        return NextResponse.json({ success: true, newId });
+        if (dryRun === true) {
+            const preview = await previewContractChange(id, values, effectiveFrom);
+            return NextResponse.json({ success: true, preview });
+        }
+
+        const result = await changeContract(id, { ...values, hourlyRate: hourlyRate.toFixed(2) }, effectiveFrom, {
+            userId: session.id,
+            ipAddress: getClientIP(req),
+        });
+        if ('errors' in result) {
+            return NextResponse.json({ success: false, message: result.errors.join(' ') }, { status: 400 });
+        }
+
+        return NextResponse.json({ success: true, newId: result.newId });
     } catch {
         return NextResponse.json({ success: false, message: getErrorMessage() }, { status: 500 });
     }

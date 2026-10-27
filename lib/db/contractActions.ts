@@ -1,7 +1,32 @@
-import { and, desc, eq, gte, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import { groupsTable, hrpContractsTable } from '@/db/schema';
 import { format } from 'date-fns';
+import { v4 as uuidv4 } from 'uuid';
+
+export interface NewContractValues {
+    userId: string;
+    employerGroupId: string;
+    type: string; // 'fixed_salary' | 'hourly'
+    weeklyHours: number;
+    hourlyRate: string;
+    vacationDaysPerYear: number;
+    workingDays: Array<number>;
+    validFrom: string; // YYYY-MM-DD
+}
+
+export async function createContract(values: NewContractValues): Promise<string> {
+    const id = uuidv4();
+
+    await db.insert(hrpContractsTable).values({
+        id,
+        ...values,
+        validFrom: new Date(values.validFrom),
+        validTo: null,
+    });
+
+    return id;
+}
 
 export interface HrpContract {
     contractId: string;
@@ -16,8 +41,30 @@ export interface HrpContract {
     validTo: Date | null;
 }
 
+/**
+ * Alle Fassungen eines Vertrags: Verträge derselben Person beim selben Arbeitgeber.
+ * Nach einer Vertragsänderung liegen ältere Buchungen und Abrechnungen an der vorherigen Fassung.
+ */
+export async function getContractChainIds(contractId: string): Promise<Array<string>> {
+    const contract = await db.query.hrpContractsTable.findFirst({
+        where: eq(hrpContractsTable.id, contractId),
+    });
+    if (!contract) {
+        return [contractId];
+    }
+
+    const chain = await db
+        .select({ id: hrpContractsTable.id })
+        .from(hrpContractsTable)
+        .where(and(eq(hrpContractsTable.userId, contract.userId), eq(hrpContractsTable.employerGroupId, contract.employerGroupId)));
+
+    return chain.map((c) => c.id);
+}
+
 export async function getActiveContractsForUser(userId: string): Promise<Array<HrpContract>> {
-    const now = new Date();
+    // Vergleich nach Kalendertag: Ein Vertrag gilt auch an seinem letzten Tag noch ganz (validTo ist 00:00 UTC dieses Tages).
+    // Der Folgevertrag gilt ab 00:00 Uhr seines ersten Tages.
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(new Date());
 
     return db
         .select({
@@ -37,8 +84,8 @@ export async function getActiveContractsForUser(userId: string): Promise<Array<H
         .where(
             and(
                 eq(hrpContractsTable.userId, userId),
-                lte(hrpContractsTable.validFrom, now),
-                or(isNull(hrpContractsTable.validTo), gte(hrpContractsTable.validTo, now)),
+                sql`${hrpContractsTable.validFrom}::date <= ${today}::date`,
+                or(isNull(hrpContractsTable.validTo), sql`${hrpContractsTable.validTo}::date >= ${today}::date`),
             ),
         )
         .orderBy(desc(hrpContractsTable.validFrom));
