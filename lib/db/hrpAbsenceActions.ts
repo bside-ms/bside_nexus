@@ -1,19 +1,38 @@
-import { and, desc, eq, gte, isNull, lt, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, isNull, lt, lte, sql } from 'drizzle-orm';
 import { db } from '@/db';
 import type { HrpAbsenceEntry } from '@/db/schema';
-import { hrpAbsencesTable, hrpContractsTable, hrpDailyRecordTable, hrpHolidayConfigsTable } from '@/db/schema';
+import { hrpAbsencesTable, hrpContractsTable, hrpDailyRecordTable, hrpHolidayConfigsTable, logsTable } from '@/db/schema';
 import { aggregateDay } from '@/lib/hrp/aggregation';
+import type { HrpAdminActor } from '@/lib/hrp/corrections';
+import { buildCorrectionNote, HrpValidationError } from '@/lib/hrp/corrections';
 import { differenceInDays, format, parseISO } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
 
+export const ABSENCE_TYPES = ['vacation', 'sick', 'sick_with', 'compensatory_day'] as const;
+export type AbsenceType = (typeof ABSENCE_TYPES)[number];
+
+const ABSENCE_TYPE_LABELS: Record<string, string> = {
+    vacation: 'Urlaub',
+    sick: 'Krankheit (ohne Attest)',
+    sick_with: 'Krankheit (mit Attest)',
+    compensatory_day: 'Ausgleichstag',
+    holiday: 'Feiertag',
+};
+
+const getAbsenceTypeLabel = (type: string): string => ABSENCE_TYPE_LABELS[type] ?? type;
+
+/**
+ * Abwesenheiten für den Vertrag von userId anlegen. Mit adminActor trägt ein*e Admin ein, das wird protokolliert.
+ */
 export async function createAbsence(
     userId: string,
     data: {
         contractId: string;
-        type: 'vacation' | 'sick' | 'sick_with' | 'compensatory_day';
+        type: AbsenceType;
         startDate: string;
         endDate: string;
     },
+    adminActor?: HrpAdminActor,
 ): Promise<{ success: boolean; count: number }> {
     const { contractId, type, startDate, endDate } = data;
 
@@ -50,7 +69,7 @@ export async function createAbsence(
         });
 
         if (!validHoliday) {
-            throw new Error('Kein anrechenbarer Feiertag in den letzten 7 Tagen gefunden.');
+            throw new HrpValidationError('Kein anrechenbarer Feiertag in den letzten 7 Tagen gefunden.');
         }
     }
 
@@ -109,12 +128,14 @@ export async function createAbsence(
     // eslint-disable-next-line no-return-await
     return await db.transaction(async (tx) => {
         // Bestehende vacation/sick Einträge im Zeitraum löschen
-        await tx
+        const adminNote = adminActor === undefined ? null : buildCorrectionNote(adminActor);
+        const overwritten = await tx
             .update(hrpAbsencesTable)
             .set({
                 deletedAt: new Date(),
-                deletedBy: userId,
-                deletionReason: 'Überschrieben durch neue Abwesenheit',
+                deletedBy: adminActor?.userId ?? userId,
+                deletionReason:
+                    adminNote === null ? 'Überschrieben durch neue Abwesenheit' : `Überschrieben durch neue Abwesenheit. ${adminNote}`,
             })
             .where(
                 and(
@@ -125,7 +146,22 @@ export async function createAbsence(
                     isNull(hrpAbsencesTable.deletedAt),
                     isNull(hrpAbsencesTable.abgerechnet_date),
                 ),
-            );
+            )
+            .returning({ id: hrpAbsencesTable.id });
+
+        if (adminActor !== undefined && adminNote !== null) {
+            await tx.insert(logsTable).values({
+                id: uuidv4(),
+                userId: adminActor.userId,
+                ipAddress: adminActor.ipAddress,
+                eventType: 'hrp.absence.create',
+                affectedUserId: contract.userId,
+                affectedGroupId: contract.employerGroupId,
+                description:
+                    `${getAbsenceTypeLabel(type)} vom ${startDate} bis ${endDate} für Vertrag ${contractId} eingetragen: ` +
+                    `${absences.length} Tage, ${overwritten.length} bestehende Abwesenheiten überschrieben. ${adminNote}`,
+            });
+        }
 
         if (absences.length > 0) {
             await tx.insert(hrpAbsencesTable).values(absences);
@@ -175,6 +211,13 @@ export async function createAbsence(
 
         return { success: true, count: absences.length };
     });
+}
+
+export async function getAbsencesByIds(ids: Array<string>): Promise<Array<HrpAbsenceEntry>> {
+    if (ids.length === 0) {
+        return [];
+    }
+    return db.query.hrpAbsencesTable.findMany({ where: inArray(hrpAbsencesTable.id, ids) });
 }
 
 export async function getAbsences(contractId: string, startDate: string, endDate: string): Promise<Array<HrpAbsenceEntry>> {
@@ -253,7 +296,15 @@ export async function deleteAbsence(userId: string, absenceId: string, reason: s
     });
 }
 
-export async function deleteAbsenceGroup(userId: string, absenceIds: Array<string>, reason: string): Promise<{ success: boolean }> {
+/**
+ * Falls adminActor gesetzt ist, wird das Löschen protokolliert.
+ */
+export async function deleteAbsenceGroup(
+    userId: string,
+    absenceIds: Array<string>,
+    reason: string,
+    adminActor?: HrpAdminActor,
+): Promise<{ success: boolean }> {
     if (absenceIds.length === 0) {
         return { success: true };
     }
@@ -262,12 +313,17 @@ export async function deleteAbsenceGroup(userId: string, absenceIds: Array<strin
         where: sql`${hrpAbsencesTable.id} IN ${absenceIds}`,
     });
 
+    if (adminActor !== undefined && (absences.length !== new Set(absenceIds).size || absences.some((a) => a.deletedAt !== null))) {
+        throw new HrpValidationError('Einige Abwesenheiten wurden nicht gefunden oder sind bereits gelöscht.');
+    }
+
     if (absences.some((a) => a.abgerechnet_date)) {
-        throw new Error('Einige Abwesenheiten sind bereits abgerechnet und können nicht gelöscht werden.');
+        throw new HrpValidationError('Einige Abwesenheiten sind bereits abgerechnet und können nicht gelöscht werden.');
     }
 
     // Prüfung der Berechtigung für alle
     const contractIds = [...new Set(absences.map((a) => a.contractId))];
+    const contracts: Array<typeof hrpContractsTable.$inferSelect> = [];
     for (const contractId of contractIds) {
         const contract = await db.query.hrpContractsTable.findFirst({
             where: and(eq(hrpContractsTable.id, contractId), eq(hrpContractsTable.userId, userId)),
@@ -275,7 +331,10 @@ export async function deleteAbsenceGroup(userId: string, absenceIds: Array<strin
         if (!contract) {
             throw new Error('Berechtigung verweigert');
         }
+        contracts.push(contract);
     }
+
+    const adminNote = adminActor === undefined ? null : buildCorrectionNote(adminActor);
 
     // eslint-disable-next-line no-return-await
     return await db.transaction(async (tx) => {
@@ -283,10 +342,28 @@ export async function deleteAbsenceGroup(userId: string, absenceIds: Array<strin
             .update(hrpAbsencesTable)
             .set({
                 deletedAt: new Date(),
-                deletedBy: userId,
-                deletionReason: reason,
+                deletedBy: adminActor?.userId ?? userId,
+                deletionReason: adminNote ?? reason,
             })
             .where(sql`${hrpAbsencesTable.id} IN ${absenceIds}`);
+
+        if (adminActor !== undefined && adminNote !== null) {
+            for (const contract of contracts) {
+                const dates = absences
+                    .filter((a) => a.contractId === contract.id)
+                    .map((a) => `${a.date} (${getAbsenceTypeLabel(a.type)})`)
+                    .sort();
+                await tx.insert(logsTable).values({
+                    id: uuidv4(),
+                    userId: adminActor.userId,
+                    ipAddress: adminActor.ipAddress,
+                    eventType: 'hrp.absence.delete',
+                    affectedUserId: contract.userId,
+                    affectedGroupId: contract.employerGroupId,
+                    description: `Abwesenheiten für Vertrag ${contract.id} gelöscht: ${dates.join(', ')}. ${adminNote}`,
+                });
+            }
+        }
 
         for (const absence of absences) {
             await aggregateDay(userId, absence.date, absence.contractId);
@@ -297,26 +374,26 @@ export async function deleteAbsenceGroup(userId: string, absenceIds: Array<strin
 }
 
 export async function getPastAbsences(userId: string): Promise<Array<HrpAbsenceEntry>> {
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const startOfYear = format(new Date(), 'yyyy-01-01');
+    const today = format(new Date(), 'yyyy-MM-dd');
+    const startOfYear = format(new Date(), 'yyyy-01-01');
 
-  const contracts = await db.query.hrpContractsTable.findMany({
-    where: eq(hrpContractsTable.userId, userId),
-  });
+    const contracts = await db.query.hrpContractsTable.findMany({
+        where: eq(hrpContractsTable.userId, userId),
+    });
 
-  const contractIds = contracts.map((c) => c.id);
+    const contractIds = contracts.map((c) => c.id);
 
-  if (contractIds.length === 0) {
-    return [];
-  }
+    if (contractIds.length === 0) {
+        return [];
+    }
 
-  return db.query.hrpAbsencesTable.findMany({
-    where: and(
-      sql`${hrpAbsencesTable.contractId} IN ${contractIds}`,
-      gte(hrpAbsencesTable.date, startOfYear),
-      lte(hrpAbsencesTable.date, today),
-      isNull(hrpAbsencesTable.deletedAt),
-    ),
-    orderBy: [desc(hrpAbsencesTable.date)],
-  });
+    return db.query.hrpAbsencesTable.findMany({
+        where: and(
+            sql`${hrpAbsencesTable.contractId} IN ${contractIds}`,
+            gte(hrpAbsencesTable.date, startOfYear),
+            lte(hrpAbsencesTable.date, today),
+            isNull(hrpAbsencesTable.deletedAt),
+        ),
+        orderBy: [desc(hrpAbsencesTable.date)],
+    });
 }

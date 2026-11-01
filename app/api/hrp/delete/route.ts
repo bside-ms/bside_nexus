@@ -4,7 +4,6 @@ import { db } from '@/db';
 import { hrpEventLogTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { deleteHrpEntry } from '@/lib/db/hrpActions';
-import { getContractAdminSession } from '@/lib/hrp/adminAccess';
 import { aggregateDay } from '@/lib/hrp/aggregation';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -20,7 +19,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ success: false, message: 'ID und Begründung erforderlich' }, { status: 400 });
     }
 
-    // Prüfen ob der Eintrag existiert und ob der User berechtigt ist
+    // Prüfen, ob der Eintrag existiert und ob der User berechtigt ist
     const entries = await db.select().from(hrpEventLogTable).where(eq(hrpEventLogTable.id, id)).limit(1);
 
     const entry = entries[0];
@@ -29,9 +28,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ success: false, message: 'Eintrag nicht gefunden' }, { status: 404 });
     }
 
-    const isOwner = entry.userId === session.id;
-    const isContractAdmin = !isOwner && entry.contractId !== null && (await getContractAdminSession(entry.contractId)) !== null;
-    if (!isOwner && !isContractAdmin) {
+    // Nur eigene Buchungen. Admins nutzen /api/hrp/admin/entries.
+    if (entry.userId !== session.id) {
         return NextResponse.json({ success: false, message: 'Keine Berechtigung' }, { status: 403 });
     }
 

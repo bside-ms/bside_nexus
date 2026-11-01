@@ -286,6 +286,98 @@ export const computeDayStats = (
     };
 };
 
+/**
+ * Converts loggedTimestamp to Date objects.
+ */
+const toDate = (timestamp: Date | string | null | undefined): Date | null => {
+    if (!timestamp) {
+        return null;
+    }
+    if (timestamp instanceof Date) {
+        return timestamp;
+    }
+    const date = new Date(timestamp);
+    return isNaN(date.getTime()) ? null : date;
+};
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export const toBerlinDateString = (date: Date): string => new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(date);
+
+const formatBerlin = (date: Date, options: Intl.DateTimeFormatOptions): string =>
+    new Intl.DateTimeFormat('de-DE', { ...options, timeZone: 'Europe/Berlin' }).format(date);
+
+// Abstand Berlin zu UTC in Minuten.
+const getBerlinOffsetMinutes = (date: Date): number => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Europe/Berlin',
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+    }).formatToParts(date);
+    const get = (type: Intl.DateTimeFormatPartTypes): number => Number(parts.find((p) => p.type === type)?.value ?? 0);
+    const wallClockAsUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'));
+    return Math.round((wallClockAsUtc - Math.floor(date.getTime() / 60_000) * 60_000) / 60_000);
+};
+
+/** Gleiche Uhrzeit am Folgetag, auch bei einer Zeitumstellung. */
+export const addOneBerlinDay = (date: Date): Date => {
+    const shifted = new Date(date.getTime() + DAY_MS);
+    return new Date(shifted.getTime() + (getBerlinOffsetMinutes(date) - getBerlinOffsetMinutes(shifted)) * 60_000);
+};
+
+/** Gibt es vor der Gehen-Buchung ein Kommen? */
+const hasOpenStartBefore = (entries: DayEntries, stopTime: number): boolean => {
+    const sorted = entries
+        .map((e) => ({ type: (e.entryType ?? '').toLowerCase(), ts: toDate(e.loggedTimestamp)?.getTime() }))
+        .filter((e): e is { type: string; ts: number } => e.ts !== undefined)
+        .sort((a, b) => a.ts - b.ts);
+
+    let isOpen = false;
+    for (const e of sorted) {
+        if (e.type === 'stop' && e.ts === stopTime) {
+            return isOpen;
+        }
+        if (e.type === 'start') {
+            isOpen = true;
+        } else if (e.type === 'stop') {
+            isOpen = false;
+        }
+    }
+    return isOpen;
+};
+
+/**
+ * Häufiger Nachtschicht-Fehler: Gehen am selben statt am Folgetag gebucht.
+ */
+export const getNextDayStopSuggestion = (entries: DayEntries, stop: Date): Date | null => {
+    const stopDay = toBerlinDateString(stop);
+    const hasLaterStartSameDay = entries.some((e) => {
+        const ts = toDate(e.loggedTimestamp);
+        return (e.entryType ?? '').toLowerCase() === 'start' && ts !== null && ts > stop && toBerlinDateString(ts) === stopDay;
+    });
+    return hasLaterStartSameDay ? addOneBerlinDay(stop) : null;
+};
+
+/** Gehen-Buchungen ohne offenes Kommen, jeweils mit Vorschlag für den Folgetag. */
+export const getMisplacedStopSuggestions = (entries: DayEntries): Array<{ id: string; suggested: Date }> =>
+    entries.flatMap((e) => {
+        const ts = toDate(e.loggedTimestamp);
+        if (
+            (e.entryType ?? '').toLowerCase() !== 'stop' ||
+            ts === null ||
+            e.id === undefined ||
+            hasOpenStartBefore(entries, ts.getTime())
+        ) {
+            return [];
+        }
+        const suggested = getNextDayStopSuggestion(entries, ts);
+        return suggested === null ? [] : [{ id: e.id, suggested }];
+    });
+
 export interface BreakValidationResult {
     isValid: boolean;
     requiredMinutes: number;
@@ -332,20 +424,6 @@ export function groupEntriesByWorkday<T extends Entry>(entries: Array<T>): Recor
     return groups;
 }
 
-/**
- * Safely converts loggedTimestamp to Date object
- */
-const toDate = (timestamp: Date | string | null | undefined): Date | null => {
-    if (!timestamp) {
-        return null;
-    }
-    if (timestamp instanceof Date) {
-        return timestamp;
-    }
-    const date = new Date(timestamp);
-    return isNaN(date.getTime()) ? null : date;
-};
-
 export function validateBreaks(
     existingEntries: Array<Partial<HrpEventLogEntry>>,
     newEntry: { entryType: string; timestamp: Date },
@@ -375,6 +453,21 @@ export function validateBreaks(
             relevantEntries = groupEntries;
             break;
         }
+    }
+
+    // Fehlerbehandlung: Gehen ohne offenes Kommen.
+    if (!hasOpenStartBefore(relevantEntries, newEntryTime)) {
+        const suggestion = getNextDayStopSuggestion(allEntries, newEntry.timestamp);
+        const hint =
+            suggestion === null
+                ? ''
+                : ` Meintest du ${formatBerlin(suggestion, { hour: '2-digit', minute: '2-digit' })} Uhr am Folgetag (${formatBerlin(suggestion, { day: '2-digit', month: '2-digit', year: 'numeric' })})?`;
+        return {
+            isValid: false,
+            requiredMinutes: 0,
+            actualMinutes: 0,
+            warning: `Zu dieser Gehen-Buchung gibt es keine passende Kommen-Buchung.${hint}`,
+        };
     }
 
     const stats = computeDayStats(relevantEntries);

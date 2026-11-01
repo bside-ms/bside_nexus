@@ -3,6 +3,10 @@ import { AlertCircle, FileCheck } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
+import AdminAbsenceDialog from '@/components/hrp/admin/AdminAbsenceDialog';
+import AdminDayEditor from '@/components/hrp/admin/AdminDayEditor';
+import type { EditableContract } from '@/components/hrp/admin/correctionShared';
+import { CORRECTION_MARKER, toCorrectionData } from '@/components/hrp/admin/correctionShared';
 import { PayrollHourlyClient } from '@/components/hrp/PayrollHourlyClient';
 import { PrintButton } from '@/components/hrp/PrintButton';
 import { RecalculatePayrollButton } from '@/components/hrp/RecalculatePayrollButton';
@@ -24,10 +28,11 @@ import {
     getUnbilledAbsencesForUser,
     getUnbilledLogs,
 } from '@/lib/db/hrpAdminActions';
+import { getContractEditorAccess } from '@/lib/hrp/adminAccess';
 import type { BalanceSummary } from '@/lib/hrp/balance';
 import { calculateBalanceSummary } from '@/lib/hrp/balance';
 import type { Entry } from '@/lib/hrp/hrpLogic';
-import { computeDayStats, groupEntriesByWorkday, toTimeStr } from '@/lib/hrp/hrpLogic';
+import { computeDayStats, groupEntriesByWorkday, toBerlinDateString, toTimeStr } from '@/lib/hrp/hrpLogic';
 import { calculatePeriodTotals } from '@/lib/hrp/period-calculation';
 
 const breadCrumbs = [
@@ -259,6 +264,25 @@ export default async function Page({
     }
 
     const selectedContract = contracts.find((c) => c.contractId === selectedContractId);
+
+    // Verträge, die Admins korrigieren dürfen.
+    const contractAccess = await Promise.all(
+        contracts.map(async (c) => ((await getContractEditorAccess(c.contractId)) === null ? null : c)),
+    );
+    const editableContracts: Array<EditableContract> = contractAccess
+        .filter((c) => c !== null)
+        .map((c) => ({
+            id: c.contractId,
+            label: `${c.groupName} (${c.type === 'fixed_salary' ? 'Fest' : 'Stunden'}, ab ${c.validFrom.toLocaleDateString('de-DE')})`,
+            validFrom: toBerlinDateString(c.validFrom),
+            validTo: c.validTo === null ? null : toBerlinDateString(c.validTo),
+        }));
+    const canCorrect = editableContracts.length > 0;
+    const correctionDefaultContractId = editableContracts.some((c) => c.id === selectedContractId) ? (selectedContractId ?? null) : null;
+
+    const todayBerlin = toBerlinDateString(new Date());
+    const firstOfSelectedMonth = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    const absenceInitialDate = todayBerlin.startsWith(firstOfSelectedMonth.slice(0, 7)) ? todayBerlin : firstOfSelectedMonth;
 
     // Abrechnungen nur für Admins der Gastro-Gruppe und Systemadmins.
     const showPayroll = await canViewPayroll();
@@ -624,6 +648,19 @@ export default async function Page({
                         </div>
                     </form>
 
+                    {canCorrect && (
+                        <div className="flex flex-wrap items-center gap-3 print:hidden">
+                            <AdminAbsenceDialog
+                                contracts={editableContracts}
+                                defaultContractId={correctionDefaultContractId}
+                                initialDate={absenceInitialDate}
+                            />
+                            <span className="text-xs text-muted-foreground">
+                                Buchungen eines Tages korrigierst du über das Stift-Symbol in der Tabelle (nur in der Desktop-Ansicht).
+                            </span>
+                        </div>
+                    )}
+
                     {currentPayroll && (
                         <div className="mt-4 print:hidden">
                             <Alert variant="default" className="bg-amber-50 border-amber-200">
@@ -704,6 +741,11 @@ export default async function Page({
                                 <th className="border px-1 py-1.5 text-left font-semibold w-[150px] sm:w-[20%] print:py-2 print:border-b-2 print:bg-zinc-100">
                                     Hinweise
                                 </th>
+                                {canCorrect && (
+                                    <th className="border px-1 py-1.5 text-center font-semibold w-[48px] print:hidden">
+                                        <span className="sr-only">Korrektur</span>
+                                    </th>
+                                )}
                             </tr>
                         </thead>
                         <tbody>
@@ -767,6 +809,10 @@ export default async function Page({
                                         text: `${typeLabel} (${a.absence?.hoursValue}h)`,
                                         className: 'font-semibold text-blue-600',
                                     });
+                                }
+
+                                if (s.entries.some((e) => e.comment?.includes(CORRECTION_MARKER) ?? false)) {
+                                    hints.push({ text: 'Admin-Korrektur', className: 'text-amber-700' });
                                 }
 
                                 for (const issue of s.issues) {
@@ -906,6 +952,24 @@ export default async function Page({
                                                 </div>
                                             ) : null}
                                         </td>
+
+                                        {canCorrect && (
+                                            <td className="border px-1 py-1 text-center print:hidden">
+                                                <AdminDayEditor
+                                                    day={`${dYear}-${String(dMonth + 1).padStart(2, '0')}-${String(dayNumber).padStart(2, '0')}`}
+                                                    dayLabel={new Date(dYear, dMonth, dayNumber).toLocaleDateString('de-DE', {
+                                                        weekday: 'short',
+                                                        day: '2-digit',
+                                                        month: '2-digit',
+                                                        year: 'numeric',
+                                                    })}
+                                                    entries={toCorrectionData(s.entries).bookings}
+                                                    absences={toCorrectionData(s.entries).absences}
+                                                    contracts={editableContracts}
+                                                    defaultContractId={correctionDefaultContractId}
+                                                />
+                                            </td>
+                                        )}
                                     </tr>
                                 );
                             })}
@@ -935,9 +999,13 @@ export default async function Page({
                                     </>
                                 )}
                                 <td className="border px-1 py-1.5 print:py-3" />
+                                {canCorrect && <td className="border px-1 py-1.5 print:hidden" />}
                             </tr>
                             <tr className="print:hidden">
-                                <td colSpan={selectedContract?.type === 'fixed_salary' ? 10 : 8} className="border-t px-3 py-3 text-sm">
+                                <td
+                                    colSpan={(selectedContract?.type === 'fixed_salary' ? 10 : 8) + (canCorrect ? 1 : 0)}
+                                    className="border-t px-3 py-3 text-sm"
+                                >
                                     {infoBits.length > 0 ? (
                                         <ul className="list-disc space-y-1 pl-5">
                                             {infoBits.map((t: string, i: number) => (

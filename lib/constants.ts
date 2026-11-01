@@ -28,3 +28,10 @@ export const HRP_EMPLOYER_GROUP_IDS = {
     gmbh: '1680099c-78e1-423c-bc70-92bec57e2f75', // GmbH - Mitarbeitende
     kv: '0ff34819-fbe0-4119-87d4-f73666ed2464', // Kulturverein - Mitarbeitende
 } as const;
+
+// HRP: Korrekturgruppe je Arbeitgebergruppe.
+export const HRP_CORRECTION_GROUP_IDS: Readonly<Record<string, string | null>> = {
+    [HRP_EMPLOYER_GROUP_IDS.gastro]: 'b708dce9-a35c-4c00-a4c5-30ab8994e832',
+    [HRP_EMPLOYER_GROUP_IDS.gmbh]: 'ed9cb18e-d3f2-41de-9ee4-0b09f04c0b2a',
+    [HRP_EMPLOYER_GROUP_IDS.kv]: '341793d8-ec6c-474d-aff8-bd11909fde0d',
+};

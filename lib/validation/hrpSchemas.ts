@@ -28,3 +28,56 @@ export const contractChangeSchema = z.object({
     // Nur Vorschau, nichts speichern.
     dryRun: z.boolean().optional(),
 });
+
+const correctionReasonSchema = z
+    .string()
+    .trim()
+    .min(3, 'Bitte gib eine Begründung an.')
+    .max(300, 'Die Begründung darf höchstens 300 Zeichen lang sein.');
+
+const entryTypeSchema = z.enum(['start', 'pause', 'pause_end', 'stop']);
+
+// Höchstens 45 Minuten in der Zukunft.
+const entryTimestampSchema = z
+    .string()
+    .refine((value) => !Number.isNaN(new Date(value).getTime()), 'Ungültiger Zeitpunkt.')
+    .refine((value) => new Date(value).getTime() <= Date.now() + 45 * 60 * 1000, 'Der Zeitpunkt liegt zu weit in der Zukunft.');
+
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Ungültiges Datum.');
+
+export const adminEntryCreateSchema = z.object({
+    contractId: z.string().min(1),
+    entryType: entryTypeSchema,
+    timestamp: entryTimestampSchema,
+    reason: correctionReasonSchema,
+    dryRun: z.boolean().optional(),
+});
+
+export const adminEntryCorrectSchema = z.object({
+    id: z.string().min(1),
+    entryType: entryTypeSchema,
+    timestamp: entryTimestampSchema,
+    reason: correctionReasonSchema,
+    dryRun: z.boolean().optional(),
+});
+
+export const adminEntryDeleteSchema = z.object({
+    id: z.string().min(1),
+    reason: correctionReasonSchema,
+    dryRun: z.boolean().optional(),
+});
+
+export const adminAbsenceCreateSchema = z
+    .object({
+        contractId: z.string().min(1),
+        type: z.enum(['vacation', 'sick', 'sick_with', 'compensatory_day']),
+        startDate: isoDateSchema,
+        endDate: isoDateSchema,
+        reason: correctionReasonSchema,
+    })
+    .refine((data) => data.startDate <= data.endDate, { message: 'Das Enddatum liegt vor dem Startdatum.', path: ['endDate'] });
+
+export const adminAbsenceDeleteSchema = z.object({
+    ids: z.array(z.string().min(1)).min(1).max(366),
+    reason: correctionReasonSchema,
+});

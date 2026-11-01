@@ -112,7 +112,7 @@ export const getSubgroups = async (groupId: string): Promise<Array<Group>> => {
         .select()
         .from(groupsTable)
         .where(and(eq(groupsTable.parentGroup, groupId), isNull(groupsTable.deletedAt)));
-    return subgroups ?? [];
+    return subgroups.sort((a, b) => a.displayName.localeCompare(b.displayName, 'de', { sensitivity: 'base' }));
 };
 
 // Counts the active admins of a group apart from the given user. Disabled users do not count, like in the member list.

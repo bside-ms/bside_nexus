@@ -1,5 +1,5 @@
-
 import { getContractAtDate } from '../db/contractActions';
+import type { HrpAbsenceEntry, HrpEventLogEntry } from '@/db/schema';
 import { getHrpLogForUser } from '@/lib/db/hrpActions';
 import type { DayEntries, DayStats } from '@/lib/hrp/hrpLogic';
 import { computeDayStats } from '@/lib/hrp/hrpLogic';
@@ -20,8 +20,10 @@ interface Totals {
     balance: number;
 }
 
-// dayStats in the page has an extra `absences` property.
-type DayStatsWithAbsences = DayStats & { absences: DayEntries };
+export type PeriodDayEntry = Partial<HrpEventLogEntry & { absence?: HrpAbsenceEntry }>;
+
+// dayStats in the page has extra `absences` and `entries` (raw entries of the workday).
+type DayStatsWithAbsences = DayStats & { absences: DayEntries; entries: Array<PeriodDayEntry> };
 
 function getDaysInMonth(year: number, monthZeroBased: number): number {
     return new Date(year, monthZeroBased + 1, 0).getDate();
@@ -31,8 +33,12 @@ function buildDayArray<T>(count: number, map: (indexZero: number) => T): Array<T
     return Array.from({ length: count }, (_, i) => map(i));
 }
 
-export async function calculatePeriodTotals(userId: string, year: number, month: number, period: PeriodMode): Promise<{ totals: Totals, dayStats: Array<DayStatsWithAbsences>, dayRefs: Array<DayRef> }> {
-    
+export async function calculatePeriodTotals(
+    userId: string,
+    year: number,
+    month: number,
+    period: PeriodMode,
+): Promise<{ totals: Totals; dayStats: Array<DayStatsWithAbsences>; dayRefs: Array<DayRef> }> {
     const logsCurrent = await getHrpLogForUser(userId, year, month);
 
     const prevEdge = new Date(year, month, 0);
@@ -76,8 +82,8 @@ export async function calculatePeriodTotals(userId: string, year: number, month:
 
             const contractAtDate = await getContractAtDate(userId, refDate);
 
-            const entries =
-                ref.source === 'prev' ? ((logsPrev?.[ref.day] ?? []) as DayEntries) : ((logsCurrent?.[ref.day] ?? []) as DayEntries);
+            const rawEntries = (ref.source === 'prev' ? logsPrev?.[ref.day] : logsCurrent?.[ref.day]) ?? [];
+            const entries = rawEntries as DayEntries;
 
             const stats = computeDayStats(
                 entries,
@@ -88,11 +94,11 @@ export async function calculatePeriodTotals(userId: string, year: number, month:
                           type: contractAtDate.type,
                       }
                     : undefined,
-                refDate
+                refDate,
             );
-            
+
             const absences = entries.filter((e) => e.entryType === 'absence');
-            return { ...stats, absences };
+            return { ...stats, absences, entries: rawEntries };
         }),
     );
 
