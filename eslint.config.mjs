@@ -377,6 +377,25 @@ export default defineConfig([
             'unicorn/prefer-includes': 2,
             'unicorn/prefer-optional-catch-binding': 2,
             'unicorn/prefer-regexp-test': 2,
+
+            '@typescript-eslint/no-restricted-imports': [
+                2,
+                {
+                    paths: [
+                        {
+                            name: 'zod',
+                            message: "Import z from '@/lib/zod', it sets the German error messages.",
+                            allowTypeImports: true,
+                        },
+                    ],
+                },
+            ],
+        },
+    },
+    {
+        files: ['lib/zod.ts'],
+        rules: {
+            '@typescript-eslint/no-restricted-imports': 0,
         },
     },
 ]);

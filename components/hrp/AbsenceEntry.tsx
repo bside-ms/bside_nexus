@@ -7,7 +7,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle, CalendarIcon, CheckCircle2, Loader2 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useForm } from 'react-hook-form';
-import { z } from 'zod';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ContractSelect } from './ContractSelect';
@@ -17,20 +16,19 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { HrpContract } from '@/lib/db/contractActions';
 import { cn } from '@/lib/utils';
+import { z } from '@/lib/zod';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
 const formSchema = z.object({
-    contractId: z.string({ required_error: 'Bitte wähle einen Bereich aus.' }).min(1),
-    type: z.enum(['vacation', 'sick', 'sick_with', 'compensatory_day'], {
-        errorMap: () => ({ message: 'Bitte wähle einen Typ aus.' }),
-    }),
+    contractId: z.string({ error: 'Bitte wähle einen Bereich aus.' }).min(1),
+    type: z.enum(['vacation', 'sick', 'sick_with', 'compensatory_day'], { error: 'Bitte wähle einen Typ aus.' }),
     dateRange: z.object(
         {
-            from: z.date({ required_error: 'Startdatum auswählen' }),
+            from: z.date({ error: 'Startdatum auswählen' }),
             to: z.date().optional(),
         },
-        { required_error: 'Bitte wähle einen Zeitraum aus.' },
+        { error: 'Bitte wähle einen Zeitraum aus.' },
     ),
 });
 
@@ -164,7 +162,6 @@ export default function AbsenceEntry({ contracts, onSaved }: AbsenceEntryProps):
                                         </PopoverTrigger>
                                         <PopoverContent className="w-auto p-0" align="start">
                                             <Calendar
-                                                initialFocus
                                                 mode="range"
                                                 defaultMonth={field.value?.from}
                                                 selected={field.value}

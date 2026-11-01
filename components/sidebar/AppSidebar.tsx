@@ -1,6 +1,6 @@
 import { isEmpty } from 'lodash-es';
-import type { ReactElement } from 'react';
 import type * as React from 'react';
+import type { ReactElement } from 'react';
 import { AppSidebarContent } from '@/components/sidebar/AppSidebarContent';
 import { AppSidebarFooter } from '@/components/sidebar/AppSidebarFooter';
 import { AppSidebarHeader } from '@/components/sidebar/AppSidebarHeader';

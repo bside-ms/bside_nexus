@@ -5,7 +5,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle, CalendarIcon, CheckCircle2, Loader2 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import { useForm } from 'react-hook-form';
-import { z } from 'zod';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Textarea } from '../ui/textarea';
@@ -17,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { HrpContract } from '@/lib/db/contractActions'; // Typ Import
 import { cn } from '@/lib/utils';
+import { z } from '@/lib/zod';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 
@@ -35,10 +35,8 @@ const Events: Array<EventOption> = [
 ];
 
 const formSchema = z.object({
-    contractId: z.string({ required_error: 'Bitte wähle einen Bereich aus.' }).min(1), // NEU
-    eventType: z.enum(['start', 'pause', 'pause_end', 'stop'], {
-        errorMap: () => ({ message: 'Ereignis auswählen' }),
-    }),
+    contractId: z.string({ error: 'Bitte wähle einen Bereich aus.' }).min(1), // NEU
+    eventType: z.enum(['start', 'pause', 'pause_end', 'stop'], { error: 'Ereignis auswählen' }),
     date: z.date({
         message: 'Gebe ein gültiges Datum ein.',
     }),

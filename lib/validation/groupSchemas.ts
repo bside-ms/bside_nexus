@@ -1,6 +1,6 @@
-import { z } from 'zod';
 import { GROUP_ROLE_CLIENTS } from '@/lib/constants';
 import { idSchema } from '@/lib/validation/keySchemas';
+import { z } from '@/lib/zod';
 
 const displayNameSchema = z.string().trim().min(3).max(100);
 const categoryNameSchema = z.string().trim().max(100);

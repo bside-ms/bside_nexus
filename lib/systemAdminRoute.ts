@@ -32,7 +32,7 @@ export const requireSystemAdmin = async (): Promise<string | NextResponse> => {
  */
 export const handleSystemAdminPost = async <T>(
     req: NextRequest,
-    schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+    schema: z.ZodType<T>,
     tag: string,
     errorMessage: string,
     action: (data: T, executingUserId: string, ipAddress: string) => Promise<NextResponse>,

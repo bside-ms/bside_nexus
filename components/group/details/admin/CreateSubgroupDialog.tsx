@@ -6,7 +6,6 @@ import { Loader2, PlusCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { useForm } from 'react-hook-form';
-import { z } from 'zod';
 import type { GroupActionResponse } from '@/components/group/details/postGroupAction';
 import { postGroupAction } from '@/components/group/details/postGroupAction';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import isNotEmptyString from '@/lib/utils/isNotEmptyString';
 import slugifyGroupName from '@/lib/utils/slugifyGroupName';
+import { z } from '@/lib/zod';
 
 const formSchema = z.object({
     displayName: z

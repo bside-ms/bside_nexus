@@ -89,7 +89,7 @@ export default function VacationOverview({ showDatePicker = true, initialDate, u
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
-                            <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} initialFocus />
+                            <Calendar mode="single" selected={date} onSelect={(d) => d && setDate(d)} />
                         </PopoverContent>
                     </Popover>
                 )}

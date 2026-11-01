@@ -1,6 +1,6 @@
 import Link from 'next/link';
-import type { ReactElement } from 'react';
 import type * as React from 'react';
+import type { ReactElement } from 'react';
 import { SiMattermost, SiNextcloud, SiOutline } from 'react-icons/si';
 import { SidebarGroup, SidebarGroupContent, SidebarMenu, SidebarMenuButton, SidebarMenuItem } from '@/components/ui/sidebar';
 

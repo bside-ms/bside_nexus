@@ -1,4 +1,4 @@
-import { Cloud, Key, PlusCircle, Trello } from 'lucide-react';
+import { Cloud, Key, PlusCircle, SquareKanban } from 'lucide-react';
 import type { ReactElement } from 'react';
 import GroupRolesOverview from '@/components/group/details/admin/GroupRolesOverview';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,7 @@ interface GroupServicesCardProps {
 const serviceIcons = {
     cloud: Cloud,
     password: Key,
-    project: Trello,
+    project: SquareKanban,
     other: PlusCircle,
 };
 

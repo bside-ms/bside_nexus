@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 // Shared helpers
 export const idSchema = z.string().min(1);

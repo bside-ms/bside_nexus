@@ -127,7 +127,7 @@ export const issueKeys = async (userProfileId: string, keyItemIds: Array<string>
     if (items.length !== keyItemIds.length) {
         throw new Error('Einige Schlüssel wurden nicht gefunden.');
     }
-    const notActive = items.find((i) => i.status !== 'active');
+    const notActive = items.some((i) => i.status !== 'active');
     if (notActive) {
         throw new Error('Ein Schlüssel ist nicht aktiv und kann nicht ausgegeben werden.');
     }
@@ -182,7 +182,7 @@ export const returnKeys = async (assignmentIds: Array<string>, createdBy?: strin
     if (assignments.length !== assignmentIds.length) {
         throw new Error('Einige Zuweisungen wurden nicht gefunden.');
     }
-    const invalid = assignments.find((a) => a.returnedAt !== null || a.lostAt !== null);
+    const invalid = assignments.some((a) => a.returnedAt !== null || a.lostAt !== null);
     if (invalid) {
         throw new Error('Mindestens eine Zuweisung ist bereits geschlossen/verloren.');
     }

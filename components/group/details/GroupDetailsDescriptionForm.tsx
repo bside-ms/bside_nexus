@@ -6,12 +6,12 @@ import { Loader2 } from 'lucide-react';
 import type { ComponentProps, ReactElement } from 'react';
 import { type ControllerRenderProps, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { z } from 'zod';
 import type { GroupDetailsProps } from '@/components/group/details/GroupDetailsDescription';
 import { Button } from '@/components/ui/button';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { z } from '@/lib/zod';
 
 const formSchema = z.object({
     description: z.string().max(510).optional(),

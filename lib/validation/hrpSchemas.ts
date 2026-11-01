@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from '@/lib/zod';
 
 // Arbeitstage als ISO-Wochentage: 1 = Mo … 7 = So.
 export const workingDaysSchema = z
