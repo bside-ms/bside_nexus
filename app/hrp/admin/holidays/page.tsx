@@ -8,6 +8,7 @@ import { usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { getContractsForUser } from '@/lib/db/contractActions';
 import { getHolidaysWithConfigs, getManagedContracts } from '@/lib/db/hrpAdminActions';
+import isNotEmptyString from '@/lib/utils/isNotEmptyString';
 
 export default async function Page(props: {
     searchParams: Promise<{ user?: string; year?: string; month?: string }>;
@@ -30,10 +31,15 @@ export default async function Page(props: {
         .where(inArray(usersTable.id, Array.from(managedUserIdsSet)));
 
     const userOptions = users.map((u) => ({ id: u.id, label: u.label || u.id }));
-    const selectedUserId = searchParams.user || userOptions[0]?.id;
+
+    // Auch prüfen, falls User vorausgewählt ist.
+    const requestedUserId = searchParams.user;
+    const selectedUserId =
+        isNotEmptyString(requestedUserId) && managedUserIdsSet.has(requestedUserId) ? requestedUserId : userOptions[0]?.id;
 
     // 2. Get contracts for selected user
-    const contracts = selectedUserId ? await getContractsForUser(selectedUserId) : [];
+    const managedContractIds = new Set(managedContracts.map((c) => c.id));
+    const contracts = selectedUserId ? (await getContractsForUser(selectedUserId)).filter((c) => managedContractIds.has(c.contractId)) : [];
 
     const holidays = selectedUserId
         ? await getHolidaysWithConfigs(

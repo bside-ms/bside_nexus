@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import type { HrpAbsenceEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
 import type { HrpContract } from '@/lib/db/contractActions';
-import { createPayrollHourly, upsertForecast } from '@/lib/db/hrpAdminActions';
+import { createPayrollHourly, upsertForecast } from '@/lib/hrp/adminServerActions';
 
 interface UnbilledDayStat {
     dateStr: string;

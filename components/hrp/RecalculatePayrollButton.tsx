@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { ReactElement } from 'react';
 import { Button } from '@/components/ui/button';
-import { recalculatePayrollFixedForUserAtDate } from '@/lib/db/hrpAdminActions';
+import { recalculatePayrollFixedForUserAtDate } from '@/lib/hrp/adminServerActions';
 
 export function RecalculatePayrollButton({
     selectedUserId,

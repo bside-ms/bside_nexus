@@ -1,5 +1,4 @@
-'use server';
-
+// Kein 'use server': Client-Komponenten rufen nur die geprüften Actions aus lib/hrp/adminServerActions.ts auf.
 import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from 'drizzle-orm';
 import { getAbsences } from './hrpAbsenceActions';
 import { db } from '@/db';
@@ -79,11 +78,12 @@ export interface ManagedContract {
 
 /**
  *  Hole alle Verträge die ein User verwalten darf.
+ *  System-Admins verwalten alle Verträge.
  */
 export async function getManagedContracts(adminUserId: string): Promise<Array<ManagedContract>> {
-    const managedGroupIds = await getManagedGroupIds(adminUserId);
-
-    if (managedGroupIds.length === 0) {
+    const isSystemAdmin = isGlobalAdmin(adminUserId);
+    const managedGroupIds = isSystemAdmin ? [] : await getManagedGroupIds(adminUserId);
+    if (!isSystemAdmin && managedGroupIds.length === 0) {
         return [];
     }
 
@@ -102,10 +102,31 @@ export async function getManagedContracts(adminUserId: string): Promise<Array<Ma
         .from(hrpContractsTable)
         .innerJoin(usersTable, eq(hrpContractsTable.userId, usersTable.id))
         .innerJoin(groupsTable, eq(hrpContractsTable.employerGroupId, groupsTable.id))
-        .where(inArray(hrpContractsTable.employerGroupId, managedGroupIds))
+        .where(isSystemAdmin ? undefined : inArray(hrpContractsTable.employerGroupId, managedGroupIds))
         .orderBy(desc(hrpContractsTable.validFrom), groupsTable.displayName, usersTable.displayName);
 
     return contracts;
+}
+
+/**
+ *  Darf der User den Vertrag verwalten?
+ *  Gleiche Regel wie getManagedContracts.
+ */
+export async function canManageContract(adminUserId: string, contractId: string): Promise<boolean> {
+    const contract = await db.query.hrpContractsTable.findFirst({
+        where: eq(hrpContractsTable.id, contractId),
+        columns: { employerGroupId: true },
+    });
+    if (!contract) {
+        return false;
+    }
+
+    if (isGlobalAdmin(adminUserId)) {
+        return true;
+    }
+
+    const managedGroupIds = await getManagedGroupIds(adminUserId);
+    return managedGroupIds.includes(contract.employerGroupId);
 }
 
 export interface ContractDetails {
@@ -236,6 +257,49 @@ export async function getHolidayConfigs(contractIds: Array<string>, year: number
         .where(
             and(inArray(hrpHolidayConfigsTable.contractId, contractIds), sql`EXTRACT(YEAR FROM ${hrpHolidayConfigsTable.date}) = ${year}`),
         );
+}
+
+export async function getHolidayConfigById(id: string): Promise<HrpHolidayConfigEntry | null> {
+    return (await db.query.hrpHolidayConfigsTable.findFirst({ where: eq(hrpHolidayConfigsTable.id, id) })) ?? null;
+}
+
+/**
+ * Prüft, ob alle abzurechnenden Einträge auch wirklich zur gleichen Person gehören.
+ * Hilfsfunktion der Abrechnungslogik.
+ */
+export async function belongToContractUser(contractId: string, eventLogIds: Array<string>, absenceIds: Array<string>): Promise<boolean> {
+    const contract = await db.query.hrpContractsTable.findFirst({
+        where: eq(hrpContractsTable.id, contractId),
+        columns: { userId: true },
+    });
+    if (!contract) {
+        return false;
+    }
+
+    const uniqueLogIds = [...new Set(eventLogIds)];
+    if (uniqueLogIds.length > 0) {
+        const logs = await db
+            .select({ id: hrpEventLogTable.id })
+            .from(hrpEventLogTable)
+            .where(and(inArray(hrpEventLogTable.id, uniqueLogIds), eq(hrpEventLogTable.userId, contract.userId)));
+        if (logs.length !== uniqueLogIds.length) {
+            return false;
+        }
+    }
+
+    const uniqueAbsenceIds = [...new Set(absenceIds)];
+    if (uniqueAbsenceIds.length > 0) {
+        const absences = await db
+            .select({ id: hrpAbsencesTable.id })
+            .from(hrpAbsencesTable)
+            .innerJoin(hrpContractsTable, eq(hrpAbsencesTable.contractId, hrpContractsTable.id))
+            .where(and(inArray(hrpAbsencesTable.id, uniqueAbsenceIds), eq(hrpContractsTable.userId, contract.userId)));
+        if (absences.length !== uniqueAbsenceIds.length) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 export async function getHolidaysWithConfigs(

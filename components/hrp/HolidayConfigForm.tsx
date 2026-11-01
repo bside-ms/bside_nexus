@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { HrpHolidayConfigEntry } from '@/db/schema';
 import { type HrpContract } from '@/lib/db/contractActions';
-import { bookHoliday, upsertHolidayConfig } from '@/lib/db/hrpAdminActions';
+import { bookHoliday, upsertHolidayConfig } from '@/lib/hrp/adminServerActions';
 import { format } from 'date-fns';
 import { de } from 'date-fns/locale';
 

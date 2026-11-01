@@ -1,5 +1,3 @@
-'use server';
-
 import { isEmpty } from 'lodash-es';
 import type { ReactElement } from 'react';
 import type * as React from 'react';

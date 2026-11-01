@@ -4,6 +4,8 @@ import { db } from '@/db';
 import { hrpEventLogTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
 import { deleteHrpEntry } from '@/lib/db/hrpActions';
+import { getContractAdminSession } from '@/lib/hrp/adminAccess';
+import { aggregateDay } from '@/lib/hrp/aggregation';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
     const session = await getUserSession();
@@ -27,10 +29,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         return NextResponse.json({ success: false, message: 'Eintrag nicht gefunden' }, { status: 404 });
     }
 
-    const isAdmin = session.roles?.includes('arbeitszeiterfassung-admin');
     const isOwner = entry.userId === session.id;
-
-    if (!isAdmin && !isOwner) {
+    const isContractAdmin = !isOwner && entry.contractId !== null && (await getContractAdminSession(entry.contractId)) !== null;
+    if (!isOwner && !isContractAdmin) {
         return NextResponse.json({ success: false, message: 'Keine Berechtigung' }, { status: 403 });
     }
 
@@ -40,6 +41,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     try {
         await deleteHrpEntry({ id, deletedBy: session.id, reason });
+
+        // Aggregation auslösen.
+        if (entry.contractId !== null) {
+            const dateString = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(entry.loggedTimestamp);
+            await aggregateDay(entry.userId, dateString, entry.contractId);
+        }
+
         return NextResponse.json({ success: true });
     } catch {
         return NextResponse.json({ success: false, message: 'Fehler beim Löschen' }, { status: 500 });

@@ -104,13 +104,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
             comment: comment || null,
             abgerechnet: false,
         });
-
-        // 5. Aggregation triggern
-        const dateString = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(time);
-        aggregateDay(session.id, dateString, contractId);
     } catch {
-        return NextResponse.json({ success: false, message: 'Fahler beim Abspeichern' }, { status: 500 });
+        return NextResponse.json({ success: false, message: 'Fehler beim Abspeichern' }, { status: 500 });
     }
+
+    // Aggregation ausführen.
+    const dateString = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Berlin' }).format(time);
+    await aggregateDay(session.id, dateString, contractId);
 
     return NextResponse.json({ success: true, received: event });
 }

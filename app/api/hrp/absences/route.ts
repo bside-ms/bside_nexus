@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from 'next/server';
 import getUserSession from '@/lib/auth/getUserSession';
 import { createAbsence, getAbsences } from '@/lib/db/hrpAbsenceActions';
+import { getContractById } from '@/lib/db/hrpAdminActions';
+import { getContractAdminSession } from '@/lib/hrp/adminAccess';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
     const session = await getUserSession();
@@ -55,6 +57,11 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
             { success: false, message: 'Einige benötigte Informationen wurden nicht richtig übermittelt.' },
             { status: 400 },
         );
+    }
+
+    const contract = await getContractById(contractId);
+    if (contract?.userId !== session.id && (await getContractAdminSession(contractId)) === null) {
+        return NextResponse.json({ success: false, message: 'Dir fehlen die erforderlichen Berechtigungen.' }, { status: 403 });
     }
 
     try {
