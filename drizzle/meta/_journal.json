@@ -127,6 +127,20 @@
       "when": 1792962276382,
       "tag": "0017_group included groups",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793594607488,
+      "tag": "0018_key management drop item tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793594648926,
+      "tag": "0019_key management protocol lines",
+      "breakpoints": true
     }
   ]
 }

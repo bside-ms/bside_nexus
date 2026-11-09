@@ -1,41 +1,65 @@
+import { FileText, KeyRound, Users } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
+import NavTile from '@/components/common/NavTile';
+import KeyPageShell from '@/components/key/KeyPageShell';
+import ProtocolTable from '@/components/key/ProtocolTable';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getKeyOverviewStats } from '@/lib/db/keyActions';
+import { listProtocols } from '@/lib/db/keyProtocolActions';
+import requireKeyPageAccess from '@/lib/key/requireKeyPageAccess';
 
-export default function KeyLandingPage(): ReactElement {
-  const links = [
-    { href: '/key/profiles', title: 'Profile', desc: 'Profile anlegen, bearbeiten und verwalten.' },
-    { href: '/key/types', title: 'Schließungen', desc: 'Schließungen (key types) verwalten und auffüllen.' },
-    { href: '/key/items', title: 'Schlüssel', desc: 'Einzelne Schlüssel-Items anlegen und Status verwalten.' },
-    { href: '/key/issuance', title: 'Ausgabe', desc: 'Schlüssel an Profile ausgeben und Quittungen erzeugen.' },
-    { href: '/key/return', title: 'Rückgabe', desc: 'Teil- oder Komplett-Rückgaben durchführen.' },
-  ];
+export default async function KeyOverviewPage(): Promise<ReactElement> {
+    await requireKeyPageAccess();
+    const [stats, recentProtocols] = await Promise.all([getKeyOverviewStats(), listProtocols({ limit: 8 })]);
 
-  return (
-    <div className="p-4 md:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight">Schlüsselverwaltung</h1>
-        <p className="text-muted-foreground mt-1">Wähle einen Bereich aus, um fortzufahren.</p> 
-      </div>
+    const statCards = [
+        { label: 'Ausgegebene Schlüssel', value: stats.keysIssued },
+        { label: 'Schließungen', value: stats.keyTypes },
+        { label: 'Personen', value: stats.persons },
+        { label: 'Tresore', value: stats.safes },
+    ];
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {links.map((l) => (
-          <Card key={l.href} className="flex flex-col">
-            <CardHeader>
-              <CardTitle>{l.title}</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col justify-between">
-              <p className="text-sm text-muted-foreground mb-4">{l.desc}</p>
-              <div>
-                <Button asChild>
-                  <Link href={l.href}>Öffnen</Link>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
+    return (
+        <KeyPageShell title="Schlüsselverwaltung" description="Wer hat welche Schlüssel? Ausgaben, Rückgaben und Verluste mit Quittung.">
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {statCards.map((stat) => (
+                    <Card key={stat.label}>
+                        <CardHeader className="pb-2">
+                            <CardDescription>{stat.label}</CardDescription>
+                            <CardTitle className="text-3xl tabular-nums">{stat.value}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <NavTile
+                    title="Personen und Tresore"
+                    description="Schlüssel ausgeben, zurücknehmen und Verluste melden."
+                    href="/key/profiles"
+                    icon={Users}
+                />
+                <NavTile title="Schließungen" description="Schlüsselarten, Bestand und wer sie hat." href="/key/types" icon={KeyRound} />
+                <NavTile title="Protokolle" description="Alle Quittungen mit PDF-Download." href="/key/protocols" icon={FileText} />
+            </div>
+
+            <Card>
+                <CardHeader className="flex-row items-center justify-between space-y-0">
+                    <CardTitle className="text-lg">Letzte Protokolle</CardTitle>
+                    <Button asChild variant="outline" size="sm">
+                        <Link href="/key/protocols">Alle anzeigen</Link>
+                    </Button>
+                </CardHeader>
+                <CardContent>
+                    <ProtocolTable protocols={recentProtocols} />
+                </CardContent>
+            </Card>
+
+            <p className="text-sm text-muted-foreground">
+                Transponder werden in wAppLoxx verwaltet. Hier stehen sie nur, wenn sie auf einer Quittung vermerkt sind.
+            </p>
+        </KeyPageShell>
+    );
 }

@@ -1,53 +1,51 @@
-import { eq } from 'drizzle-orm';
-import { type NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { keysBaseTable } from '@/db/schema';
-import requireRole from '@/lib/auth/requireRole';
-import { softDeleteKeyType, updateKeyType } from '@/lib/db/keyActions';
-import { keyTypeUpdateSchema, parseOrError } from '@/lib/validation/keySchemas';
+import { NextResponse } from 'next/server';
+import { deleteKeyType, updateKeyType } from '@/lib/db/keyActions';
+import { formatKeyNr } from '@/lib/key/constants';
+import { errorResponse, guardKeyRoute, readJson, validationErrorResponse, writeKeyLog } from '@/lib/key/routeHelpers';
+import { keyTypeSchema, parseOrError } from '@/lib/validation/keySchemas';
 
-export async function GET(_: NextRequest, ctx: { params: Promise<{ id: string }> }): Promise<NextResponse> {
-    const guard = await requireRole('schluesselverwaltung');
-    if (!guard.isAllowed) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-    const { id } = await ctx.params;
-    const rows = await db.select().from(keysBaseTable).where(eq(keysBaseTable.id, id));
-    if (rows.length === 0) {
-        return NextResponse.json({ error: 'Not Found' }, { status: 404 });
-    }
-    return NextResponse.json(rows[0]);
+interface RouteContext {
+    params: Promise<{ id: string }>;
 }
 
-export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }): Promise<NextResponse> {
-    const guard = await requireRole('schluesselverwaltung');
-    if (!guard.isAllowed) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+export async function PATCH(req: Request, ctx: RouteContext): Promise<NextResponse> {
+    const guard = await guardKeyRoute();
+    if (guard instanceof NextResponse) {
+        return guard;
     }
+
+    const parsed = parseOrError(keyTypeSchema, await readJson(req));
+    if (!parsed.ok) {
+        return validationErrorResponse(parsed.error);
+    }
+
     try {
-        const body = await req.json();
-        const parsed = parseOrError(keyTypeUpdateSchema, body);
-        if (!parsed.ok) {
-            return NextResponse.json(parsed.error, { status: 400 });
-        }
         const { id } = await ctx.params;
-        const row = await updateKeyType(id, parsed.data);
-        return NextResponse.json(row);
-    } catch (e) {
-        return NextResponse.json({ error: e instanceof Error ? e.message : 'Fehler beim Aktualisieren' }, { status: 400 });
+        const keyType = await updateKeyType(id, parsed.data);
+        await writeKeyLog(
+            req,
+            guard,
+            'key.type.update',
+            `Schließung ${formatKeyNr(keyType.keyNr)} (${keyType.keyDescription}) geändert, Bestand ${keyType.totalQuantity ?? 'unbekannt'}`,
+        );
+        return NextResponse.json({ success: true, id: keyType.id });
+    } catch (error) {
+        return errorResponse(error, 'Die Schließung konnte nicht gespeichert werden.');
     }
 }
 
-export async function DELETE(_: NextRequest, ctx: { params: Promise<{ id: string }> }): Promise<NextResponse> {
-    const guard = await requireRole('schluesselverwaltung');
-    if (!guard.isAllowed) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+export async function DELETE(req: Request, ctx: RouteContext): Promise<NextResponse> {
+    const guard = await guardKeyRoute();
+    if (guard instanceof NextResponse) {
+        return guard;
     }
+
     try {
         const { id } = await ctx.params;
-        const row = await softDeleteKeyType(id);
-        return NextResponse.json(row);
-    } catch (e) {
-        return NextResponse.json({ error: e instanceof Error ? e.message : 'Fehler beim Löschen' }, { status: 400 });
+        const keyType = await deleteKeyType(id);
+        await writeKeyLog(req, guard, 'key.type.delete', `Schließung ${formatKeyNr(keyType.keyNr)} (${keyType.keyDescription}) gelöscht`);
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        return errorResponse(error, 'Die Schließung konnte nicht gelöscht werden.');
     }
 }

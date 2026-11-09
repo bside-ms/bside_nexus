@@ -1,63 +1,65 @@
+import { KEY_PROFILE_KINDS, KEY_PROTOCOL_TYPES } from '@/lib/key/constants';
 import { z } from '@/lib/zod';
 
-// Shared helpers
+// Shared helpers (also used by other modules)
 export const idSchema = z.string().min(1);
-export const uuidLike = z.string().min(1); // DB uses varchar, not enforcing UUID at DB level everywhere
 
-export const userProfileCreateSchema = z.object({
-    userId: idSchema.nullish(),
-    firstName: z.string().min(1),
-    lastName: z.string().optional().nullable(),
-    addressStreet: z.string().optional().nullable(),
-    addressHouseNumber: z.string().optional().nullable(),
-    addressZipCode: z.string().optional().nullable(),
-    addressCity: z.string().optional().nullable(),
-    phoneNumber: z.string().optional().nullable(),
-    emailAddress: z.string().email().optional().nullable(),
-    description: z.string().optional().nullable(),
+// Empty strings from forms become null.
+const optionalText = (max: number): z.ZodType<string | null> =>
+    z
+        .string()
+        .trim()
+        .max(max)
+        .nullish()
+        .transform((value) => (value === undefined || value === null || value === '' ? null : value));
+
+export const keyProfileSchema = z
+    .object({
+        profileKind: z.enum(KEY_PROFILE_KINDS),
+        userId: optionalText(255),
+        firstName: z.string().trim().min(1, 'Bitte gib einen Namen an.').max(255),
+        lastName: optionalText(255),
+        addressStreet: optionalText(255),
+        addressHouseNumber: optionalText(50),
+        addressZipCode: optionalText(20),
+        addressCity: optionalText(255),
+        phoneNumber: optionalText(50),
+        emailAddress: optionalText(255),
+        description: optionalText(2000),
+    })
+    .refine((value) => value.emailAddress === null || z.email().safeParse(value.emailAddress).success, {
+        message: 'Bitte gib eine gültige E-Mail-Adresse an.',
+        path: ['emailAddress'],
+    });
+
+export const keyTypeSchema = z.object({
+    keyNr: z.coerce.number().int().min(0).max(9999),
+    keyDescription: z.string().trim().min(1, 'Bitte gib eine Bezeichnung an.').max(255),
+    totalQuantity: z.coerce.number().int().min(0).max(9999).nullable(),
 });
 
-export const userProfileUpdateSchema = userProfileCreateSchema.partial();
+const protocolLineSchema = z.discriminatedUnion('lineType', [
+    z.object({
+        lineType: z.literal('key'),
+        keyTypeId: idSchema,
+        quantity: z.coerce.number().int().min(1).max(99),
+    }),
+    z.object({
+        lineType: z.literal('transponder'),
+        transponderSerial: z.string().trim().min(1, 'Bitte gib die Seriennummer des Transponders an.').max(50),
+        description: z.string().trim().max(255).nullish(),
+    }),
+]);
 
-export const keyTypeCreateSchema = z.object({
-    keyNr: z.coerce.number().int(),
-    keyDescription: z.string().min(1),
-});
-
-export const keyTypeUpdateSchema = z.object({
-    keyNr: z.coerce.number().int().optional(),
-    keyDescription: z.string().min(1).optional(),
-});
-
-export const keyItemCreateSchema = z.object({
-    keyTypeId: idSchema,
-    seqNumber: z.coerce.number().int().nonnegative(),
-    comment: z.string().optional().nullable(),
-});
-
-export const fillUpSchema = z.object({
-    targetQuantity: z.coerce.number().int().nonnegative(),
-});
-
-export const changeStatusSchema = z.object({
-    status: z.enum(['active', 'inactive', 'lost', 'broken', 'destroyed']),
-});
-
-export const issuanceSchema = z.object({
+export const protocolCreateSchema = z.object({
+    protocolType: z.enum(KEY_PROTOCOL_TYPES),
     userProfileId: idSchema,
-    keyItemIds: z.array(idSchema).min(1),
+    lines: z.array(protocolLineSchema).min(1, 'Bitte gib mindestens eine Zeile an.').max(40),
+    comment: z.string().trim().max(2000).nullish(),
 });
 
-export const returnSchema = z.object({
-    assignmentIds: z.array(idSchema).min(1),
-});
-
-export const lostSchema = z.object({
-    assignmentId: idSchema,
-});
-
-export const reactivateSchema = z.object({
-    keyItemId: idSchema,
+export const protocolCancelSchema = z.object({
+    reason: z.string().trim().min(3, 'Bitte gib einen Grund an.').max(2000),
 });
 
 export interface ZodErrorShape {

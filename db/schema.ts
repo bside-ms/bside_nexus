@@ -36,9 +36,8 @@ export type HrpPayrollHourlyForecastEntry = typeof hrpPayrollHourlyForecastsTabl
 // Schlüsselverwaltung
 export type UserProfileEntry = typeof userProfilesTable.$inferSelect;
 export type KeysBaseEntry = typeof keysBaseTable.$inferSelect;
-export type KeyItemEntry = typeof keyItemsTable.$inferSelect;
 export type KeyProtocolEntry = typeof keyProtocolsTable.$inferSelect;
-export type KeyAssignmentEntry = typeof keyAssignmentTable.$inferSelect;
+export type KeyProtocolItemEntry = typeof keyProtocolItemsTable.$inferSelect;
 
 export const groupsTable = pgTable('groups', {
     id: varchar({ length: 255 }).primaryKey(),
@@ -76,8 +75,11 @@ export const userProfilesTable = pgTable(
     {
         id: varchar({ length: 255 }).primaryKey(),
         userId: varchar({ length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
-        // Fortlaufende Profilnummer für Quittungen
-        profileNumber: integer().generatedAlwaysAsIdentity(),
+        // Sequential profile number for receipts
+        // BY DEFAULT, so the import can keep the numbers of the old receipts.
+        profileNumber: integer().generatedByDefaultAsIdentity(),
+        // 'person' or 'safe' (key safe). Safes keep their name in firstName and their location in description.
+        profileKind: varchar('profile_kind', { length: 20 }).notNull().default('person'),
         firstName: varchar({ length: 255 }).notNull(),
         lastName: varchar({ length: 255 }),
         addressStreet: varchar({ length: 255 }),
@@ -85,7 +87,7 @@ export const userProfilesTable = pgTable(
         addressZipCode: varchar({ length: 20 }),
         addressCity: varchar({ length: 255 }),
         phoneNumber: varchar({ length: 50 }),
-        emailAddress: varchar({ length: 50 }),
+        emailAddress: varchar({ length: 255 }),
         description: text(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at'),
@@ -94,15 +96,15 @@ export const userProfilesTable = pgTable(
     },
     (table) => {
         return {
-            // Alle Versionen einer Benutzer*in
+            // All versions of a user's profile
             userProfileVersionsIdx: index('user_profiles_user_id_version_created_at_idx').on(table.userId, table.createdAt),
 
-            // Nur eine aktive Version (nur unique, wenn userId vorhanden ist).
+            // Only one active version (unique only if userId is set).
             currentUserProfileIdx: uniqueIndex('user_profiles_user_id_current_unique_idx')
                 .on(table.userId)
                 .where(sql`${table.updatedAt} IS NULL AND ${table.deleteAt} IS NULL AND ${table.userId} IS NOT NULL`),
 
-            // Eindeutige fortlaufende Profilnummer
+            // Unique sequential profile number
             userProfileNumberUniqueIdx: uniqueIndex('user_profiles_profile_number_unique_idx').on(table.profileNumber),
         };
     },
@@ -147,9 +149,11 @@ export const keysBaseTable = pgTable(
     'key_types',
     {
         id: varchar({ length: 36 }).primaryKey(),
-        keyNr: integer().notNull(), // z.B. 1 oder 58
+        keyNr: integer().notNull(), // e.g. 1 or 58
         keyDescription: text().notNull(),
-        totalQuantity: integer().default(0),
+        // All keys of this key type, issued ones included. null = unknown.
+        // Single copies are not tracked, the keys carry no sub-numbers.
+        totalQuantity: integer(),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         updatedAt: timestamp('updated_at'),
         deleteAt: timestamp('delete_at'),
@@ -157,78 +161,80 @@ export const keysBaseTable = pgTable(
     },
     (table) => {
         return {
-            // Jede Schließung hat eine eindeutige Nummer
-            keyNrUniqueIdx: uniqueIndex('key_types_key_nr_unique_idx').on(table.keyNr),
+            // Every key type that is not deleted has a unique number
+            keyNrUniqueIdx: uniqueIndex('key_types_key_nr_unique_idx')
+                .on(table.keyNr)
+                .where(sql`${table.deleteAt} IS NULL`),
         };
     },
 );
 
-export const keyItemsTable = pgTable(
-    'key_items',
+// Recipient data at the time of the protocol. Later profile changes don't change old receipts.
+export interface KeyProtocolRecipient {
+    name: string;
+    profileNumber: number | null;
+    address: string;
+    mail: string;
+    phone: string;
+}
+
+// Issuance, return or loss. At most 4 lines per receipt (template).
+export const keyProtocolsTable = pgTable(
+    'key_protocols',
     {
         id: varchar({ length: 36 }).primaryKey(),
-        keyTypeId: varchar('key_type_id', { length: 36 })
-            .notNull()
-            .references(() => keysBaseTable.id, { onDelete: 'restrict' }),
-        seqNumber: integer().notNull(),
-        status: varchar({ length: 50 }).notNull().default('active'), // 'active', 'inactive', 'lost', 'broken', 'destroyed'
-        comment: text(),
-        createdAt: timestamp('created_at').defaultNow().notNull(),
-    },
-    (table) => {
-        return {
-            // Je Schließung ist die laufende Nummer eindeutig
-            keyItemSeqUniqueIdx: uniqueIndex('key_items_key_type_id_seq_unique_idx').on(table.keyTypeId, table.seqNumber),
-        };
-    },
-);
-
-export const keyProtocolsTable = pgTable('key_protocols', {
-    id: varchar({ length: 36 }).primaryKey(),
-    protocolType: varchar({ length: 50 }).notNull(), // 'issuance' / 'return'
-    userProfileId: varchar('user_profile_id', { length: 255 })
-        .notNull()
-        .references(() => userProfilesTable.id),
-    createdAt: timestamp('created_at').defaultNow().notNull(),
-    createdBy: varchar('created_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }), // Mitarbeiter, der die Quittung erstellt
-    signatureDate: timestamp('signature_date'),
-});
-
-export const keyAssignmentTable = pgTable(
-    'key_assignment',
-    {
-        id: varchar({ length: 255 }).primaryKey(),
-
-        keyItemId: varchar('key_item_id', { length: 36 })
-            .notNull()
-            .references(() => keyItemsTable.id, { onDelete: 'restrict' }),
-
+        // Readable number, e.g. "0231". Imported duplicates of old receipts get a letter ("0062a").
+        protocolNumber: varchar('protocol_number', { length: 20 }).notNull(),
+        protocolType: varchar('protocol_type', { length: 20 }).notNull(), // 'issuance' | 'return' | 'lost'
         userProfileId: varchar('user_profile_id', { length: 255 })
             .notNull()
-            .references(() => userProfilesTable.id, { onDelete: 'cascade' }),
-
-        issuanceProtocolId: varchar('issuance_protocol_id', { length: 36 })
-            .notNull()
-            .references(() => keyProtocolsTable.id),
-
-        returnProtocolId: varchar('return_protocol_id', { length: 36 }).references(() => keyProtocolsTable.id),
-
-        receivedAt: timestamp('received_at').defaultNow().notNull(), // Zeitpunkt der Ausgabe
-        returnedAt: timestamp('returned_at'), // Zeitpunkt der tatsächlichen Rückgabe
-
-        lostAt: timestamp('lost_at'),
-
+            .references(() => userProfilesTable.id, { onDelete: 'restrict' }),
+        // null = date unknown (old paper receipts)
+        protocolDate: date('protocol_date', { mode: 'string' }),
+        issuerName: varchar('issuer_name', { length: 255 }),
+        recipient: json().$type<KeyProtocolRecipient>().notNull(),
+        comment: text(),
+        // File name of the original receipt (import)
+        sourceFile: varchar('source_file', { length: 255 }),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         createdBy: varchar('created_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
+        // Cancelled because it was created by mistake. It no longer counts for the stock.
+        deletedAt: timestamp('deleted_at'),
+        deletedBy: varchar('deleted_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
+        deletionReason: text('deletion_reason'),
     },
-    (table) => {
-        return {
-            // Pro Schlüssel darf es nur eine aktive (nicht zurückgegebene, nicht verlorene) Zuweisung geben
-            activeAssignmentUniqueIdx: uniqueIndex('key_assignment_active_unique_idx')
-                .on(table.keyItemId)
-                .where(sql`${table.returnedAt} IS NULL AND ${table.lostAt} IS NULL`),
-        };
+    (table) => ({
+        protocolNumberUniqueIdx: uniqueIndex('key_protocols_protocol_number_unique_idx').on(table.protocolNumber),
+        userProfileIdx: index('key_protocols_user_profile_idx').on(table.userProfileId),
+    }),
+);
+
+// One line of a receipt: key type + quantity, or a transponder.
+// Transponders are managed in wAppLoxx and are only listed here for the receipt.
+export const keyProtocolItemsTable = pgTable(
+    'key_protocol_items',
+    {
+        id: varchar({ length: 36 }).primaryKey(),
+        protocolId: varchar('protocol_id', { length: 36 })
+            .notNull()
+            .references(() => keyProtocolsTable.id, { onDelete: 'cascade' }),
+        position: integer().notNull(),
+        lineType: varchar('line_type', { length: 20 }).notNull(), // 'key' | 'transponder'
+        keyTypeId: varchar('key_type_id', { length: 36 }).references(() => keysBaseTable.id, { onDelete: 'restrict' }),
+        quantity: integer().notNull(),
+        transponderSerial: varchar('transponder_serial', { length: 50 }),
+        // Text on the receipt ("Veranstaltungstechnik", "Transponder (grün)")
+        description: varchar({ length: 255 }),
+        // Returns and losses: the issuance this line refers to
+        issuanceProtocolId: varchar('issuance_protocol_id', { length: 36 }).references(() => keyProtocolsTable.id, {
+            onDelete: 'restrict',
+        }),
     },
+    (table) => ({
+        protocolIdx: index('key_protocol_items_protocol_idx').on(table.protocolId),
+        keyTypeIdx: index('key_protocol_items_key_type_idx').on(table.keyTypeId),
+        transponderIdx: index('key_protocol_items_transponder_idx').on(table.transponderSerial),
+    }),
 );
 
 // ==========================================
