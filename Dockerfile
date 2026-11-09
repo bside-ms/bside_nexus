@@ -1,21 +1,21 @@
-# Basis wechseln: Debian statt Alpine
-FROM node:20-bookworm-slim as base
+FROM node:24-bookworm-slim AS base
 
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --force
 
-FROM base AS runner
+# Shared by builder and runner: system packages and env.
+FROM base AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# LibreOffice + Fonts (ohne Recommends, um das Image kleiner zu halten)
+# Security updates for the base, then LibreOffice + fonts. The DOCX to PDF conversion does not need JAVA.
 RUN apt-get update \
+  && apt-get upgrade -y \
   && apt-get install -y --no-install-recommends \
        libreoffice \
-       default-jre-headless \
        fonts-dejavu fontconfig \
   && rm -rf /var/lib/apt/lists/*
 
@@ -59,10 +59,16 @@ ENV MATTERMOST_AUTH_TOKEN=$
 ENV PDF_DOCX_ENABLED=$PDF_DOCX_ENABLED
 ENV PDF_TIMEOUT_MS=$PDF_TIMEOUT_MS
 
-
+FROM runtime AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build && rm -rf /app/.next/cache
+
+# Dev tools (eslint, typescript, drizzle-kit, tsx/esbuild) are only needed for the build.
+# Pruning in a separate stage keeps them out of every layer of the final image.
+RUN npm run build && npm prune --omit=dev --force && rm -rf /app/.next/cache
+
+FROM runtime AS runner
+COPY --from=builder /app /app
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

@@ -544,6 +544,13 @@ const describeLine = (line: { lineType: string; keyNr: number | null; quantity: 
     return line.quantity === 1 ? keyNr : `${line.quantity}× ${keyNr}`;
 };
 
+// Regular numbers ("0231", "0062a") first, then "ohne Nr. …", then "ABUS …" and anything else.
+const protocolNumberGroup = sql`case
+    when ${keyProtocolsTable.protocolNumber} ~ '^[0-9]{4}' then 0
+    when ${keyProtocolsTable.protocolNumber} ilike 'ohne%' then 1
+    else 2
+end`;
+
 export const listProtocols = async (
     filter: { userProfileId?: string; keyTypeId?: string; withoutScan?: boolean; uncertain?: boolean; limit?: number } = {},
 ): Promise<Array<KeyProtocolListEntry>> => {
@@ -578,7 +585,7 @@ export const listProtocols = async (
         .from(keyProtocolsTable)
         .innerJoin(userProfilesTable, eq(keyProtocolsTable.userProfileId, userProfilesTable.id))
         .where(and(...conditions))
-        .orderBy(desc(keyProtocolsTable.protocolNumber));
+        .orderBy(protocolNumberGroup, desc(keyProtocolsTable.protocolNumber));
     const rows = filter.limit === undefined ? await query : await query.limit(filter.limit);
     if (rows.length === 0) {
         return [];
