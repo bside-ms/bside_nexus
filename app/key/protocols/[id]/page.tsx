@@ -4,13 +4,23 @@ import { notFound } from 'next/navigation';
 import type { ReactElement } from 'react';
 import CancelProtocolDialog from '@/components/key/CancelProtocolDialog';
 import KeyPageShell from '@/components/key/KeyPageShell';
+import ProtocolScans from '@/components/key/ProtocolScans';
 import ProtocolTypeBadge from '@/components/key/ProtocolTypeBadge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getProtocolDetails } from '@/lib/db/keyProtocolActions';
-import { formatKeyNr, formatProtocolDate, KEY_LINE_TYPE_LABELS, KEY_PROTOCOL_TYPE_LABELS } from '@/lib/key/constants';
+import { listProtocolScans } from '@/lib/db/keyProtocolFileActions';
+import {
+    formatKeyNr,
+    formatProtocolDate,
+    KEY_DELETION_KIND_LABELS,
+    KEY_LINE_TYPE_LABELS,
+    KEY_PROTOCOL_TYPE_LABELS,
+    toKeyDeletionKind,
+} from '@/lib/key/constants';
 import requireKeyPageAccess from '@/lib/key/requireKeyPageAccess';
+import { isNextcloudConfigured } from '@/lib/nextcloud/webdav';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -34,8 +44,10 @@ export default async function KeyProtocolPage({ params, searchParams }: PageProp
     }
 
     const { protocol, protocolType, profileKind, items, followUps } = details;
+    const scans = await listProtocolScans(protocol.id);
     const isCancelled = protocol.deletedAt !== null;
-    const hasReceipt = protocolType !== 'lost' && profileKind === 'person';
+    const deletionKind = isCancelled ? toKeyDeletionKind(protocol.deletionKind) : null;
+    const hasReceipt = profileKind === 'person';
     const recipient = protocol.recipient;
 
     return (
@@ -44,7 +56,7 @@ export default async function KeyProtocolPage({ params, searchParams }: PageProp
             title={`${KEY_PROTOCOL_TYPE_LABELS[protocolType]} ${protocol.protocolNumber}`}
             description={
                 <div className="mt-1">
-                    <ProtocolTypeBadge type={protocolType} isCancelled={isCancelled} />
+                    <ProtocolTypeBadge type={protocolType} deletionKind={deletionKind} />
                 </div>
             }
             actions={
@@ -73,9 +85,9 @@ export default async function KeyProtocolPage({ params, searchParams }: PageProp
                     </AlertDescription>
                 </Alert>
             )}
-            {isCancelled && (
+            {deletionKind !== null && (
                 <Alert variant="destructive">
-                    <AlertTitle>Storniert</AlertTitle>
+                    <AlertTitle>{KEY_DELETION_KIND_LABELS[deletionKind]}</AlertTitle>
                     <AlertDescription>{protocol.deletionReason ?? 'Ohne Begründung.'}</AlertDescription>
                 </Alert>
             )}
@@ -167,6 +179,20 @@ export default async function KeyProtocolPage({ params, searchParams }: PageProp
                     </tbody>
                 </table>
             </div>
+
+            {hasReceipt && (
+                <ProtocolScans
+                    protocolId={protocol.id}
+                    protocolDate={protocol.protocolDate}
+                    isConfigured={isNextcloudConfigured()}
+                    scans={scans.map((scan) => ({
+                        id: scan.id,
+                        fileName: scan.filePath.split('/').pop() ?? scan.filePath,
+                        uploadedAt: scan.uploadedAt.toISOString(),
+                        uploadedByName: scan.uploadedByName,
+                    }))}
+                />
+            )}
         </KeyPageShell>
     );
 }

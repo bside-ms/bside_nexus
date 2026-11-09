@@ -20,6 +20,11 @@ declare namespace NodeJS {
         PDF_DOCX_ENABLED?: string;
         PDF_TIMEOUT_MS?: string;
 
+        NEXTCLOUD_URL?: string;
+        NEXTCLOUD_USER?: string;
+        NEXTCLOUD_APP_PASSWORD?: string;
+        NEXTCLOUD_KEY_FOLDER?: string;
+
         NEXT_PUBLIC_BASE_PATH?: string;
     }
 }

@@ -38,6 +38,7 @@ export type UserProfileEntry = typeof userProfilesTable.$inferSelect;
 export type KeysBaseEntry = typeof keysBaseTable.$inferSelect;
 export type KeyProtocolEntry = typeof keyProtocolsTable.$inferSelect;
 export type KeyProtocolItemEntry = typeof keyProtocolItemsTable.$inferSelect;
+export type KeyProtocolFileEntry = typeof keyProtocolFilesTable.$inferSelect;
 
 export const groupsTable = pgTable('groups', {
     id: varchar({ length: 255 }).primaryKey(),
@@ -198,8 +199,10 @@ export const keyProtocolsTable = pgTable(
         sourceFile: varchar('source_file', { length: 255 }),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         createdBy: varchar('created_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
-        // Cancelled because it was created by mistake. It no longer counts for the stock.
+        // Marked invalid: 'cancelled' (created by mistake) or 'destroyed' (paper receipt destroyed or void).
+        // Either way it no longer counts for the stock.
         deletedAt: timestamp('deleted_at'),
+        deletionKind: varchar('deletion_kind', { length: 20 }),
         deletedBy: varchar('deleted_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
         deletionReason: text('deletion_reason'),
     },
@@ -234,6 +237,27 @@ export const keyProtocolItemsTable = pgTable(
         protocolIdx: index('key_protocol_items_protocol_idx').on(table.protocolId),
         keyTypeIdx: index('key_protocol_items_key_type_idx').on(table.keyTypeId),
         transponderIdx: index('key_protocol_items_transponder_idx').on(table.transponderSerial),
+    }),
+);
+
+// Signed scans of a receipt, stored in Nextcloud. Files are never overwritten or deleted there.
+export const keyProtocolFilesTable = pgTable(
+    'key_protocol_files',
+    {
+        id: varchar({ length: 36 }).primaryKey(),
+        protocolId: varchar('protocol_id', { length: 36 })
+            .notNull()
+            .references(() => keyProtocolsTable.id, { onDelete: 'restrict' }),
+        // Path below the configured Nextcloud folder, e.g. "Ausgabe/0231 - Kai Brüske.pdf"
+        filePath: text('file_path').notNull(),
+        originalName: varchar('original_name', { length: 255 }),
+        contentType: varchar('content_type', { length: 100 }).notNull(),
+        size: integer().notNull(),
+        uploadedAt: timestamp('uploaded_at').defaultNow().notNull(),
+        uploadedBy: varchar('uploaded_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
+    },
+    (table) => ({
+        protocolIdx: index('key_protocol_files_protocol_idx').on(table.protocolId),
     }),
 );
 

@@ -1,4 +1,4 @@
-import { KEY_PROFILE_KINDS, KEY_PROTOCOL_TYPES } from '@/lib/key/constants';
+import { KEY_DELETION_KINDS, KEY_PROFILE_KINDS, KEY_PROTOCOL_TYPES } from '@/lib/key/constants';
 import { z } from '@/lib/zod';
 
 // Shared helpers (also used by other modules)
@@ -59,7 +59,17 @@ export const protocolCreateSchema = z.object({
 });
 
 export const protocolCancelSchema = z.object({
+    kind: z.enum(KEY_DELETION_KINDS),
     reason: z.string().trim().min(3, 'Bitte gib einen Grund an.').max(2000),
+});
+
+// Date written on the paper receipt. Empty = unknown.
+export const protocolScanSchema = z.object({
+    date: z
+        .string()
+        .trim()
+        .regex(/^(\d{4}-\d{2}-\d{2})?$/, 'Bitte gib ein gültiges Datum an.')
+        .transform((value) => (value === '' ? null : value)),
 });
 
 export interface ZodErrorShape {

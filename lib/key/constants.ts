@@ -17,6 +17,17 @@ export const KEY_PROTOCOL_TYPE_LABELS: Record<KeyProtocolType, string> = {
     lost: 'Verlust',
 };
 
+// How an invalid protocol was marked. The scan in Nextcloud is never changed.
+export const KEY_DELETION_KINDS = ['cancelled', 'destroyed'] as const;
+export type KeyDeletionKind = (typeof KEY_DELETION_KINDS)[number];
+
+export const KEY_DELETION_KIND_LABELS: Record<KeyDeletionKind, string> = {
+    cancelled: 'Storniert',
+    destroyed: 'Vernichtet',
+};
+
+export const toKeyDeletionKind = (value: string | null): KeyDeletionKind => (value === 'destroyed' ? 'destroyed' : 'cancelled');
+
 export const KEY_LINE_TYPES = ['key', 'transponder'] as const;
 export type KeyLineType = (typeof KEY_LINE_TYPES)[number];
 

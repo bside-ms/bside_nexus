@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cancelProtocol } from '@/lib/db/keyProtocolActions';
-import { KEY_PROTOCOL_TYPE_LABELS, toKeyProtocolType } from '@/lib/key/constants';
+import { KEY_DELETION_KIND_LABELS, KEY_PROTOCOL_TYPE_LABELS, toKeyProtocolType } from '@/lib/key/constants';
 import { errorResponse, guardKeyRoute, readJson, validationErrorResponse, writeKeyLog } from '@/lib/key/routeHelpers';
 import { parseOrError, protocolCancelSchema } from '@/lib/validation/keySchemas';
 
@@ -21,16 +21,16 @@ export async function POST(req: Request, ctx: RouteContext): Promise<NextRespons
 
     try {
         const { id } = await ctx.params;
-        const protocol = await cancelProtocol(id, parsed.data.reason, guard);
+        const protocol = await cancelProtocol(id, parsed.data.kind, parsed.data.reason, guard);
         const typeLabel = KEY_PROTOCOL_TYPE_LABELS[toKeyProtocolType(protocol.protocolType)];
         await writeKeyLog(
             req,
             guard,
             'key.protocol.cancel',
-            `${typeLabel} ${protocol.protocolNumber} für ${protocol.recipient.name} storniert: ${parsed.data.reason}`,
+            `${typeLabel} ${protocol.protocolNumber} für ${protocol.recipient.name} als ${KEY_DELETION_KIND_LABELS[parsed.data.kind].toLowerCase()} markiert: ${parsed.data.reason}`,
         );
         return NextResponse.json({ success: true });
     } catch (error) {
-        return errorResponse(error, 'Das Protokoll konnte nicht storniert werden.');
+        return errorResponse(error, 'Das Protokoll konnte nicht als ungültig markiert werden.');
     }
 }

@@ -1,4 +1,4 @@
-import { FileDown } from 'lucide-react';
+import { FileCheck2, FileDown } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 import ProtocolTypeBadge from '@/components/key/ProtocolTypeBadge';
@@ -41,7 +41,7 @@ const ProtocolTable = ({ protocols, showRecipient = true, emptyText = 'Noch kein
                             </td>
                             <td className="p-3 whitespace-nowrap">{formatProtocolDate(protocol.protocolDate)}</td>
                             <td className="p-3">
-                                <ProtocolTypeBadge type={protocol.protocolType} isCancelled={protocol.isCancelled} />
+                                <ProtocolTypeBadge type={protocol.protocolType} deletionKind={protocol.deletionKind} />
                             </td>
                             {showRecipient && (
                                 <td className="p-3">
@@ -52,13 +52,23 @@ const ProtocolTable = ({ protocols, showRecipient = true, emptyText = 'Noch kein
                             )}
                             <td className="hidden p-3 sm:table-cell">{protocol.summary}</td>
                             <td className="p-3 text-right">
-                                {protocol.protocolType !== 'lost' && protocol.profileKind === 'person' && !protocol.isCancelled && (
-                                    <Button asChild size="sm" variant="ghost">
-                                        <a href={`/api/key/protocols/${protocol.id}/pdf`} title="Quittung als PDF herunterladen">
-                                            <FileDown className="size-4" />
-                                            <span className="sr-only">PDF</span>
-                                        </a>
-                                    </Button>
+                                {protocol.profileKind === 'person' && !protocol.isCancelled && (
+                                    <div className="flex items-center justify-end gap-1">
+                                        {protocol.hasScan ? (
+                                            <span title="Unterschriebene Quittung liegt vor" className="text-green-600 dark:text-green-400">
+                                                <FileCheck2 className="size-4" />
+                                                <span className="sr-only">Unterschrieben</span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-xs text-amber-600 dark:text-amber-400">Scan fehlt</span>
+                                        )}
+                                        <Button asChild size="sm" variant="ghost">
+                                            <a href={`/api/key/protocols/${protocol.id}/pdf`} title="Quittung als PDF herunterladen">
+                                                <FileDown className="size-4" />
+                                                <span className="sr-only">PDF</span>
+                                            </a>
+                                        </Button>
+                                    </div>
                                 )}
                             </td>
                         </tr>

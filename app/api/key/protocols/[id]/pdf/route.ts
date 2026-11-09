@@ -19,9 +19,6 @@ export async function GET(_: Request, ctx: RouteContext): Promise<NextResponse> 
     if (details === null) {
         return NextResponse.json({ success: false, error: 'Das Protokoll gibt es nicht.' }, { status: 404 });
     }
-    if (details.protocolType === 'lost') {
-        return NextResponse.json({ success: false, error: 'Für Verlustmeldungen gibt es keine Quittung.' }, { status: 400 });
-    }
 
     if (!isDocxEnabled()) {
         return NextResponse.json(
@@ -46,7 +43,8 @@ export async function GET(_: Request, ctx: RouteContext): Promise<NextResponse> 
         );
     }
 
-    const typeName = details.protocolType === 'issuance' ? 'Ausgabe' : 'Rueckgabe';
+    const typeNames = { issuance: 'Ausgabe', return: 'Rueckgabe', lost: 'Verlust' } as const;
+    const typeName = typeNames[details.protocolType];
     const fileName = `Schluessel-${typeName}-${details.protocol.protocolNumber}.pdf`;
     return new NextResponse(new Uint8Array(pdfBuffer), {
         headers: {

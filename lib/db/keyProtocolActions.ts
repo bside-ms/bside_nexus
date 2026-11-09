@@ -1,15 +1,17 @@
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '@/db';
 import type { KeyProtocolEntry, KeyProtocolRecipient, UserProfileEntry } from '@/db/schema';
-import { keyProtocolItemsTable, keyProtocolsTable, keysBaseTable, userProfilesTable } from '@/db/schema';
-import type { KeyLineType, KeyProfileKind, KeyProtocolType } from '@/lib/key/constants';
+import { keyProtocolFilesTable, keyProtocolItemsTable, keyProtocolsTable, keysBaseTable, userProfilesTable } from '@/db/schema';
+import type { KeyDeletionKind, KeyLineType, KeyProfileKind, KeyProtocolType } from '@/lib/key/constants';
 import {
     formatKeyNr,
     formatProfileName,
+    KEY_DELETION_KIND_LABELS,
     KEY_PROTOCOL_MAX_LINES,
     KEY_PROTOCOL_TYPE_LABELS,
     normalizeTransponderSerial,
+    toKeyDeletionKind,
     toKeyProfileKind,
     toKeyProtocolType,
 } from '@/lib/key/constants';
@@ -456,14 +458,22 @@ export const createProtocols = async (input: CreateProtocolsInput, actor: Protoc
  * Cancels a protocol. An issuance only if no return refers to it anymore.
  * This function is triggered by the /api/key/protocols/[id]/cancel endpoint.
  */
-export const cancelProtocol = async (protocolId: string, reason: string, actor: ProtocolActor): Promise<KeyProtocolEntry> => {
+export const cancelProtocol = async (
+    protocolId: string,
+    kind: KeyDeletionKind,
+    reason: string,
+    actor: ProtocolActor,
+): Promise<KeyProtocolEntry> => {
     return db.transaction(async (tx) => {
         const [protocol] = await tx.select().from(keyProtocolsTable).where(eq(keyProtocolsTable.id, protocolId)).limit(1);
         if (protocol === undefined) {
             throw new KeyActionError('Das Protokoll gibt es nicht.', 404);
         }
         if (protocol.deletedAt !== null) {
-            throw new KeyActionError('Das Protokoll ist bereits storniert.', 409);
+            throw new KeyActionError(
+                `Das Protokoll ist bereits als ${KEY_DELETION_KIND_LABELS[toKeyDeletionKind(protocol.deletionKind)].toLowerCase()} markiert.`,
+                409,
+            );
         }
 
         if (protocol.protocolType === 'issuance') {
@@ -474,7 +484,10 @@ export const cancelProtocol = async (protocolId: string, reason: string, actor: 
                 .where(and(eq(keyProtocolItemsTable.issuanceProtocolId, protocolId), isNull(keyProtocolsTable.deletedAt)));
             if (followUps.length > 0) {
                 const numbers = followUps.map((row) => row.protocolNumber).join(', ');
-                throw new KeyActionError(`Auf diese Ausgabe beziehen sich noch Protokolle (${numbers}). Storniere zuerst diese.`, 409);
+                throw new KeyActionError(
+                    `Auf diese Ausgabe beziehen sich noch Protokolle (${numbers}). Markiere zuerst diese als ungültig.`,
+                    409,
+                );
             }
         }
 
@@ -489,7 +502,7 @@ export const cancelProtocol = async (protocolId: string, reason: string, actor: 
 
         const [updated] = await tx
             .update(keyProtocolsTable)
-            .set({ deletedAt: new Date(), deletedBy: actor.userId, deletionReason: reason })
+            .set({ deletedAt: new Date(), deletedBy: actor.userId, deletionKind: kind, deletionReason: reason })
             .where(eq(keyProtocolsTable.id, protocolId))
             .returning();
         if (updated === undefined) {
@@ -512,6 +525,8 @@ export interface KeyProtocolListEntry {
     recipientName: string;
     profileKind: KeyProfileKind;
     isCancelled: boolean;
+    deletionKind: KeyDeletionKind | null;
+    hasScan: boolean;
     summary: string;
 }
 
@@ -524,18 +539,29 @@ const describeLine = (line: { lineType: string; keyNr: number | null; quantity: 
 };
 
 export const listProtocols = async (
-    filter: { userProfileId?: string; keyTypeId?: string; limit?: number } = {},
+    filter: { userProfileId?: string; keyTypeId?: string; withoutScan?: boolean; limit?: number } = {},
 ): Promise<Array<KeyProtocolListEntry>> => {
     const conditions = [];
     if (filter.userProfileId !== undefined) {
         conditions.push(eq(keyProtocolsTable.userProfileId, filter.userProfileId));
     }
+
     if (filter.keyTypeId !== undefined) {
         const withKeyType = db
             .select({ protocolId: keyProtocolItemsTable.protocolId })
             .from(keyProtocolItemsTable)
             .where(eq(keyProtocolItemsTable.keyTypeId, filter.keyTypeId));
         conditions.push(inArray(keyProtocolsTable.id, withKeyType));
+    }
+
+    // Valid receipts of persons that still lack a signed scan.
+    if (filter.withoutScan === true) {
+        const withScan = db.select({ protocolId: keyProtocolFilesTable.protocolId }).from(keyProtocolFilesTable);
+        conditions.push(
+            notInArray(keyProtocolsTable.id, withScan),
+            isNull(keyProtocolsTable.deletedAt),
+            eq(userProfilesTable.profileKind, 'person'),
+        );
     }
 
     const query = db
@@ -567,6 +593,20 @@ export const listProtocols = async (
         )
         .orderBy(asc(keyProtocolItemsTable.position));
 
+    const scanned = new Set(
+        (
+            await db
+                .selectDistinct({ protocolId: keyProtocolFilesTable.protocolId })
+                .from(keyProtocolFilesTable)
+                .where(
+                    inArray(
+                        keyProtocolFilesTable.protocolId,
+                        rows.map((row) => row.protocol.id),
+                    ),
+                )
+        ).map((row) => row.protocolId),
+    );
+
     const summaries = new Map<string, Array<string>>();
     for (const item of items) {
         const list = summaries.get(item.protocolId) ?? [];
@@ -583,8 +623,27 @@ export const listProtocols = async (
         recipientName: protocol.recipient.name,
         profileKind: toKeyProfileKind(profileKind),
         isCancelled: protocol.deletedAt !== null,
+        deletionKind: protocol.deletedAt === null ? null : toKeyDeletionKind(protocol.deletionKind),
         summary: (summaries.get(protocol.id) ?? []).join(', '),
+        hasScan: scanned.has(protocol.id),
     }));
+};
+
+// Valid receipts of persons that still lack a signed scan.
+export const countProtocolsWithoutScan = async (): Promise<number> => {
+    const withScan = db.select({ protocolId: keyProtocolFilesTable.protocolId }).from(keyProtocolFilesTable);
+    const [row] = await db
+        .select({ value: count() })
+        .from(keyProtocolsTable)
+        .innerJoin(userProfilesTable, eq(keyProtocolsTable.userProfileId, userProfilesTable.id))
+        .where(
+            and(
+                isNull(keyProtocolsTable.deletedAt),
+                eq(userProfilesTable.profileKind, 'person'),
+                notInArray(keyProtocolsTable.id, withScan),
+            ),
+        );
+    return row?.value ?? 0;
 };
 
 export interface ProtocolDetailItem {

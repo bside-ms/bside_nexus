@@ -83,7 +83,7 @@ const ReturnForm = ({ profileId, mode, holdings }: ReturnFormProps): ReactElemen
                 <CardTitle>{isLost ? 'Was ist verloren gegangen?' : 'Was wird zurückgegeben?'}</CardTitle>
                 <CardDescription>
                     {isLost
-                        ? 'Verlorene Schlüssel werden vom Bestand der Schließung abgezogen. Für Verlustmeldungen gibt es keine Quittung.'
+                        ? 'Verlorene Schlüssel werden vom Bestand der Schließung abgezogen. Der Verlust wird auf der Rückgabe-Quittung unterschrieben.'
                         : 'Die Rückgabe wird automatisch der ältesten offenen Ausgabe zugeordnet. Die Quittung nennt die Nummer der Ausgabe.'}
                 </CardDescription>
             </CardHeader>

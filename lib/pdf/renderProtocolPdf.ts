@@ -16,7 +16,7 @@ export const renderDocxPdfOrNull = async (details: ProtocolDetails): Promise<Buf
         return null;
     }
 
-    // Template by protocol type
+    // Losses use the return template, like the paper receipts.
     const kind = details.protocolType === 'issuance' ? 'issuance' : 'return';
     const templatePath = getTemplateAbsolutePath(kind);
     const placeholders = buildReceiptPlaceholders(details);

@@ -4,15 +4,20 @@ import type { ReactElement } from 'react';
 import NavTile from '@/components/common/NavTile';
 import KeyPageShell from '@/components/key/KeyPageShell';
 import ProtocolTable from '@/components/key/ProtocolTable';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getKeyOverviewStats } from '@/lib/db/keyActions';
-import { listProtocols } from '@/lib/db/keyProtocolActions';
+import { countProtocolsWithoutScan, listProtocols } from '@/lib/db/keyProtocolActions';
 import requireKeyPageAccess from '@/lib/key/requireKeyPageAccess';
 
 export default async function KeyOverviewPage(): Promise<ReactElement> {
     await requireKeyPageAccess();
-    const [stats, recentProtocols] = await Promise.all([getKeyOverviewStats(), listProtocols({ limit: 8 })]);
+    const [stats, recentProtocols, withoutScan] = await Promise.all([
+        getKeyOverviewStats(),
+        listProtocols({ limit: 8 }),
+        countProtocolsWithoutScan(),
+    ]);
 
     const statCards = [
         { label: 'Ausgegebene Schlüssel', value: stats.keysIssued },
@@ -33,6 +38,17 @@ export default async function KeyOverviewPage(): Promise<ReactElement> {
                     </Card>
                 ))}
             </div>
+
+            {withoutScan > 0 && (
+                <Alert>
+                    <AlertTitle>{withoutScan === 1 ? '1 Quittung' : `${withoutScan} Quittungen`} ohne unterschriebenen Scan</AlertTitle>
+                    <AlertDescription>
+                        <Link href="/key/protocols?ohneScan=1" className="underline">
+                            Zur Liste
+                        </Link>
+                    </AlertDescription>
+                </Alert>
+            )}
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <NavTile
