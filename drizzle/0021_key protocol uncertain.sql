@@ -1,0 +1,1 @@
+ALTER TABLE "key_protocols" ADD COLUMN "uncertain_reason" text;

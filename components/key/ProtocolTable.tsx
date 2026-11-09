@@ -2,6 +2,7 @@ import { FileCheck2, FileDown } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactElement } from 'react';
 import ProtocolTypeBadge from '@/components/key/ProtocolTypeBadge';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import type { KeyProtocolListEntry } from '@/lib/db/keyProtocolActions';
 import { formatProtocolDate } from '@/lib/key/constants';
@@ -41,7 +42,18 @@ const ProtocolTable = ({ protocols, showRecipient = true, emptyText = 'Noch kein
                             </td>
                             <td className="p-3 whitespace-nowrap">{formatProtocolDate(protocol.protocolDate)}</td>
                             <td className="p-3">
-                                <ProtocolTypeBadge type={protocol.protocolType} deletionKind={protocol.deletionKind} />
+                                <div className="flex flex-wrap items-center gap-1">
+                                    <ProtocolTypeBadge type={protocol.protocolType} deletionKind={protocol.deletionKind} />
+                                    {protocol.uncertainReason !== null && !protocol.isCancelled && (
+                                        <Badge
+                                            variant="outline"
+                                            className="border-amber-500 text-amber-700 dark:text-amber-400"
+                                            title={protocol.uncertainReason}
+                                        >
+                                            unsicher
+                                        </Badge>
+                                    )}
+                                </div>
                             </td>
                             {showRecipient && (
                                 <td className="p-3">

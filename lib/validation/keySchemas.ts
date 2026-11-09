@@ -56,6 +56,13 @@ export const protocolCreateSchema = z.object({
     userProfileId: idSchema,
     lines: z.array(protocolLineSchema).min(1, 'Bitte gib mindestens eine Zeile an.').max(40),
     comment: z.string().trim().max(2000).nullish(),
+    // Only for backdated entries. Missing = today, null = unknown.
+    protocolDate: z
+        .string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'Bitte gib ein gültiges Datum an.')
+        .refine((value) => value <= new Date().toISOString().slice(0, 10), 'Das Datum darf nicht in der Zukunft liegen.')
+        .nullish(),
+    withoutReceipt: z.boolean().optional(),
 });
 
 export const protocolCancelSchema = z.object({

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, isNotNull, isNull, notInArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '@/db';
 import type { KeyProtocolEntry, KeyProtocolRecipient, UserProfileEntry } from '@/db/schema';
@@ -209,6 +209,10 @@ export interface CreateProtocolsInput {
     userProfileId: string;
     lines: Array<ProtocolLineInput>;
     comment?: string | null;
+    // Backdated entries: undefined = today, null = unknown date.
+    protocolDate?: string | null;
+    // Recorded later without a signed receipt. Marks the protocol as uncertain.
+    withoutReceipt?: boolean;
 }
 
 export interface ProtocolActor {
@@ -420,10 +424,11 @@ export const createProtocols = async (input: CreateProtocolsInput, actor: Protoc
                 protocolNumber,
                 protocolType: input.protocolType,
                 userProfileId: profile.id,
-                protocolDate: todayIsoDate(),
+                protocolDate: input.protocolDate === undefined ? todayIsoDate() : input.protocolDate,
                 issuerName: actor.displayName,
                 recipient,
                 comment: input.comment ?? null,
+                uncertainReason: input.withoutReceipt === true ? 'Nachgetragen ohne Quittung' : null,
                 createdBy: actor.userId,
             });
             await tx.insert(keyProtocolItemsTable).values(
@@ -527,6 +532,7 @@ export interface KeyProtocolListEntry {
     isCancelled: boolean;
     deletionKind: KeyDeletionKind | null;
     hasScan: boolean;
+    uncertainReason: string | null;
     summary: string;
 }
 
@@ -539,7 +545,7 @@ const describeLine = (line: { lineType: string; keyNr: number | null; quantity: 
 };
 
 export const listProtocols = async (
-    filter: { userProfileId?: string; keyTypeId?: string; withoutScan?: boolean; limit?: number } = {},
+    filter: { userProfileId?: string; keyTypeId?: string; withoutScan?: boolean; uncertain?: boolean; limit?: number } = {},
 ): Promise<Array<KeyProtocolListEntry>> => {
     const conditions = [];
     if (filter.userProfileId !== undefined) {
@@ -554,6 +560,9 @@ export const listProtocols = async (
         conditions.push(inArray(keyProtocolsTable.id, withKeyType));
     }
 
+    if (filter.uncertain === true) {
+        conditions.push(isNotNull(keyProtocolsTable.uncertainReason), isNull(keyProtocolsTable.deletedAt));
+    }
     // Valid receipts of persons that still lack a signed scan.
     if (filter.withoutScan === true) {
         const withScan = db.select({ protocolId: keyProtocolFilesTable.protocolId }).from(keyProtocolFilesTable);
@@ -626,7 +635,39 @@ export const listProtocols = async (
         deletionKind: protocol.deletedAt === null ? null : toKeyDeletionKind(protocol.deletionKind),
         summary: (summaries.get(protocol.id) ?? []).join(', '),
         hasScan: scanned.has(protocol.id),
+        uncertainReason: protocol.uncertainReason,
     }));
+};
+
+export const countUncertainProtocols = async (): Promise<number> => {
+    const [row] = await db
+        .select({ value: count() })
+        .from(keyProtocolsTable)
+        .where(and(isNotNull(keyProtocolsTable.uncertainReason), isNull(keyProtocolsTable.deletedAt)));
+    return row?.value ?? 0;
+};
+
+/**
+ * Marks an uncertain protocol as verified.
+ * This function is triggered by the /api/key/protocols/[id]/verify endpoint.
+ */
+export const verifyProtocol = async (protocolId: string): Promise<KeyProtocolEntry> => {
+    const [protocol] = await db.select().from(keyProtocolsTable).where(eq(keyProtocolsTable.id, protocolId)).limit(1);
+    if (protocol === undefined) {
+        throw new KeyActionError('Das Protokoll gibt es nicht.', 404);
+    }
+    if (protocol.uncertainReason === null) {
+        throw new KeyActionError('Das Protokoll ist nicht als unsicher markiert.', 409);
+    }
+    const [updated] = await db
+        .update(keyProtocolsTable)
+        .set({ uncertainReason: null })
+        .where(eq(keyProtocolsTable.id, protocolId))
+        .returning();
+    if (updated === undefined) {
+        throw new Error('Verifying the protocol failed');
+    }
+    return updated;
 };
 
 // Valid receipts of persons that still lack a signed scan.

@@ -8,15 +8,16 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getKeyOverviewStats } from '@/lib/db/keyActions';
-import { countProtocolsWithoutScan, listProtocols } from '@/lib/db/keyProtocolActions';
+import { countProtocolsWithoutScan, countUncertainProtocols, listProtocols } from '@/lib/db/keyProtocolActions';
 import requireKeyPageAccess from '@/lib/key/requireKeyPageAccess';
 
 export default async function KeyOverviewPage(): Promise<ReactElement> {
     await requireKeyPageAccess();
-    const [stats, recentProtocols, withoutScan] = await Promise.all([
+    const [stats, recentProtocols, withoutScan, uncertain] = await Promise.all([
         getKeyOverviewStats(),
         listProtocols({ limit: 8 }),
         countProtocolsWithoutScan(),
+        countUncertainProtocols(),
     ]);
 
     const statCards = [
@@ -38,6 +39,17 @@ export default async function KeyOverviewPage(): Promise<ReactElement> {
                     </Card>
                 ))}
             </div>
+
+            {uncertain > 0 && (
+                <Alert className="border-amber-500">
+                    <AlertTitle>{uncertain === 1 ? '1 Protokoll ist' : `${uncertain} Protokolle sind`} als unsicher markiert</AlertTitle>
+                    <AlertDescription>
+                        <Link href="/key/protocols?unsicher=1" className="underline">
+                            Zur Liste
+                        </Link>
+                    </AlertDescription>
+                </Alert>
+            )}
 
             {withoutScan > 0 && (
                 <Alert>

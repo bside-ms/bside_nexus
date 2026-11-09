@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { KeyRound, Loader2, Nfc, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ReactElement } from 'react';
+import type { BackdateValue } from '@/components/key/BackdateFields';
+import BackdateFields, { backdateToRequest, EMPTY_BACKDATE } from '@/components/key/BackdateFields';
 import sendKeyRequest from '@/components/key/sendKeyRequest';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,6 +44,7 @@ const IssueForm = ({ profileId, isSafe, keyTypes }: IssueFormProps): ReactElemen
     const [lines, setLines] = useState<Array<Line>>([{ id: 1, lineType: 'key', keyTypeId: '', quantity: '1' }]);
     const [nextId, setNextId] = useState(2);
     const [comment, setComment] = useState('');
+    const [backdate, setBackdate] = useState<BackdateValue>(EMPTY_BACKDATE);
     const [isLoading, setIsLoading] = useState(false);
 
     const addLine = (lineType: Line['lineType']): void => {
@@ -73,6 +76,7 @@ const IssueForm = ({ profileId, isSafe, keyTypes }: IssueFormProps): ReactElemen
             protocolType: 'issuance',
             userProfileId: profileId,
             comment: comment.trim() === '' ? null : comment.trim(),
+            ...backdateToRequest(backdate),
             lines: lines.map((line) =>
                 line.lineType === 'key'
                     ? { lineType: 'key', keyTypeId: line.keyTypeId, quantity: Number(line.quantity) }
@@ -193,6 +197,8 @@ const IssueForm = ({ profileId, isSafe, keyTypes }: IssueFormProps): ReactElemen
                     <Label htmlFor="issue-comment">Interne Notiz (optional)</Label>
                     <Textarea id="issue-comment" rows={2} value={comment} onChange={(event) => setComment(event.target.value)} />
                 </div>
+
+                <BackdateFields value={backdate} onChange={setBackdate} />
 
                 {protocolCount > 1 && (
                     <p className="text-sm text-muted-foreground">

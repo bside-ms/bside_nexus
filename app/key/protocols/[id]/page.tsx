@@ -6,6 +6,7 @@ import CancelProtocolDialog from '@/components/key/CancelProtocolDialog';
 import KeyPageShell from '@/components/key/KeyPageShell';
 import ProtocolScans from '@/components/key/ProtocolScans';
 import ProtocolTypeBadge from '@/components/key/ProtocolTypeBadge';
+import VerifyProtocolDialog from '@/components/key/VerifyProtocolDialog';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -82,6 +83,17 @@ export default async function KeyProtocolPage({ params, searchParams }: PageProp
                         {hasReceipt
                             ? 'Lade die Quittung herunter, drucke sie aus und lass sie unterschreiben.'
                             : 'Für dieses Protokoll gibt es keine Quittung zum Unterschreiben.'}
+                    </AlertDescription>
+                </Alert>
+            )}
+            {protocol.uncertainReason !== null && deletionKind === null && (
+                <Alert className="border-amber-500">
+                    <AlertTitle>Unsicher: {protocol.uncertainReason}</AlertTitle>
+                    <AlertDescription>
+                        <p>Dieser Vorgang ist nicht sicher belegt. Er zählt trotzdem für den Bestand, bis er geprüft ist.</p>
+                        <div className="mt-2">
+                            <VerifyProtocolDialog protocolId={protocol.id} protocolNumber={protocol.protocolNumber} />
+                        </div>
                     </AlertDescription>
                 </Alert>
             )}

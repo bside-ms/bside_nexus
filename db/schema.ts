@@ -197,6 +197,8 @@ export const keyProtocolsTable = pgTable(
         comment: text(),
         // File name of the original receipt (import)
         sourceFile: varchar('source_file', { length: 255 }),
+        // Set while the protocol is not verified (e.g. imported without a signed scan). null = verified.
+        uncertainReason: text('uncertain_reason'),
         createdAt: timestamp('created_at').defaultNow().notNull(),
         createdBy: varchar('created_by', { length: 255 }).references(() => usersTable.id, { onDelete: 'set null' }),
         // Marked invalid: 'cancelled' (created by mistake) or 'destroyed' (paper receipt destroyed or void).

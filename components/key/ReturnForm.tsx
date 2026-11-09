@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { ReactElement } from 'react';
+import type { BackdateValue } from '@/components/key/BackdateFields';
+import BackdateFields, { backdateToRequest, EMPTY_BACKDATE } from '@/components/key/BackdateFields';
 import sendKeyRequest from '@/components/key/sendKeyRequest';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +28,7 @@ const ReturnForm = ({ profileId, mode, holdings }: ReturnFormProps): ReactElemen
     const [quantities, setQuantities] = useState<Record<string, string>>({});
     const [serials, setSerials] = useState<Set<string>>(new Set());
     const [comment, setComment] = useState('');
+    const [backdate, setBackdate] = useState<BackdateValue>(EMPTY_BACKDATE);
     const [isLoading, setIsLoading] = useState(false);
     const isLost = mode === 'lost';
 
@@ -56,6 +59,7 @@ const ReturnForm = ({ profileId, mode, holdings }: ReturnFormProps): ReactElemen
             protocolType: mode,
             userProfileId: profileId,
             comment: comment.trim() === '' ? null : comment.trim(),
+            ...backdateToRequest(backdate),
             lines: [
                 ...keyLines.map((entry) => ({ lineType: 'key', keyTypeId: entry.holding.keyTypeId, quantity: entry.quantity })),
                 ...[...serials].map((serial) => ({ lineType: 'transponder', transponderSerial: serial })),
@@ -164,6 +168,8 @@ const ReturnForm = ({ profileId, mode, holdings }: ReturnFormProps): ReactElemen
                     <Label htmlFor="return-comment">Interne Notiz (optional)</Label>
                     <Textarea id="return-comment" rows={2} value={comment} onChange={(event) => setComment(event.target.value)} />
                 </div>
+
+                <BackdateFields value={backdate} onChange={setBackdate} />
 
                 {lineCount > KEY_PROTOCOL_MAX_LINES && (
                     <p className="text-sm text-muted-foreground">
