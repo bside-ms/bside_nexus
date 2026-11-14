@@ -1,7 +1,7 @@
 'use client';
 
 import { type ReactElement } from 'react';
-import { Key, PieChart, Settings2 } from 'lucide-react';
+import { Key, PieChart, Plug, Settings2 } from 'lucide-react';
 import { SidebarContent, SidebarGroup } from '../ui/sidebar';
 import { NavbarSecondary } from './NavbarSecondary';
 import type { SidebarGroupNode } from '@/components/sidebar/NavbarGroups';
@@ -18,7 +18,7 @@ const baseUpperSidebarData: Array<NavbarItems> = [
     },
 ];
 
-const lowerSidebarData: Array<NavbarItems> = [
+const baseLowerSidebarData: Array<NavbarItems> = [
     {
         title: 'Dein Account',
         items: [{ title: 'Einstellungen', url: '/portal/settings', icon: Settings2 }],
@@ -28,9 +28,17 @@ const lowerSidebarData: Array<NavbarItems> = [
 interface AppSidebarContentProps {
     groups?: Array<SidebarGroupNode>;
     hasKeyRole?: boolean;
+    isSystemAdmin?: boolean;
 }
 
-export function AppSidebarContent({ groups, hasKeyRole }: AppSidebarContentProps): ReactElement {
+export function AppSidebarContent({ groups, hasKeyRole, isSystemAdmin }: AppSidebarContentProps): ReactElement {
+    const lowerSidebarData: Array<NavbarItems> =
+        isSystemAdmin === true
+            ? [
+                  ...baseLowerSidebarData,
+                  { title: 'System', items: [{ title: 'Integrationen', url: '/portal/admin/integrations', icon: Plug }] },
+              ]
+            : baseLowerSidebarData;
     // Clone base and inject key management if allowed
     const upperSidebarData: Array<NavbarItems> = baseUpperSidebarData.map((section) => ({
         ...section,

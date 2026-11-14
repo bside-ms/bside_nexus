@@ -2,6 +2,7 @@ import '@/app/globals.css';
 
 import type { Metadata } from 'next';
 import type { ReactElement, ReactNode } from 'react';
+import EnvironmentWarning from '@/components/common/EnvironmentWarning';
 import { AppSidebar } from '@/components/sidebar/AppSidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import isUserLoggedIn from '@/lib/auth/isUserLoggedIn';
@@ -25,6 +26,7 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
+                <EnvironmentWarning />
                 <main>{children}</main>
             </SidebarInset>
         </SidebarProvider>

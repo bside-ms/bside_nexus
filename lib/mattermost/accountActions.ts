@@ -1,6 +1,7 @@
 import type { Client4 } from '@mattermost/client';
 import type { UserProfile } from '@mattermost/types/users';
 import getMattermostClient from '@/lib/mattermost/getMattermostClient';
+import { isMattermostWriteAllowed } from '@/lib/mattermost/messaging';
 
 const getUserByUsername = async (username: string): Promise<UserProfile | null> => {
     const client: Client4 = getMattermostClient();
@@ -13,7 +14,12 @@ const getUserByUsername = async (username: string): Promise<UserProfile | null> 
     }
 };
 
+// Test system: only test users are changed, everyone else is skipped.
 export const invalidateMattermostSession = async (username: string): Promise<void> => {
+    if (!isMattermostWriteAllowed(username)) {
+        return;
+    }
+
     const client: Client4 = getMattermostClient();
 
     const currentUser = await getUserByUsername(username);
@@ -25,6 +31,10 @@ export const invalidateMattermostSession = async (username: string): Promise<voi
 };
 
 export const changeMattermostDisplayname = async (username: string, newDisplayname: string): Promise<void> => {
+    if (!isMattermostWriteAllowed(username)) {
+        return;
+    }
+
     const client: Client4 = getMattermostClient();
 
     const currentUser = await getUserByUsername(username);

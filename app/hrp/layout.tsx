@@ -2,6 +2,7 @@ import '@/app/globals.css';
 
 import type { Metadata } from 'next';
 import type { ReactElement, ReactNode } from 'react';
+import EnvironmentWarning from '@/components/common/EnvironmentWarning';
 import { AppSidebar } from '@/components/sidebar/AppSidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import getUserSession from '@/lib/auth/getUserSession';
@@ -19,6 +20,7 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
             <SidebarProvider>
                 <AppSidebar />
                 <SidebarInset>
+                    <EnvironmentWarning />
                     <main>
                         <div className="p-8">
                             <h1 className="text-2xl font-bold underline">Fehlende Berechtigungen</h1>
@@ -37,6 +39,7 @@ const RootLayout = async ({ children }: Readonly<{ children: ReactNode }>): Prom
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
+                <EnvironmentWarning />
                 <main>{children}</main>
             </SidebarInset>
         </SidebarProvider>

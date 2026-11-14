@@ -12,8 +12,12 @@ declare namespace NodeJS {
         KEYCLOAK_CLIENT_ID: string;
         KEYCLOAK_CLIENT_SECRET: string;
 
+        NEXUS_ENVIRONMENT?: string;
+
         MATTERMOST_URL: string;
         MATTERMOST_AUTH_TOKEN: string;
+        MATTERMOST_TEST_CHANNEL_ID?: string;
+        MATTERMOST_TEST_USERS?: string;
 
         SUPPORT_EMAIL?: string;
 

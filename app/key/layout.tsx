@@ -2,6 +2,7 @@ import '@/app/globals.css';
 
 import type { Metadata } from 'next';
 import type { ReactElement, ReactNode } from 'react';
+import EnvironmentWarning from '@/components/common/EnvironmentWarning';
 import { AppSidebar } from '@/components/sidebar/AppSidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import getUserSession from '@/lib/auth/getUserSession';
@@ -20,6 +21,7 @@ const KeyLayout = async ({ children }: Readonly<{ children: ReactNode }>): Promi
         <SidebarProvider>
             <AppSidebar />
             <SidebarInset>
+                <EnvironmentWarning />
                 <main>
                     {isAllowed ? (
                         children
