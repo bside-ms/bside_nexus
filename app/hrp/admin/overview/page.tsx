@@ -18,9 +18,11 @@ import { db } from '@/db';
 import type { HrpAbsenceEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
 import { hrpEventLogTable, usersTable } from '@/db/schema';
 import getUserSession from '@/lib/auth/getUserSession';
+import { HRP_EMPLOYER_GROUP_IDS } from '@/lib/constants';
 import { getContractAtDate, getContractChainIds, getContractsForUser } from '@/lib/db/contractActions';
 import {
     canViewPayroll,
+    getContractById,
     getCurrentPayrollHourly,
     getForecastForContract,
     getManagedContracts,
@@ -294,6 +296,7 @@ export default async function Page({
     let previousPayroll: HrpMonthlyPayrollEntry | null = null;
     let currentPayroll: HrpMonthlyPayrollEntry | null = null;
     let forecast: string | undefined = undefined;
+    let usesForecastPlanning = false;
 
     const contextWindowStart = new Date();
     contextWindowStart.setDate(contextWindowStart.getDate() - 70);
@@ -307,6 +310,7 @@ export default async function Page({
         currentPayroll = await getCurrentPayrollHourly(selectedContractId, year, month);
         const forecastEntry = await getForecastForContract(selectedContractId, year, month);
         forecast = forecastEntry?.forecastedHours ?? undefined;
+        usesForecastPlanning = (await getContractById(selectedContractId))?.employerGroupId === HRP_EMPLOYER_GROUP_IDS.gastro;
     }
 
     // Für die korrekte Gruppierung brauchen wir auch bereits abgerechnete Logs als Kontext
@@ -1089,6 +1093,7 @@ export default async function Page({
                             previousPayroll={previousPayroll}
                             currentPayrollHourly={currentPayroll}
                             initialForecast={forecast}
+                            usesForecastPlanning={usesForecastPlanning}
                             periodMode={period}
                             isAlreadyFinalized={!!currentPayroll}
                         />

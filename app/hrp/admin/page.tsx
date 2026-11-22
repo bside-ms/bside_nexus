@@ -1,10 +1,11 @@
-import { FileCheck, FileText, SquareChartGantt } from 'lucide-react';
+import { CalendarClock, FileCheck, FileText, SquareChartGantt } from 'lucide-react';
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
 import NavTile from '@/components/common/NavTile';
 import NavbarTop from '@/components/sidebar/NavbarTop';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { canViewPayroll } from '@/lib/db/hrpAdminActions';
+import { getForecastPlannerSession } from '@/lib/hrp/adminAccess';
 
 const breadCrumbs = [
     { title: 'Zeiterfassung', url: '/hrp' },
@@ -35,6 +36,15 @@ export default async function Page(): Promise<ReactElement> {
             icon: SquareChartGantt,
         },
     ];
+
+    if ((await getForecastPlannerSession()) !== null) {
+        navItems.push({
+            title: 'Stundenplanung Café',
+            description: 'Geplante Stunden vom 23. bis zum Monatsende für die Abrechnung eintragen.',
+            href: '/hrp/admin/forecast',
+            icon: CalendarClock,
+        });
+    }
 
     if (await canViewPayroll()) {
         navItems.push({

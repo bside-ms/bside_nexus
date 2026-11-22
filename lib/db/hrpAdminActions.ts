@@ -24,6 +24,7 @@ import {
     hrpPayrollHourlyForecastsTable,
     hrpPayrollHourlyTable,
     hrpPublicHolidaysTable,
+    logsTable,
     membersTable,
     usersTable,
 } from '@/db/schema';
@@ -31,6 +32,9 @@ import getUserSession from '@/lib/auth/getUserSession';
 import { HRP_EMPLOYER_GROUP_IDS } from '@/lib/constants';
 import { getContractAtDate, getContractChainIds } from '@/lib/db/contractActions';
 import { isGlobalAdmin } from '@/lib/db/groupActions';
+import type { HrpAdminActor } from '@/lib/hrp/corrections';
+import { HrpValidationError } from '@/lib/hrp/corrections';
+import { getForecastWindow } from '@/lib/hrp/forecast';
 import { computeDayStats, type DayEntries, groupEntriesByWorkday } from '@/lib/hrp/hrpLogic';
 import { format } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
@@ -375,56 +379,175 @@ export async function getForecastForContract(
     year: number,
     month: number,
 ): Promise<HrpPayrollHourlyForecastEntry | null> {
-    return (
-        (
-            await db
-                .select()
-                .from(hrpPayrollHourlyForecastsTable)
+    // The plan may sit on another version of the contract.
+    const chainIds = await getContractChainIds(contractId);
+    const rows = await db
+        .select()
+        .from(hrpPayrollHourlyForecastsTable)
+        .where(
+            and(
+                inArray(hrpPayrollHourlyForecastsTable.contractId, chainIds),
+                eq(hrpPayrollHourlyForecastsTable.year, year),
+                eq(hrpPayrollHourlyForecastsTable.month, month),
+            ),
+        );
+
+    return rows.find((row) => row.contractId === contractId) ?? rows[0] ?? null;
+}
+
+export interface ForecastPlanRow {
+    contractId: string;
+    userId: string;
+    userName: string;
+    validTo: Date | null;
+    plannedHours: string | null;
+    // Forecast stored in the finished payroll, null while the month is open.
+    finalizedHours: string | null;
+}
+
+/**
+ * Café staff with an hourly contract that overlaps the 23rd to the end of the month, one row per person.
+ */
+export async function getForecastPlanRows(year: number, month: number): Promise<Array<ForecastPlanRow>> {
+    const { from, to } = getForecastWindow(year, month);
+    const contracts = await db
+        .select({
+            contractId: hrpContractsTable.id,
+            userId: hrpContractsTable.userId,
+            displayName: usersTable.displayName,
+            username: usersTable.username,
+            validTo: hrpContractsTable.validTo,
+        })
+        .from(hrpContractsTable)
+        .innerJoin(usersTable, eq(hrpContractsTable.userId, usersTable.id))
+        .where(
+            and(
+                eq(hrpContractsTable.employerGroupId, HRP_EMPLOYER_GROUP_IDS.gastro),
+                eq(hrpContractsTable.type, 'hourly'),
+                sql`${hrpContractsTable.validFrom}::date <= ${to}::date`,
+                or(isNull(hrpContractsTable.validTo), sql`${hrpContractsTable.validTo}::date >= ${from}::date`),
+            ),
+        )
+        .orderBy(desc(hrpContractsTable.validFrom));
+
+    // Newest contract version wins.
+    const latestByUser = new Map<string, (typeof contracts)[number]>();
+    for (const contract of contracts) {
+        if (!latestByUser.has(contract.userId)) {
+            latestByUser.set(contract.userId, contract);
+        }
+    }
+    if (latestByUser.size === 0) {
+        return [];
+    }
+    const userIds = [...latestByUser.keys()];
+    const gastroUserCondition = and(
+        eq(hrpContractsTable.employerGroupId, HRP_EMPLOYER_GROUP_IDS.gastro),
+        inArray(hrpContractsTable.userId, userIds),
+    );
+
+    const [forecasts, payrolls] = await Promise.all([
+        db
+            .select({
+                userId: hrpContractsTable.userId,
+                contractId: hrpPayrollHourlyForecastsTable.contractId,
+                forecastedHours: hrpPayrollHourlyForecastsTable.forecastedHours,
+            })
+            .from(hrpPayrollHourlyForecastsTable)
+            .innerJoin(hrpContractsTable, eq(hrpPayrollHourlyForecastsTable.contractId, hrpContractsTable.id))
+            .where(
+                and(gastroUserCondition, eq(hrpPayrollHourlyForecastsTable.year, year), eq(hrpPayrollHourlyForecastsTable.month, month)),
+            ),
+        db
+            .select({ userId: hrpContractsTable.userId, forecastedHours: hrpPayrollHourlyTable.forecastedHoursLateMonth })
+            .from(hrpPayrollHourlyTable)
+            .innerJoin(hrpContractsTable, eq(hrpPayrollHourlyTable.contractId, hrpContractsTable.id))
+            .where(and(gastroUserCondition, eq(hrpPayrollHourlyTable.year, year), eq(hrpPayrollHourlyTable.month, month))),
+    ]);
+
+    return [...latestByUser.values()]
+        .map((contract) => {
+            const userForecasts = forecasts.filter((f) => f.userId === contract.userId);
+            const forecast = userForecasts.find((f) => f.contractId === contract.contractId) ?? userForecasts[0];
+            const payroll = payrolls.find((p) => p.userId === contract.userId);
+
+            return {
+                contractId: contract.contractId,
+                userId: contract.userId,
+                userName: contract.displayName?.trim() || contract.username,
+                validTo: contract.validTo,
+                plannedHours: forecast?.forecastedHours ?? null,
+                finalizedHours: payroll === undefined ? null : (payroll.forecastedHours ?? '0.00'),
+            };
+        })
+        .sort((a, b) => a.userName.localeCompare(b.userName, 'de'));
+}
+
+/**
+ * Stores the planned hours. Keeps one row per person and month, also across contract versions.
+ */
+export async function saveForecastPlan({
+    year,
+    month,
+    changes,
+    actor,
+}: {
+    year: number;
+    month: number;
+    changes: Array<{ row: ForecastPlanRow; hours: string | null }>;
+    actor: HrpAdminActor;
+}): Promise<void> {
+    const { label } = getForecastWindow(year, month);
+
+    await db.transaction(async (tx) => {
+        for (const { row, hours } of changes) {
+            const chain = await tx
+                .select({ id: hrpContractsTable.id })
+                .from(hrpContractsTable)
+                .where(and(eq(hrpContractsTable.userId, row.userId), eq(hrpContractsTable.employerGroupId, HRP_EMPLOYER_GROUP_IDS.gastro)));
+            const chainIds = chain.map((c) => c.id);
+
+            const billed = await tx
+                .select({ id: hrpPayrollHourlyTable.id })
+                .from(hrpPayrollHourlyTable)
                 .where(
                     and(
-                        eq(hrpPayrollHourlyForecastsTable.contractId, contractId),
+                        inArray(hrpPayrollHourlyTable.contractId, chainIds),
+                        eq(hrpPayrollHourlyTable.year, year),
+                        eq(hrpPayrollHourlyTable.month, month),
+                    ),
+                )
+                .limit(1);
+            if (billed.length > 0) {
+                throw new HrpValidationError(`${row.userName} wurde für diesen Monat bereits abgerechnet.`);
+            }
+
+            await tx
+                .delete(hrpPayrollHourlyForecastsTable)
+                .where(
+                    and(
+                        inArray(hrpPayrollHourlyForecastsTable.contractId, chainIds),
                         eq(hrpPayrollHourlyForecastsTable.year, year),
                         eq(hrpPayrollHourlyForecastsTable.month, month),
                     ),
-                )
-                .limit(1)
-        )[0] || null
-    );
-}
+                );
+            if (hours !== null) {
+                await tx
+                    .insert(hrpPayrollHourlyForecastsTable)
+                    .values({ id: uuidv4(), contractId: row.contractId, year, month, forecastedHours: hours });
+            }
 
-export async function upsertForecast(data: {
-    contractId: string;
-    year: number;
-    month: number;
-    forecastedHours: string;
-}): Promise<HrpPayrollHourlyForecastEntry> {
-    if (!(await canViewPayroll())) {
-        throw new Error('Not allowed to manage payrolls');
-    }
-
-    const result = (
-        await db
-            .insert(hrpPayrollHourlyForecastsTable)
-            .values({
+            await tx.insert(logsTable).values({
                 id: uuidv4(),
-                ...data,
-            })
-            .onConflictDoUpdate({
-                target: [
-                    hrpPayrollHourlyForecastsTable.contractId,
-                    hrpPayrollHourlyForecastsTable.year,
-                    hrpPayrollHourlyForecastsTable.month,
-                ],
-                set: { forecastedHours: data.forecastedHours },
-            })
-            .returning()
-    )[0];
-
-    if (!result) {
-        throw new Error('Forecast could not be upserted');
-    }
-
-    return result;
+                userId: actor.userId,
+                ipAddress: actor.ipAddress,
+                eventType: 'hrp.forecast.update',
+                affectedUserId: row.userId,
+                affectedGroupId: HRP_EMPLOYER_GROUP_IDS.gastro,
+                description: `Geplante Stunden ${label} für Vertrag ${row.contractId}: ${row.plannedHours ?? 'keine'} -> ${hours ?? 'keine'}`,
+            });
+        }
+    });
 }
 
 export async function createPayrollHourly(data: {

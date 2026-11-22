@@ -1,3 +1,4 @@
+import { isValidForecastHours } from '@/lib/hrp/forecast';
 import { z } from '@/lib/zod';
 
 // Arbeitstage als ISO-Wochentage: 1 = Mo … 7 = So.
@@ -80,4 +81,19 @@ export const adminAbsenceCreateSchema = z
 export const adminAbsenceDeleteSchema = z.object({
     ids: z.array(z.string().min(1)).min(1).max(366),
     reason: correctionReasonSchema,
+});
+
+// null removes the plan of this person.
+export const forecastPlanSchema = z.object({
+    year: z.number().int().min(2020).max(2100),
+    month: z.number().int().min(0).max(11),
+    entries: z
+        .array(
+            z.object({
+                contractId: z.string().min(1),
+                hours: z.number().refine(isValidForecastHours, 'Bitte gib die Stunden in Viertelstunden an.').nullable(),
+            }),
+        )
+        .min(1)
+        .max(200),
 });

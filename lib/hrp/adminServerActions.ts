@@ -1,6 +1,6 @@
 'use server';
 
-import type { HrpHolidayConfigEntry, HrpPayrollHourlyForecastEntry } from '@/db/schema';
+import type { HrpHolidayConfigEntry } from '@/db/schema';
 import { getContractAtDate } from '@/lib/db/contractActions';
 import {
     belongToContractUser,
@@ -10,7 +10,6 @@ import {
     getContractById,
     getHolidayConfigById,
     recalculatePayrollFixed,
-    upsertForecast as upsertForecastInDb,
     upsertHolidayConfig as upsertHolidayConfigInDb,
 } from '@/lib/db/hrpAdminActions';
 import { getContractAdminSession } from '@/lib/hrp/adminAccess';
@@ -59,22 +58,6 @@ export async function bookHoliday(holidayId: string, userId: string, contractId:
     }
 
     await bookHolidayInDb(holidayId, userId, contractId, date);
-}
-
-export async function upsertForecast(data: {
-    contractId: string;
-    year: number;
-    month: number;
-    forecastedHours: string;
-}): Promise<HrpPayrollHourlyForecastEntry> {
-    if (!(await canViewPayroll()) || (await getContractAdminSession(data.contractId)) === null) {
-        throw new Error(NOT_ALLOWED);
-    }
-    if (!isValidMonth(data.year, data.month)) {
-        throw new Error('Ungültiger Abrechnungsmonat.');
-    }
-
-    return upsertForecastInDb({ contractId: data.contractId, year: data.year, month: data.month, forecastedHours: data.forecastedHours });
 }
 
 export async function createPayrollHourly(data: {

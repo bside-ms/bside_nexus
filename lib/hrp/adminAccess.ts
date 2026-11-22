@@ -1,6 +1,6 @@
 import type { Session } from 'next-auth';
 import getUserSession from '@/lib/auth/getUserSession';
-import { HRP_CORRECTION_GROUP_IDS } from '@/lib/constants';
+import { HRP_CORRECTION_GROUP_IDS, HRP_EMPLOYER_GROUP_IDS } from '@/lib/constants';
 import { getGroupAdminStatus, isGlobalAdmin } from '@/lib/db/groupActions';
 import type { ContractDetails } from '@/lib/db/hrpAdminActions';
 import { canManageContract, getContractById } from '@/lib/db/hrpAdminActions';
@@ -57,6 +57,32 @@ export async function getContractEditorAccess(contractId: string): Promise<Contr
     }
 
     return { session, contract };
+}
+
+/**
+ * Session of a user who may plan Café hours.
+ */
+export async function getForecastPlannerSession(): Promise<Session['user'] | null> {
+    const session = await getUserSession();
+    if (session === null || !(session.roles?.includes(HRP_ADMIN_ROLE) ?? false)) {
+        return null;
+    }
+
+    if (isGlobalAdmin(session.id)) {
+        return session;
+    }
+
+    const correctionGroupId = HRP_CORRECTION_GROUP_IDS[HRP_EMPLOYER_GROUP_IDS.gastro] ?? null;
+    if (correctionGroupId === null) {
+        return null;
+    }
+
+    const [employerStatus, correctionStatus] = await Promise.all([
+        getGroupAdminStatus(session.id, HRP_EMPLOYER_GROUP_IDS.gastro),
+        getGroupAdminStatus(session.id, correctionGroupId),
+    ]);
+
+    return employerStatus === 'Admin' && correctionStatus !== 'None' ? session : null;
 }
 
 export const buildAdminActor = (session: Session['user'], req: Request, reason: string): HrpAdminActor => ({

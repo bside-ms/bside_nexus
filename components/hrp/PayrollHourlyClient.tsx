@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import type { HrpAbsenceEntry, HrpEventLogEntry, HrpMonthlyPayrollEntry } from '@/db/schema';
 import type { HrpContract } from '@/lib/db/contractActions';
-import { createPayrollHourly, upsertForecast } from '@/lib/hrp/adminServerActions';
+import { createPayrollHourly } from '@/lib/hrp/adminServerActions';
 
 interface UnbilledDayStat {
     dateStr: string;
@@ -32,6 +32,8 @@ interface PayrollHourlyClientProps {
     initialForecast?: string;
     periodMode?: 'calendar' | '23-22' | '15-14';
     isAlreadyFinalized?: boolean;
+    // Only Café contracts are planned by the Thekenleitung.
+    usesForecastPlanning?: boolean;
 }
 
 export function PayrollHourlyClient({
@@ -44,12 +46,14 @@ export function PayrollHourlyClient({
     unbilledDayStats,
     previousPayroll,
     currentPayrollHourly,
-    initialForecast = '0',
+    initialForecast,
     periodMode = '23-22',
     isAlreadyFinalized = false,
+    usesForecastPlanning = false,
 }: PayrollHourlyClientProps): ReactElement {
     const router = useRouter();
-    const [forecastedHours, setForecastedHours] = useState<string>(initialForecast);
+    const plannedHours = initialForecast === undefined ? null : parseFloat(initialForecast);
+    const [forecastedHours, setForecastedHours] = useState<string>(String(plannedHours ?? 0));
 
     const hourlyRate = parseFloat(contract.hourlyRate || '0');
 
@@ -163,13 +167,7 @@ export function PayrollHourlyClient({
             const eventLogIds = unbilledLogs.map((l) => l.id).filter((id) => !excludedLogIds.has(id));
             const absenceIds = unbilledAbsences.map((a) => a.id).filter((id) => !excludedAbsenceIds.has(id));
 
-            await upsertForecast({
-                contractId,
-                year,
-                month,
-                forecastedHours: (parseFloat(forecastedHours) || 0).toFixed(2),
-            });
-
+            // The plan stays as entered. The final value is stored with the payroll.
             await createPayrollHourly({
                 contractId,
                 year,
@@ -221,23 +219,35 @@ export function PayrollHourlyClient({
                             <span>Korrektur Forecast Vormonat:</span>
                             <span className="font-mono">{formatMinutes(correctionMinutes)}</span>
                         </div>
-                        <div className="flex justify-between items-center border-b pb-2">
-                            <label htmlFor="forecast" className="flex-1">
-                                Forecast für Restmonat (h):
-                            </label>
-                            <Input
-                                id="forecast"
-                                type="number"
-                                step="0.5"
-                                value={
-                                    isAlreadyFinalized
-                                        ? parseFloat(currentPayrollHourly?.forecastedHoursLateMonth || '0').toString()
-                                        : forecastedHours
-                                }
-                                onChange={(e) => setForecastedHours(e.target.value)}
-                                className="w-24 text-right"
-                                disabled={isAlreadyFinalized}
-                            />
+                        <div className="border-b pb-2">
+                            <div className="flex justify-between items-center">
+                                <label htmlFor="forecast" className="flex-1">
+                                    Forecast für Restmonat (h):
+                                </label>
+                                <Input
+                                    id="forecast"
+                                    type="number"
+                                    step="0.25"
+                                    value={
+                                        isAlreadyFinalized
+                                            ? parseFloat(currentPayrollHourly?.forecastedHoursLateMonth || '0').toString()
+                                            : forecastedHours
+                                    }
+                                    onChange={(e) => setForecastedHours(e.target.value)}
+                                    className="w-24 text-right"
+                                    disabled={isAlreadyFinalized}
+                                />
+                            </div>
+                            {usesForecastPlanning && !isAlreadyFinalized && plannedHours === null && (
+                                <p className="mt-1 text-xs text-amber-700">Die Thekenleitung hat für diese Person noch nichts geplant.</p>
+                            )}
+                            {usesForecastPlanning && !isAlreadyFinalized && plannedHours !== null && (
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                    {(parseFloat(forecastedHours) || 0) === plannedHours
+                                        ? 'Von der Thekenleitung geplant. Du kannst den Wert vor dem Speichern ändern.'
+                                        : `Geändert. Die Thekenleitung hat ${plannedHours.toLocaleString('de-DE')} h geplant.`}
+                                </p>
+                            )}
                         </div>
                         <div className="flex justify-between items-center border-b pb-2">
                             <label htmlFor="threshold" className="flex-1">
