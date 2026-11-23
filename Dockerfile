@@ -63,8 +63,9 @@ FROM runtime AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Dev tools (eslint, typescript, drizzle-kit, tsx/esbuild) are only needed for the build.
+# Dev tools (eslint, typescript, drizzle-kit) are only needed for the build.
 # Pruning in a separate stage keeps them out of every layer of the final image.
+# tsx is a production dependency because the db:populate cron job runs with it.
 RUN npm run build && npm prune --omit=dev --force && rm -rf /app/.next/cache
 
 FROM runtime AS runner
