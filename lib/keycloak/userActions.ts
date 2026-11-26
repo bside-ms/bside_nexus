@@ -49,3 +49,21 @@ export const keycloakRemoveUserFromGroup = async (userId: string, groupId: strin
 export const keycloakAddUserToGroup = async (userId: string, groupId: string): Promise<string> => {
     return (await getClient()).users.addToGroup({ id: userId, groupId });
 };
+
+export interface KeycloakNameParts {
+    firstName: string;
+    lastName: string;
+}
+
+export const keycloakGetNameParts = async (userIds: Array<string>): Promise<Map<string, KeycloakNameParts>> => {
+    const client = await getClient();
+    const users = await Promise.all(userIds.map(async (id) => client.users.findOne({ id })));
+
+    const names = new Map<string, KeycloakNameParts>();
+    for (const user of users) {
+        if (!isNil(user?.id)) {
+            names.set(user.id, { firstName: user.firstName?.trim() ?? '', lastName: user.lastName?.trim() ?? '' });
+        }
+    }
+    return names;
+};

@@ -1,4 +1,4 @@
-import { CalendarClock, FileCheck, FileText, SquareChartGantt } from 'lucide-react';
+import { CalendarClock, FileCheck, FileText, SquareChartGantt, Thermometer } from 'lucide-react';
 import type { Metadata } from 'next';
 import type { ReactElement } from 'react';
 import NavTile from '@/components/common/NavTile';
@@ -34,6 +34,12 @@ export default async function Page(): Promise<ReactElement> {
             description: 'Einblick in die Stundenzettel von Mitarbeitenden.',
             href: '/hrp/admin/overview',
             icon: SquareChartGantt,
+        },
+        {
+            title: 'Krankheitsliste',
+            description: 'Krankheitszeiten mit Fehlstunden je Abrechnungszeitraum.',
+            href: '/hrp/admin/sick-list',
+            icon: Thermometer,
         },
     ];
 

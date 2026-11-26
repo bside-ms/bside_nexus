@@ -42,7 +42,7 @@ import { v4 as uuidv4 } from 'uuid';
 /**
  *  Hole alle Gruppen-IDs, die ein User verwalten darf
  */
-async function getManagedGroupIds(userId: string): Promise<Array<string>> {
+export async function getManagedGroupIds(userId: string): Promise<Array<string>> {
     const memberships = await db
         .select({ groupId: membersTable.groupId })
         .from(membersTable)
